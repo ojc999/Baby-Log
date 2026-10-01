@@ -1,3 +1,10 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<!-- width=device-width is what makes a phone lay this out at its real width instead of a
+     virtual 980px desktop one. viewport-fit=cover is what makes the env(safe-area-inset-*)
+     rules below resolve to anything other than zero on a notched iPhone. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Baby Log</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -8,13 +15,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: full-height shell. Sticky state header, one screen at a time
+/* Colours are checked against WCAG AA (4.5:1 for body text) by the dark/contrast
+   harness in the development notes. --ink-faint and --amber were nudged after that
+   check; if you change them, re-run it.
+   Layout: full-height shell. Sticky state header, one screen at a time
    (home → category → back), sticky tab bar. Tokens follow
    apps/early-labour-timer so the repo's apps look like one family. */
 :root{
   --ground:#f4f6f5; --surface:#ffffff; --surface-2:#eceff0; --line:#d8dedd;
-  --ink:#141a1f; --ink-dim:#5d6a73; --ink-faint:#8b979f;
-  --amber:#b96e0c; --amber-bg:#fdf1de; --amber-line:#e8c48c;
+  --ink:#141a1f; --ink-dim:#5d6a73; --ink-faint:#66727a;
+  --amber:#a75c00; --amber-bg:#fdf1de; --amber-line:#e8c48c;
   --teal:#0f7d6b; --teal-bg:#def0ec; --teal-line:#8dc9bd;
   --alert:#c0392b; --alert-bg:#fbe6e3; --alert-line:#e7a79f;
   --night:#3f4b8f; --night-bg:#e7eaf8; --night-line:#aeb6e0;
@@ -25,7 +35,7 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --ground:#12161c; --surface:#1a2129; --surface-2:#232c36; --line:#2f3a45;
-  --ink:#e9eef1; --ink-dim:#98a6b2; --ink-faint:#6b7883;
+  --ink:#e9eef1; --ink-dim:#98a6b2; --ink-faint:#87949f;
   --amber:#f0a441; --amber-bg:#2e2313; --amber-line:#6b5222;
   --teal:#4fb3a0; --teal-bg:#122a27; --teal-line:#2a5d54;
   --alert:#e2574c; --alert-bg:#2e1715; --alert-line:#6d302b;
@@ -36,7 +46,7 @@
 }}
 :root[data-theme="dark"]{
   --ground:#12161c; --surface:#1a2129; --surface-2:#232c36; --line:#2f3a45;
-  --ink:#e9eef1; --ink-dim:#98a6b2; --ink-faint:#6b7883;
+  --ink:#e9eef1; --ink-dim:#98a6b2; --ink-faint:#87949f;
   --amber:#f0a441; --amber-bg:#2e2313; --amber-line:#6b5222;
   --teal:#4fb3a0; --teal-bg:#122a27; --teal-line:#2a5d54;
   --alert:#e2574c; --alert-bg:#2e1715; --alert-line:#6d302b;
@@ -69,7 +79,7 @@ body{
 .sync-act{
   appearance:none;margin-left:auto;background:transparent;border:1px solid currentColor;
   color:inherit;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.07em;
-  text-transform:uppercase;border-radius:6px;padding:5px 8px;min-height:28px;cursor:pointer;
+  text-transform:uppercase;border-radius:6px;padding:5px 10px;min-height:44px;min-width:60px;cursor:pointer;
 }
 
 /* ───── state header ───── */
@@ -169,14 +179,14 @@ body{
 .when.armed .when-lbl{color:var(--amber)}
 .chip{
   appearance:none;flex:none;background:transparent;border:1px solid var(--line);color:var(--ink-dim);
-  font-family:var(--mono);font-size:12px;font-weight:600;border-radius:8px;padding:7px 10px;
-  min-height:38px;cursor:pointer;
+  font-family:var(--mono);font-size:13px;font-weight:600;border-radius:8px;padding:7px 11px;
+  min-height:44px;min-width:44px;cursor:pointer;
 }
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
 .chip:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
 .timein{
   flex:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);
-  font-family:var(--mono);font-size:12px;padding:6px 7px;min-height:38px;
+  font-family:var(--mono);font-size:16px;padding:6px 7px;min-height:44px;
 }
 
 /* ───── amount sheet ───── */
@@ -193,7 +203,7 @@ body{
 /* ───── free text ───── */
 .ta{
   width:100%;min-height:56px;resize:vertical;background:var(--surface);border:1px solid var(--line);
-  border-radius:11px;color:var(--ink);font-family:var(--sans);font-size:15px;padding:11px 12px;line-height:1.4;
+  border-radius:11px;color:var(--ink);font-family:var(--sans);font-size:16px;padding:11px 12px;line-height:1.4;
 }
 .ta:focus{outline:2px solid var(--teal);outline-offset:-1px}
 .preview{margin-top:8px;padding:10px 12px;border-radius:10px;font-size:13px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-dim)}
@@ -235,7 +245,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 .field label{display:block;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px}
 .field input{
   width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);
-  font-family:var(--mono);font-size:14px;padding:11px 12px;min-height:46px;
+  font-family:var(--mono);font-size:16px;padding:11px 12px;min-height:46px;
 }
 .field input:focus{outline:2px solid var(--teal);outline-offset:-1px}
 .field p{margin:5px 0 0;font-size:11.5px;color:var(--ink-faint);line-height:1.4}
@@ -701,10 +711,13 @@ var entries = [];            // every entry this device knows: its own plus any 
 var dirty   = {};            // { 'YYYY-MM-DD': true } days this device still owes GitHub
 var shas    = {};            // { path: blob sha } so a push does not need a read first
 var cfg     = { who: '', device: '', repo: '', branch: 'main', token: '' };
+var PULL_EVERY_MS = 60000;   /* at most one read-back a minute unless asked */
 var lastErr = '';
 var lastPush = '';
 var lastPull = '';
 var pushing = false;
+var lastPullMs = 0;        /* throttles the read-back of the other phone */
+var absorbed = 0;          /* rows recovered from our own remote file, see absorbOwn */
 
 var screen = 'home';         // home | cat
 var curCat = null;
@@ -908,6 +921,43 @@ function jsonlFor(day) {
     }).join('\n') + '\n';
 }
 
+/* Take rows out of this device's own remote file that this browser does not hold, and
+   keep them as ours. Two ways that file can hold entries we have never seen:
+
+     - this browser's storage was cleared, or the app was opened in a second browser;
+     - both phones were given the same device name, so they are writing one file.
+
+   The second is the dangerous one. Rewriting the file whole from our copy — which is
+   what every push does — would delete the other phone's night feeds without a word.
+   Taking the unknown rows into our copy first means the push writes the union, so
+   whichever phone pushes last, nothing is lost. Returns how many were taken. */
+function absorbOwn(text, day) {
+  var have = {};
+  entries.forEach(function (r) { have[r.msg_id] = true; });
+  var taken = 0;
+  text.split('\n').forEach(function (line) {
+    line = line.trim();
+    if (!line) return;
+    var r;
+    try { r = JSON.parse(line); } catch (e) { return; }   /* next push carries it */
+    if (!r.msg_id || have[r.msg_id]) return;
+    r.ms = msFromIso(r.ts);
+    if (daySG(r.ms) !== day) return;                      /* only the day being pushed */
+    r.own = true;
+    r.device = cfg.device || 'this-device';
+    entries.push(r);
+    have[r.msg_id] = true;
+    taken++;
+  });
+  if (taken) {
+    entries.sort(function (a, b) { return a.ms - b.ms; });
+    saveEntries();
+    absorbed += taken;
+    render();
+  }
+  return taken;
+}
+
 /* Rewrite this device's whole file for one day. Idempotent — safe to repeat. */
 function pushDay(day) {
   var path = dayPath(day);
@@ -930,8 +980,12 @@ function pushDay(day) {
         .then(function (g) {
           if (g.ok && g.json && g.json.sha) { shas[path] = g.json.sha; saveShas(); }
           else { delete shas[path]; saveShas(); }
+          /* Never overwrite rows we have not seen — take them first, then push the union. */
+          var took = (g.ok && g.json && g.json.content) ? absorbOwn(b64dec(g.json.content), day) : 0;
           var b2 = {
-            message: body.message, content: body.content, branch: body.branch
+            message: body.message,
+            content: took ? b64enc(jsonlFor(day)) : body.content,
+            branch: body.branch
           };
           if (shas[path]) b2.sha = shas[path];
           return gh('PUT', '/contents/' + path, b2).then(function (r2) {
@@ -959,7 +1013,16 @@ function flush(manual) {
   if (pushing) return Promise.resolve();
   if (!configured()) { paintSync(); return Promise.resolve(); }
   var days = Object.keys(dirty).filter(function (d) { return dirty[d]; }).sort();
-  if (!days.length) { if (manual) pullToday(); paintSync(); return Promise.resolve(); }
+  if (!days.length) {
+    /* Nothing of ours to push, but the other phone may have logged the night feeds.
+       Read it back anyway. This used to happen only on a manual sync, and the Sync now
+       button is hidden whenever everything is saved — so a phone with an empty queue
+       never saw the other one's entries at all. Throttled so that opening and
+       re-focusing the app repeatedly does not hammer the API. */
+    if (manual || Date.now() - lastPullMs > PULL_EVERY_MS) { lastPullMs = Date.now(); pullToday(); }
+    paintSync();
+    return Promise.resolve();
+  }
 
   pushing = true;
   lastErr = '';
@@ -969,6 +1032,7 @@ function flush(manual) {
   function step() {
     if (i >= days.length) {
       pushing = false;
+      lastPullMs = Date.now();
       lastPush = isoSG(Date.now());
       saveDirty();
       paintSync(); renderDiag();
@@ -1320,6 +1384,13 @@ function renderDiag() {
   L.push('last push     ' + (lastPush || 'never'));
   L.push('last read     ' + (lastPull || 'never'));
   L.push('writes to     ' + (cfg.device ? dayPath(daySG(Date.now())) : '—'));
+  if (absorbed) {
+    L.push('');
+    L.push('recovered     ' + absorbed + ' row(s) were already in this device\'s own file and');
+    L.push('              this browser did not have them, so they were kept rather');
+    L.push('              than overwritten. If this keeps happening, two phones are');
+    L.push('              probably sharing one device name — give them different ones.');
+  }
   L.push('');
   L.push(lastErr ? 'LAST ERROR\n' + lastErr : 'last error    none');
   $('diag').textContent = L.join('\n');

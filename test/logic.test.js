@@ -63,10 +63,13 @@ A.undo(e3.msg_id);
 t('undo keeps the row', A.entries().length, 3);
 t('undo marks it deleted', A.entries().find(r=>r.msg_id===e3.msg_id).type, 'deleted');
 
-// The field names and order of the archive format, as a synthetic row. Deliberately not a
-// read of the real archive: that made the suite unrunnable anywhere but one laptop, and
-// real entries must never reach this repo. Keep in step with docs/background.md §6.
-const real = JSON.parse(fs.readFileSync(__dirname + '/schema-fixture.jsonl','utf8').trim().split('\n')[0]);
+// The archive format's field names and order, as a synthetic row held inline. Deliberately
+// not a read of the real archive: that made the suite unrunnable anywhere but one laptop,
+// and real entries must never reach this repo. Inline rather than a fixture file because
+// .gitignore excludes *.jsonl here on purpose, and that guard should stay absolute.
+// Keep in step with docs/background.md §6.
+const real = JSON.parse('{"ts":"2026-01-02T03:14:00+08:00","sender":"EXAMPLE","type":"sleep",' +
+  '"subtype":"start","value":null,"unit":"","note":"","raw":"asleep now","msg_id":"web-example-0001"}');
 const out = A.jsonlFor('2026-10-01').trim().split('\n').map(JSON.parse);
 t('export has all three incl deleted', out.length, 3);
 t('field names and order match archive', JSON.stringify(Object.keys(out[0])), JSON.stringify(Object.keys(real)));
