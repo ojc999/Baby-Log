@@ -1,0 +1,67 @@
+# Serve the app from the PRIVATE data repo, publishing only the app folder.
+#
+# Use this only if you want one repo instead of two, and you are on a plan that allows
+# GitHub Pages from a private repository (Pro or above).
+#
+#   1. Copy this file to .github/workflows/pages.yml in the DATA repo.
+#   2. Settings → Pages → Build and deployment → Source: GitHub Actions.
+#
+# WHY THIS FILE EXISTS: branch-based Pages can only publish "/" or "/docs". Pointing it
+# at "/" in the data repo would publish data/ to the open internet. The `path:` below is
+# the only thing standing between your data and a public URL, so read it, and never
+# widen it to ".".
+#
+# Remember the site itself is public whatever the repo's visibility. That is fine: the
+# app holds no secret and no data. Just do not let anything else get uploaded with it.
+
+name: Deploy Baby Log to Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/baby-log-web/**']     # only rebuild when the app changes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Do not publish a page whose logic is broken.
+      - run: node apps/baby-log-web/test/logic.test.js
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Belt and braces: fail loudly rather than publish anything from data/.
+      - name: Refuse to publish if the app folder contains data
+        run: |
+          if [ -e apps/baby-log-web/data ]; then
+            echo "apps/baby-log-web/data exists — refusing to publish." >&2
+            exit 1
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/baby-log-web      # ONLY this folder. Never "."
+      - id: deployment
+        uses: actions/deploy-pages@v4

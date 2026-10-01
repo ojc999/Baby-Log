@@ -1,0 +1,7 @@
+.DS_Store
+node_modules/
+*.log
+
+# Never commit baby data into this repo. It belongs in the private data repo.
+data/
+*.jsonl

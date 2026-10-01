@@ -1,0 +1,1655 @@
+<title>Baby Log</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#161b2e">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: full-height shell. Sticky state header, one screen at a time
+   (home → category → back), sticky tab bar. Tokens follow
+   apps/early-labour-timer so the repo's apps look like one family. */
+:root{
+  --ground:#f4f6f5; --surface:#ffffff; --surface-2:#eceff0; --line:#d8dedd;
+  --ink:#141a1f; --ink-dim:#5d6a73; --ink-faint:#8b979f;
+  --amber:#b96e0c; --amber-bg:#fdf1de; --amber-line:#e8c48c;
+  --teal:#0f7d6b; --teal-bg:#def0ec; --teal-line:#8dc9bd;
+  --alert:#c0392b; --alert-bg:#fbe6e3; --alert-line:#e7a79f;
+  --night:#3f4b8f; --night-bg:#e7eaf8; --night-line:#aeb6e0;
+  --mum:#8a4a86; --mum-bg:#f6e9f5; --mum-line:#d4aed1;
+  --leaf:#4a6a2f; --leaf-bg:#eaf2e0; --leaf-line:#b6cf98;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#12161c; --surface:#1a2129; --surface-2:#232c36; --line:#2f3a45;
+  --ink:#e9eef1; --ink-dim:#98a6b2; --ink-faint:#6b7883;
+  --amber:#f0a441; --amber-bg:#2e2313; --amber-line:#6b5222;
+  --teal:#4fb3a0; --teal-bg:#122a27; --teal-line:#2a5d54;
+  --alert:#e2574c; --alert-bg:#2e1715; --alert-line:#6d302b;
+  --night:#8e9ae8; --night-bg:#1a1e35; --night-line:#39406b;
+  --mum:#cd90c8; --mum-bg:#2a1a29; --mum-line:#5a3657;
+  --leaf:#a3c479; --leaf-bg:#1b2414; --leaf-line:#44572c;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --ground:#12161c; --surface:#1a2129; --surface-2:#232c36; --line:#2f3a45;
+  --ink:#e9eef1; --ink-dim:#98a6b2; --ink-faint:#6b7883;
+  --amber:#f0a441; --amber-bg:#2e2313; --amber-line:#6b5222;
+  --teal:#4fb3a0; --teal-bg:#122a27; --teal-line:#2a5d54;
+  --alert:#e2574c; --alert-bg:#2e1715; --alert-line:#6d302b;
+  --night:#8e9ae8; --night-bg:#1a1e35; --night-line:#39406b;
+  --mum:#cd90c8; --mum-bg:#2a1a29; --mum-line:#5a3657;
+  --leaf:#a3c479; --leaf-bg:#1b2414; --leaf-line:#44572c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.45;overscroll-behavior:none;
+  -webkit-text-size-adjust:100%;touch-action:manipulation;
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.app{display:flex;flex-direction:column;height:100%}
+.pane{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px 26px}
+.pane[hidden],[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ───── sync strip ───── */
+.sync{
+  flex:none;display:flex;align-items:center;gap:8px;padding:6px 16px;
+  font-size:11px;font-weight:600;letter-spacing:.03em;
+  background:var(--teal-bg);border-bottom:1px solid var(--teal-line);color:var(--teal);
+}
+.sync.warn{background:var(--amber-bg);border-bottom-color:var(--amber-line);color:var(--amber)}
+.sync.bad{background:var(--alert-bg);border-bottom-color:var(--alert-line);color:var(--alert)}
+.sync-act{
+  appearance:none;margin-left:auto;background:transparent;border:1px solid currentColor;
+  color:inherit;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;border-radius:6px;padding:5px 8px;min-height:28px;cursor:pointer;
+}
+
+/* ───── state header ───── */
+.state{
+  flex:none;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;
+  background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px 9px;
+}
+.state-main{display:flex;align-items:baseline;gap:9px}
+.state-lbl{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.11em;text-transform:uppercase}
+.state-lbl.asleep{color:var(--night)}
+.state-lbl.awake{color:var(--amber)}
+.state-dur{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.state-since{margin-left:auto;font-size:12px;color:var(--ink-faint);text-align:right}
+
+/* ───── last-X cards ───── */
+.lastgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.lcard{padding:10px 11px;border:1px solid var(--line);border-radius:11px;background:var(--surface);min-width:0}
+.lcard dt{font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint)}
+.lcard dd{margin:3px 0 0;font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.lcard dd small{display:block;font-family:var(--sans);font-size:11px;font-weight:500;color:var(--ink-faint);letter-spacing:0;margin-top:1px}
+.lcard.stale dd{color:var(--amber)}
+
+/* ───── section headings ───── */
+.sect{margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.sect:first-child{margin-top:2px}
+.sect h2{margin:0;font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint)}
+.sect hr{flex:1;border:0;border-top:1px solid var(--line);margin:0}
+
+/* ───── buttons ───── */
+.grid{display:grid;gap:9px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.btn{
+  appearance:none;background:var(--surface);border:1px solid var(--line);color:var(--ink);
+  font-family:var(--sans);font-size:14px;font-weight:600;border-radius:12px;
+  padding:13px 8px;min-height:56px;cursor:pointer;text-align:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  transition:transform .06s ease,background .12s ease;
+}
+.btn:active{transform:scale(.97);background:var(--surface-2)}
+.btn:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.btn small{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--ink-faint);letter-spacing:.03em}
+.btn.big{min-height:84px;font-size:20px;font-weight:700;border-radius:14px;letter-spacing:-.01em}
+.btn.night{background:var(--night-bg);border-color:var(--night-line);color:var(--night)}
+.btn.amberb{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber)}
+.btn.tealb{background:var(--teal-bg);border-color:var(--teal-line);color:var(--teal)}
+.btn.mumb{background:var(--mum-bg);border-color:var(--mum-line);color:var(--mum)}
+.btn.leafb{background:var(--leaf-bg);border-color:var(--leaf-line);color:var(--leaf)}
+.btn.quiet{font-size:13px;min-height:50px;color:var(--ink-dim);font-weight:600}
+.btn.solid{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+
+/* ───── category tiles (home) ───── */
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tile{
+  appearance:none;border:1px solid var(--line);border-radius:14px;background:var(--surface);
+  color:var(--ink);font-family:var(--sans);text-align:left;cursor:pointer;
+  padding:14px 14px 13px;min-height:92px;display:flex;flex-direction:column;gap:3px;
+  transition:transform .06s ease;
+}
+.tile:active{transform:scale(.98)}
+.tile:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.tile b{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.tile span{font-size:11.5px;color:var(--ink-faint);line-height:1.35}
+.tile em{
+  margin-top:auto;font-style:normal;font-family:var(--mono);font-size:11px;font-weight:600;
+  color:var(--ink-dim);font-variant-numeric:tabular-nums;
+}
+.tile.wide{grid-column:1/-1;min-height:66px;flex-direction:row;align-items:center;gap:10px}
+.tile.wide b{font-size:15px}
+.tile.wide em{margin:0 0 0 auto}
+.tile.t-sleep{background:var(--night-bg);border-color:var(--night-line)}
+.tile.t-sleep b{color:var(--night)}
+.tile.t-feed{background:var(--amber-bg);border-color:var(--amber-line)}
+.tile.t-feed b{color:var(--amber)}
+.tile.t-nappy{background:var(--teal-bg);border-color:var(--teal-line)}
+.tile.t-nappy b{color:var(--teal)}
+.tile.t-hyg{background:var(--leaf-bg);border-color:var(--leaf-line)}
+.tile.t-hyg b{color:var(--leaf)}
+
+/* ───── back bar ───── */
+.back{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.back button{
+  appearance:none;background:var(--surface);border:1px solid var(--line);color:var(--ink-dim);
+  font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.04em;
+  border-radius:9px;padding:8px 11px;min-height:38px;cursor:pointer;
+}
+.back h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+
+/* ───── when row ───── */
+.when{
+  display:flex;align-items:center;gap:6px;margin:10px 0 2px;padding:7px 8px;
+  border:1px solid var(--line);border-radius:11px;background:var(--surface);
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+}
+.when.armed{background:var(--amber-bg);border-color:var(--amber-line)}
+.when-lbl{flex:none;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);padding-left:3px}
+.when.armed .when-lbl{color:var(--amber)}
+.chip{
+  appearance:none;flex:none;background:transparent;border:1px solid var(--line);color:var(--ink-dim);
+  font-family:var(--mono);font-size:12px;font-weight:600;border-radius:8px;padding:7px 10px;
+  min-height:38px;cursor:pointer;
+}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.chip:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.timein{
+  flex:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+  font-family:var(--mono);font-size:12px;padding:6px 7px;min-height:38px;
+}
+
+/* ───── amount sheet ───── */
+.sheet{margin-top:9px;padding:12px;border:1px solid var(--amber-line);border-radius:12px;background:var(--amber-bg)}
+.sheet.mums{border-color:var(--mum-line);background:var(--mum-bg)}
+.sheet.plain{border-color:var(--line);background:var(--surface-2)}
+.sheet-head{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim)}
+.sheet-val{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--ink);margin-left:auto;font-variant-numeric:tabular-nums}
+.sheet-row{display:flex;flex-wrap:wrap;gap:6px}
+.sheet-row .chip{background:var(--surface)}
+.sheet-act{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:10px}
+.sheet-act .btn{min-height:50px;font-size:15px}
+
+/* ───── free text ───── */
+.ta{
+  width:100%;min-height:56px;resize:vertical;background:var(--surface);border:1px solid var(--line);
+  border-radius:11px;color:var(--ink);font-family:var(--sans);font-size:15px;padding:11px 12px;line-height:1.4;
+}
+.ta:focus{outline:2px solid var(--teal);outline-offset:-1px}
+.preview{margin-top:8px;padding:10px 12px;border-radius:10px;font-size:13px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-dim)}
+.preview b{color:var(--ink);font-weight:600}
+.preview.note{background:var(--amber-bg);border-color:var(--amber-line);color:var(--amber)}
+
+/* ───── rows / timeline ───── */
+.row{display:flex;align-items:flex-start;gap:11px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.row-t{flex:none;width:44px;font-family:var(--mono);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink-dim);padding-top:1px}
+.row-b{flex:1;min-width:0}
+.row-b strong{font-weight:600;font-size:14px}
+.row-b em{font-style:normal;color:var(--ink-faint);font-size:12px;display:block;margin-top:1px;word-break:break-word}
+.row-who{flex:none;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);padding-top:3px}
+.row.del{opacity:.42}
+.row.del strong{text-decoration:line-through}
+.row.pend .row-t::after{content:"\00B7";color:var(--amber);font-size:20px;vertical-align:middle}
+.del-tag{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--alert);text-transform:uppercase}
+.row-x{appearance:none;flex:none;background:transparent;border:0;color:var(--ink-faint);font-size:17px;line-height:1;padding:5px 7px;cursor:pointer;border-radius:7px;min-height:34px}
+.row-x:focus-visible{outline:2px solid var(--alert);outline-offset:1px}
+.empty{padding:26px 12px;text-align:center;color:var(--ink-faint);font-size:13px}
+
+/* ───── notices ───── */
+.gap{margin:10px 0;padding:10px 12px;border:1px dashed var(--alert-line);border-radius:10px;background:var(--alert-bg);color:var(--alert);font-size:12px;font-weight:500}
+.info{margin:10px 0;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-dim);font-size:12.5px}
+.info b{color:var(--ink)}
+
+/* ───── week table ───── */
+.wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.week{border-collapse:collapse;width:100%;font-size:13px}
+table.week th,table.week td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.week th{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint)}
+table.week td{font-family:var(--mono);font-variant-numeric:tabular-nums}
+table.week th:first-child,table.week td:first-child{text-align:left}
+table.week tr.today td{color:var(--ink);font-weight:600}
+table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink-faint);font-weight:500;font-size:11px}
+
+/* ───── setup ───── */
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px}
+.field input{
+  width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);
+  font-family:var(--mono);font-size:14px;padding:11px 12px;min-height:46px;
+}
+.field input:focus{outline:2px solid var(--teal);outline-offset:-1px}
+.field p{margin:5px 0 0;font-size:11.5px;color:var(--ink-faint);line-height:1.4}
+.diag{font-family:var(--mono);font-size:11.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--ink-dim)}
+.foot{margin-top:20px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint)}
+.foot p{margin:0 0 8px}
+.foot code{font-family:var(--mono);font-size:11px;background:var(--surface-2);padding:1px 4px;border-radius:4px}
+
+/* ───── tabs ───── */
+.tabs{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab{
+  appearance:none;border:0;background:var(--surface);color:var(--ink-dim);font-family:var(--sans);
+  font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  padding:14px 4px 13px;cursor:pointer;min-height:54px;
+}
+.tab[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 var(--teal)}
+.tab:focus-visible{outline:2px solid var(--teal);outline-offset:-3px}
+</style>
+
+<div class="app">
+  <div class="sync" id="sync" hidden>
+    <span id="sync-txt"></span>
+    <button class="sync-act" id="sync-btn">Sync now</button>
+  </div>
+
+  <header class="state">
+    <div class="state-main">
+      <span class="state-lbl" id="state-lbl">&mdash;</span>
+      <span class="state-dur" id="state-dur">&mdash;</span>
+      <span class="state-since" id="state-since"></span>
+    </div>
+  </header>
+
+  <!-- ═══════════ HOME ═══════════ -->
+  <div class="pane" id="pane-home">
+    <dl class="lastgrid" id="lastgrid"></dl>
+    <div class="sect"><h2>Log something</h2><hr></div>
+    <div class="tiles">
+      <button class="tile t-sleep" data-go="sleep">
+        <b>Sleep</b><span>Down and up</span><em id="tile-sleep"></em>
+      </button>
+      <button class="tile t-feed" data-go="feed">
+        <b>Feed</b><span>Bottle, breast, formula</span><em id="tile-feed"></em>
+      </button>
+      <button class="tile t-nappy" data-go="nappy">
+        <b>Diapers</b><span>Wet, dirty, both</span><em id="tile-nappy"></em>
+      </button>
+      <button class="tile t-hyg" data-go="hygiene">
+        <b>Hygiene</b><span>Bath, nails, hair</span><em id="tile-hygiene"></em>
+      </button>
+      <button class="tile wide" data-go="more">
+        <b>More</b><span>Growth, temperature, medicine, notes</span><em id="tile-more"></em>
+      </button>
+    </div>
+    <div id="home-recent"></div>
+  </div>
+
+  <!-- ═══════════ CATEGORY ═══════════ -->
+  <div class="pane" id="pane-cat" hidden>
+    <div class="back">
+      <button id="cat-back">&larr; Back</button>
+      <h1 id="cat-title"></h1>
+    </div>
+
+    <div class="when" id="when">
+      <span class="when-lbl" id="when-lbl">When</span>
+      <button class="chip" data-off="0" aria-pressed="true">now</button>
+      <button class="chip" data-off="5">&minus;5</button>
+      <button class="chip" data-off="15">&minus;15</button>
+      <button class="chip" data-off="30">&minus;30</button>
+      <button class="chip" data-off="60">&minus;60</button>
+      <input class="timein" id="when-time" type="time" aria-label="Or pick a time earlier today">
+    </div>
+
+    <div id="cat-body"></div>
+
+    <div class="sheet" id="sheet" hidden>
+      <div class="sheet-head">
+        <span id="sheet-title"></span>
+        <span class="sheet-val"><span id="sheet-num">0</span><span id="sheet-unit"></span></span>
+      </div>
+      <div class="sheet-row" id="sheet-presets"></div>
+      <div class="sheet-row" id="sheet-side" style="margin-top:6px"></div>
+      <div class="sheet-act">
+        <button class="btn" id="sheet-cancel">Cancel</button>
+        <button class="btn solid" id="sheet-save">Save</button>
+      </div>
+    </div>
+
+    <div class="sect"><h2 id="free-head">Or write it</h2><hr></div>
+    <label class="sr" for="free">Type an entry the way you would say it</label>
+    <textarea class="ta" id="free" rows="2"></textarea>
+    <div class="preview" id="preview" hidden></div>
+    <div class="grid g2" style="margin-top:8px">
+      <button class="btn quiet" id="free-clear">Clear</button>
+      <button class="btn quiet" id="free-save" style="font-weight:700">Save entry</button>
+    </div>
+
+    <div class="sect"><h2>Recent</h2><hr></div>
+    <div id="cat-recent"></div>
+  </div>
+
+  <!-- ═══════════ SUMMARY ═══════════ -->
+  <div class="pane" id="pane-sum" hidden>
+    <div class="sect"><h2>Today so far</h2><hr></div>
+    <dl class="lastgrid" id="sum-today"></dl>
+    <div id="sum-gaps"></div>
+
+    <div class="sect"><h2>Last seven days</h2><hr></div>
+    <div class="wrap"><table class="week" id="sum-week"></table></div>
+    <p class="info" id="sum-weeknote"></p>
+
+    <div class="sect"><h2>Growth</h2><hr></div>
+    <div id="sum-growth"></div>
+
+    <div class="sect"><h2>Everything logged</h2><hr></div>
+    <div id="sum-timeline"></div>
+  </div>
+
+  <!-- ═══════════ SETUP ═══════════ -->
+  <div class="pane" id="pane-set" hidden>
+    <div class="sect"><h2>Who and where</h2><hr></div>
+    <div class="field">
+      <label for="in-who">Your name</label>
+      <input id="in-who" type="text" autocomplete="off" placeholder="Simon">
+      <p>Stored on every entry, so you can see who did which night feed.</p>
+    </div>
+    <div class="field">
+      <label for="in-device">This device</label>
+      <input id="in-device" type="text" autocomplete="off" placeholder="simon-phone">
+      <p>Lowercase, no spaces. Each device writes its own file in the repo, which is
+      why two phones can log at the same time without ever clashing.</p>
+    </div>
+    <div class="field">
+      <label for="in-repo">Private data repo</label>
+      <input id="in-repo" type="text" autocomplete="off" placeholder="owner/private-repo">
+      <p>Owner slash name. This must be a <b>private</b> repo.</p>
+    </div>
+    <div class="field">
+      <label for="in-branch">Branch</label>
+      <input id="in-branch" type="text" autocomplete="off" placeholder="main">
+    </div>
+    <div class="field">
+      <label for="in-token">GitHub token</label>
+      <input id="in-token" type="password" autocomplete="off" placeholder="github_pat_...">
+      <p>A fine-grained token limited to that one repo, Contents: Read and write, and
+      nothing else. It is kept in this browser only and never leaves it except to talk
+      to GitHub. Revoke it from GitHub settings at any time.</p>
+    </div>
+    <div class="grid g2">
+      <button class="btn quiet" id="set-clear">Forget token</button>
+      <button class="btn solid" id="set-test">Save and test</button>
+    </div>
+
+    <div class="sect"><h2>Diagnostics</h2><hr></div>
+    <div class="diag" id="diag">&mdash;</div>
+    <div class="grid g2" style="margin-top:9px">
+      <button class="btn quiet" id="set-copy">Copy today as JSONL</button>
+      <button class="btn quiet" id="set-push">Force full re-push</button>
+    </div>
+
+    <div class="foot">
+      <p><b>Nothing is ever deleted here.</b> Undo marks an entry <code>deleted</code> and
+      keeps it, the way the archive does.</p>
+      <p>Entries are kept in this browser and pushed to
+      <code>data/events/&lt;date&gt;/&lt;device&gt;.jsonl</code>. A Claude Code session
+      compacts those into <code>data/raw/&lt;date&gt;.jsonl</code> when you ask it to.</p>
+      <p>Without a token the app still works and keeps everything locally &mdash; it just
+      does not push. Nothing is lost; it syncs once a token is set.</p>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" id="tab-log" role="tab" aria-selected="true">Log</button>
+    <button class="tab" id="tab-sum" role="tab" aria-selected="false">Summary</button>
+    <button class="tab" id="tab-set" role="tab" aria-selected="false">Setup</button>
+  </nav>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════════════
+   Baby Log
+
+   Four categories at the top, buttons inside, everything pushed to a private
+   GitHub repo. No server: the browser talks to the GitHub API directly.
+
+   Writes go to  data/events/<YYYY-MM-DD>/<device>.jsonl
+   Each device only ever writes its own file, so two phones never clash. Each
+   push rewrites that file whole from this device's local copy, so a push is
+   idempotent and re-running one is always safe.
+
+   The PARSER block below is a port of apps/baby-log-bot/Parser.gs. It is
+   behaviourally identical and passes that file's own 21-case test suite
+   unchanged; the only edits are cosmetic (one local renamed to stop it
+   shadowing another). Do not edit it here. Edit it there, re-run its tests,
+   re-copy.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────── PARSER (verbatim port) ───────────────────────── */
+
+var WORDS = {
+  sleepStart: ['down', 'asleep', 'sleep', 'sleeping', 'slept', 'zzz', 'nap', 'napping'],
+  sleepEnd:   ['up', 'awake', 'woke', 'wake', 'awoke', 'waking'],
+  breast:     ['bf', 'breast', 'latch', 'latched', 'nurse', 'nursed', 'nursing'],
+  expressed:  ['ebm', 'expressed', 'pumped'],
+  formula:    ['formula', 'fm'],
+  feedGeneric:['fed', 'feed', 'bottle'],
+  wet:        ['pee', 'peed', 'wee', 'weed', 'wet'],
+  dirty:      ['poo', 'poop', 'pooped', 'pooed', 'dirty', 'soiled', 'meconium', 'bm'],
+  both:       ['both'],
+  vomit:      ['vomit', 'vomited', 'spit', 'spitup', 'posset', 'possetted'],
+  pump:       ['pump', 'pumped', 'pumping', 'expressing'],
+  bath:       ['bath', 'bathed', 'bathing'],
+  cry:        ['cry', 'cried', 'crying', 'fussy', 'fussing', 'colic', 'unsettled'],
+  tummy:      ['tummy', 'tummytime'],
+  undo:       ['no', 'undo', 'oops', 'delete', 'wrong', 'cancel']
+};
+
+var CONSUMING = /^(note|milestone|vax|vaccine|med|meds|medicine)\b\s*([\s\S]*)$/;
+
+function parseMessage(text, nowMs) {
+  var raw = String(text || '').trim();
+  if (!raw) return { events: [], matched: false, tsShift: 0 };
+  var lower = raw.toLowerCase();
+  var shifted = extractTime_(lower, nowMs);
+  var ts = shifted.ts;
+  var body = shifted.rest;
+  var tsShift = ts - nowMs;
+
+  if (isWord_(body, WORDS.undo)) {
+    return { events: [{ type: 'undo', subtype: '', value: '', unit: '', note: '', ts: ts }],
+             matched: true, tsShift: tsShift };
+  }
+  var c = body.match(CONSUMING);
+  if (c) {
+    var ev0 = consumingEvent_(c[1], raw.replace(/^\S+\s*/, '').trim() || c[2], ts);
+    return { events: [ev0], matched: true, tsShift: tsShift };
+  }
+  var parts = body.split(/\s*(?:,|\+|\bthen\b)\s*/).filter(function (p) { return p.trim(); });
+  if (!parts.length) parts = [body];
+
+  var events = [];
+  for (var i = 0; i < parts.length; i++) {
+    var ev = parsePart_(parts[i].trim(), ts);
+    if (ev) events.push(ev);
+  }
+  if (!events.length) return { events: [], matched: false, tsShift: tsShift };
+  return { events: events, matched: true, tsShift: tsShift };
+}
+
+function consumingEvent_(kw, text, ts) {
+  text = String(text || '').trim();
+  if (kw === 'vax' || kw === 'vaccine')                   return ev_('vax', '', '', '', text, ts);
+  if (kw === 'med' || kw === 'meds' || kw === 'medicine') return ev_('med', '', '', '', text, ts);
+  if (kw === 'milestone')                                 return ev_('milestone', '', '', '', text, ts);
+  return ev_('note', '', '', '', text, ts);
+}
+
+function parsePart_(part, ts) {
+  if (!part) return null;
+  var m;
+  m = part.match(/(\d+(?:\.\d+)?)\s*kg\b/);
+  if (m) return ev_('measure', 'weight', num_(m[1]), 'kg', rest_(part, m[0]), ts);
+  m = part.match(/\bhead\D{0,8}(\d+(?:\.\d+)?)\s*cm\b/) || part.match(/\bhc\D{0,8}(\d+(?:\.\d+)?)/);
+  if (m) return ev_('measure', 'head', num_(m[1]), 'cm', rest_(part, m[0]), ts);
+  m = part.match(/(\d+(?:\.\d+)?)\s*cm\b/);
+  if (m) return ev_('measure', 'length', num_(m[1]), 'cm', rest_(part, m[0]), ts);
+  m = part.match(/\btemp\w*\D{0,4}(\d{2}(?:\.\d+)?)/) || part.match(/(\d{2}\.\d)\s*(?:c|deg)\b/);
+  if (m) return ev_('measure', 'temp', num_(m[1]), 'C', rest_(part, m[0]), ts);
+
+  if (isWord_(part, WORDS.pump)) {
+    var pm = part.match(/(\d+(?:\.\d+)?)/);
+    return ev_('pump', '', pm ? num_(pm[1]) : '', pm ? 'ml' : '', '', ts);
+  }
+  if (isWord_(part, WORDS.cry)) {
+    var cm = part.match(/(\d+)/);
+    return ev_('cry', '', cm ? num_(cm[1]) : '', cm ? 'min' : '', '', ts);
+  }
+  if (isWord_(part, WORDS.tummy)) {
+    var tm = part.match(/(\d+)/);
+    return ev_('tummy', '', tm ? num_(tm[1]) : '', tm ? 'min' : '', '', ts);
+  }
+  if (isWord_(part, WORDS.bath)) return ev_('bath', '', '', '', '', ts);
+
+  m = part.match(/(\d+(?:\.\d+)?)\s*(?:ml|mls)\b/);
+  if (m) {
+    var sub = isWord_(part, WORDS.formula) ? 'formula'
+            : isWord_(part, WORDS.expressed) ? 'expressed'
+            : 'bottle';
+    return ev_('feed', sub, num_(m[1]), 'ml', rest_(part, m[0]), ts);
+  }
+  if (isWord_(part, WORDS.breast)) {
+    var mins = part.match(/(\d+)\s*(?:min|mins|m)?\b/);
+    var side = part.match(/(?:^|[^a-z])(left|right|l|r)(?:[^a-z]|$)/);
+    var sideNote = side ? (side[1].charAt(0) === 'l' ? 'left' : 'right') : '';
+    return ev_('feed', 'breast', mins ? num_(mins[1]) : '', mins ? 'min' : '',
+               sideNote || rest_(part, mins ? mins[0] : ''), ts);
+  }
+  if (isWord_(part, WORDS.expressed)) return ev_('feed', 'expressed', '', '', '', ts);
+  if (isWord_(part, WORDS.formula))   return ev_('feed', 'formula', '', '', '', ts);
+
+  var wet   = isWord_(part, WORDS.wet);
+  var dirty = isWord_(part, WORDS.dirty);
+  if (isWord_(part, WORDS.both) || (wet && dirty)) return ev_('nappy', 'both', '', '', '', ts);
+  if (dirty) return ev_('nappy', 'dirty', '', '', '', ts);
+  if (wet)   return ev_('nappy', 'wet', '', '', '', ts);
+  if (isWord_(part, WORDS.vomit)) return ev_('vomit', '', '', '', '', ts);
+  if (isWord_(part, WORDS.sleepEnd))   return ev_('sleep', 'end', '', '', '', ts);
+  if (isWord_(part, WORDS.sleepStart)) return ev_('sleep', 'start', '', '', '', ts);
+  if (isWord_(part, WORDS.feedGeneric)) return ev_('feed', '', '', '', '', ts);
+  return null;
+}
+
+function extractTime_(text, nowMs) {
+  var m = text.match(/(?:^|\s)-(\d{1,3})(?=\s|$)/);
+  if (m) return { ts: nowMs - num_(m[1]) * 60000, rest: text.replace(m[0], ' ').trim() };
+  m = text.match(/(?:^|\s)@\s?(\d{1,2})[:.]?(\d{2})\s?(am|pm)?(?=\s|$)/);
+  if (m) {
+    var h = num_(m[1]), min = num_(m[2]), ap = m[3];
+    if (ap === 'pm' && h < 12) h += 12;
+    if (ap === 'am' && h === 12) h = 0;
+    var d = new Date(nowMs);
+    d.setHours(h, min, 0, 0);
+    if (d.getTime() > nowMs + 60000) d.setDate(d.getDate() - 1);
+    return { ts: d.getTime(), rest: text.replace(m[0], ' ').trim() };
+  }
+  return { ts: nowMs, rest: text };
+}
+
+function ev_(type, subtype, value, unit, note, ts) {
+  return { type: type, subtype: subtype, value: value, unit: unit, note: note || '', ts: ts };
+}
+function isWord_(text, list) {
+  for (var i = 0; i < list.length; i++) {
+    if (new RegExp('(?:^|[^a-z])' + list[i] + '(?:[^a-z]|$)').test(text)) return true;
+  }
+  return false;
+}
+function num_(s) { var n = parseFloat(s); return isNaN(n) ? '' : n; }
+function rest_(part, matched) {
+  return part.replace(matched, ' ')
+             .replace(/\b(fed|feed|bottle|of|at|ml|mls)\b/g, ' ')
+             .replace(/\s+/g, ' ').trim();
+}
+
+/* ═══════════════════════ what each category offers ═══════════════════════ */
+
+var CATS = {
+  sleep: {
+    title: 'Sleep', tone: 'night',
+    groups: [{ cols: 2, items: [
+      { t: 'sleep', s: 'start', label: 'Asleep now', big: true },
+      { t: 'sleep', s: 'end',   label: 'Awake now',  big: true }
+    ] }],
+    hint: 'Both buttons are always available. If you missed one, log the other anyway — ' +
+          'an unpaired entry shows up on the summary as a missed message rather than ' +
+          'being quietly patched over.',
+    free: 'down · up · down -20 · up @0214'
+  },
+  feed: {
+    title: 'Feed', tone: 'amberb',
+    groups: [
+      { cols: 2, items: [
+        { sheet: 'bottle' }, { sheet: 'breast' }, { sheet: 'formula' }, { sheet: 'expressed' }
+      ] },
+      { head: 'Mum', cols: 2, items: [{ sheet: 'pump' }] },
+      { head: 'Came back up', cols: 2, items: [{ t: 'vomit', s: '', label: 'Vomit', tone: '' }] }
+    ],
+    hint: 'Expressing is stored as its own kind of entry, never as a feed. Expressing ' +
+          '80 ml and him drinking 80 ml are different events and must not be added together.',
+    free: '60ml · bf 20 · bf left 20 · formula 90'
+  },
+  nappy: {
+    title: 'Diapers', tone: 'tealb',
+    groups: [{ cols: 3, items: [
+      { t: 'nappy', s: 'wet',   label: 'Wet',   big: true },
+      { t: 'nappy', s: 'dirty', label: 'Dirty', big: true },
+      { t: 'nappy', s: 'both',  label: 'Both',  big: true }
+    ] }],
+    free: 'pee · poo · both'
+  },
+  hygiene: {
+    title: 'Hygiene', tone: 'leafb',
+    groups: [{ cols: 2, items: [
+      { t: 'hygiene', s: 'bath',  label: 'Bath' },
+      { t: 'hygiene', s: 'wipe',  label: 'Top and tail' },
+      { t: 'hygiene', s: 'nails', label: 'Nails cut' },
+      { t: 'hygiene', s: 'hair',  label: 'Hair wash' },
+      { t: 'hygiene', s: 'cord',  label: 'Cord care' },
+      { t: 'hygiene', s: 'cream', label: 'Cream' }
+    ] }],
+    free: 'anything not on a button'
+  },
+  more: {
+    title: 'More', tone: '',
+    groups: [
+      { head: 'Growth', cols: 3, items: [
+        { sheet: 'weight' }, { sheet: 'length' }, { sheet: 'head' }
+      ] },
+      { head: 'Unwell', cols: 2, items: [{ sheet: 'temp' }, { sheet: 'cry' }] },
+      { head: 'Play', cols: 2, items: [{ sheet: 'tummy' }] },
+      { head: 'Needs a few words', cols: 2, items: [
+        { prefill: 'med ',       label: 'Medicine',    sub: 'then type it' },
+        { prefill: 'vax ',       label: 'Vaccination', sub: 'then type it' },
+        { prefill: 'milestone ', label: 'Milestone',   sub: 'then type it' },
+        { prefill: 'note ',      label: 'Note',        sub: 'then type it' }
+      ] }
+    ],
+    hint: 'The four on the bottom row fill in the box below and keep every word you ' +
+          'write. Nothing after them is interpreted, so "note why is he not pooping" ' +
+          'does not log a dirty nappy.',
+    free: '3.4kg · 50cm · head 35cm · temp 37.8'
+  }
+};
+
+var SHEETS = {
+  bottle:   { title: 'Bottle',        t: 'feed',    s: 'bottle',    unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150, 180] },
+  breast:   { title: 'Breast',        t: 'feed',    s: 'breast',    unit: 'min', step: 5,    dec: 0, presets: [5, 10, 15, 20, 25, 30], sides: true },
+  formula:  { title: 'Formula',       t: 'feed',    s: 'formula',   unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150, 180] },
+  expressed:{ title: 'EBM',           t: 'feed',    s: 'expressed', unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150] },
+  pump:     { title: 'Expressed',     t: 'pump',    s: '',          unit: 'ml',  step: 10,   dec: 0, presets: [40, 60, 80, 100, 120, 150], tone: 'mums' },
+  cry:      { title: 'Unsettled',     t: 'cry',     s: '',          unit: 'min', step: 5,    dec: 0, presets: [5, 10, 15, 30, 45, 60], tone: 'plain' },
+  tummy:    { title: 'Tummy time',    t: 'tummy',   s: '',          unit: 'min', step: 1,    dec: 0, presets: [2, 5, 10, 15, 20], tone: 'plain' },
+  temp:     { title: 'Temperature',   t: 'measure', s: 'temp',      unit: 'C',   step: 0.1,  dec: 1, presets: [36.5, 37, 37.5, 38, 38.5, 39], tone: 'plain' },
+  weight:   { title: 'Weight',        t: 'measure', s: 'weight',    unit: 'kg',  step: 0.05, dec: 2, presets: [3, 3.5, 4, 4.5, 5, 6], tone: 'plain' },
+  length:   { title: 'Length',        t: 'measure', s: 'length',    unit: 'cm',  step: 0.5,  dec: 1, presets: [50, 52, 54, 56, 58, 60], tone: 'plain' },
+  head:     { title: 'Head',          t: 'measure', s: 'head',      unit: 'cm',  step: 0.5,  dec: 1, presets: [34, 36, 38, 40, 42], tone: 'plain' }
+};
+
+var LABELS = {
+  'sleep/start': 'Went down', 'sleep/end': 'Woke up',
+  'nappy/wet': 'Wet nappy', 'nappy/dirty': 'Dirty nappy', 'nappy/both': 'Wet and dirty',
+  'hygiene/bath': 'Bath', 'hygiene/wipe': 'Top and tail', 'hygiene/nails': 'Nails cut',
+  'hygiene/hair': 'Hair wash', 'hygiene/cord': 'Cord care', 'hygiene/cream': 'Cream',
+  'feed/bottle': 'Bottle', 'feed/breast': 'Breastfeed', 'feed/formula': 'Formula',
+  'feed/expressed': 'Expressed milk', 'feed/': 'Feed',
+  'measure/weight': 'Weight', 'measure/length': 'Length', 'measure/head': 'Head',
+  'measure/temp': 'Temperature',
+  'pump/': 'Mum expressed', 'cry/': 'Unsettled', 'tummy/': 'Tummy time', 'vomit/': 'Vomit',
+  'med/': 'Medicine', 'vax/': 'Vaccination', 'milestone/': 'Milestone', 'note/': 'Note',
+  'bath/': 'Bath'
+};
+
+/* which category a type belongs to, for the "recent" lists */
+var CAT_OF = {
+  sleep: 'sleep', feed: 'feed', pump: 'feed', vomit: 'feed',
+  nappy: 'nappy', hygiene: 'hygiene', bath: 'hygiene',
+  measure: 'more', cry: 'more', tummy: 'more', med: 'more', vax: 'more',
+  milestone: 'more', note: 'more'
+};
+
+/* ═══════════════════════ state ═══════════════════════ */
+
+var TZ = 'Asia/Singapore';   // no daylight saving, so the offset is always +08:00
+var LS = {
+  entries: 'babylog.entries.v2',
+  dirty:   'babylog.dirty.v2',
+  cfg:     'babylog.cfg.v2',
+  shas:    'babylog.shas.v2'
+};
+
+var entries = [];            // every entry this device knows: its own plus any pulled in
+var dirty   = {};            // { 'YYYY-MM-DD': true } days this device still owes GitHub
+var shas    = {};            // { path: blob sha } so a push does not need a read first
+var cfg     = { who: '', device: '', repo: '', branch: 'main', token: '' };
+var lastErr = '';
+var lastPush = '';
+var lastPull = '';
+var pushing = false;
+
+var screen = 'home';         // home | cat
+var curCat = null;
+var offsetMin = 0;
+var absTime = '';            // 'HH:MM' from the time picker, wins over offsetMin
+var sheetKind = null, sheetVal = 0, sheetSide = '';
+
+function lsGet(k, dflt) {
+  try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : dflt; }
+  catch (e) { return dflt; }
+}
+function lsSet(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+  catch (e) { lastErr = 'Could not save locally: ' + (e && e.message ? e.message : e); return false; }
+}
+
+function loadAll() {
+  entries = lsGet(LS.entries, []) || [];
+  if (!Array.isArray(entries)) entries = [];
+  dirty = lsGet(LS.dirty, {}) || {};
+  shas  = lsGet(LS.shas, {}) || {};
+  var c = lsGet(LS.cfg, null);
+  if (c) for (var k in cfg) if (c[k] !== undefined) cfg[k] = c[k];
+}
+function saveEntries() { lsSet(LS.entries, entries); }
+function saveDirty()   { lsSet(LS.dirty, dirty); }
+function saveCfg()     { lsSet(LS.cfg, cfg); }
+function saveShas()    { lsSet(LS.shas, shas); }
+
+/* ═══════════════════════ time ═══════════════════════ */
+
+function sgParts(ms) {
+  var f = new Intl.DateTimeFormat('en-GB', {
+    timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+  var o = {};
+  f.formatToParts(new Date(ms)).forEach(function (p) { o[p.type] = p.value; });
+  if (o.hour === '24') o.hour = '00';
+  return o;
+}
+function isoSG(ms) {
+  var p = sgParts(ms);
+  return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute + ':' + p.second + '+08:00';
+}
+function daySG(ms) { var p = sgParts(ms); return p.year + '-' + p.month + '-' + p.day; }
+function hhmm(ms) { var p = sgParts(ms); return p.hour + ':' + p.minute; }
+function msFromIso(iso) { var t = Date.parse(iso); return isNaN(t) ? Date.now() : t; }
+function dayLabel(d) {
+  var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var p = d.split('-');
+  return Number(p[2]) + ' ' + m[Number(p[1]) - 1] + ' ' + p[0];
+}
+function dayShort(d) {
+  var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var p = d.split('-');
+  return Number(p[2]) + ' ' + m[Number(p[1]) - 1];
+}
+function dur(ms) {
+  var mins = Math.max(0, Math.round(ms / 60000));
+  var h = Math.floor(mins / 60), m = mins % 60;
+  return h ? h + 'h ' + m + 'm' : m + 'm';
+}
+function ago(ms) { return dur(Date.now() - ms); }
+
+/* The timestamp the next entry gets: an explicit time wins, else the offset. */
+function stamp() {
+  if (absTime) {
+    var hm = absTime.split(':');
+    var p = sgParts(Date.now());
+    // build the chosen wall-clock time in Singapore, then step back a day if it is ahead
+    var t = Date.parse(p.year + '-' + p.month + '-' + p.day + 'T' +
+                       ('0' + hm[0]).slice(-2) + ':' + ('0' + hm[1]).slice(-2) + ':00+08:00');
+    if (isNaN(t)) return Date.now();
+    if (t > Date.now() + 60000) t -= 86400000;
+    return t;
+  }
+  return Date.now() - offsetMin * 60000;
+}
+
+/* ═══════════════════════ writing an entry ═══════════════════════ */
+
+function uid() {
+  return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+}
+
+function add(type, subtype, value, unit, note, raw, ms) {
+  var when = (ms === undefined || ms === null) ? stamp() : ms;
+  var e = {
+    ms: when, ts: isoSG(when), sender: cfg.who || 'me', type: type, subtype: subtype || '',
+    value: (value === '' || value === undefined || value === null) ? null : value,
+    unit: unit || '', note: note || '', raw: raw || '', msg_id: uid(),
+    own: true, device: cfg.device || 'this-device'
+  };
+  entries.push(e);
+  entries.sort(function (a, b) { return a.ms - b.ms; });
+  dirty[daySG(when)] = true;
+  saveEntries(); saveDirty();
+  return e;
+}
+
+function live() { return entries.filter(function (r) { return r.type !== 'deleted'; }); }
+
+/* Undo marks the entry deleted and keeps it. It never removes it. */
+function undo(id) {
+  for (var i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].msg_id === id && entries[i].type !== 'deleted') {
+      if (!entries[i].own) { toast('That one was logged on another device. Undo it there.'); return; }
+      entries[i].type = 'deleted';
+      entries[i].subtype = '';
+      dirty[daySG(entries[i].ms)] = true;
+      saveEntries(); saveDirty();
+      afterWrite();
+      return;
+    }
+  }
+}
+
+function label(r) {
+  var k = r.type + '/' + (r.subtype || '');
+  return LABELS[k] || LABELS[r.type + '/'] || r.type;
+}
+
+function describe(r) {
+  var base = label(r);
+  if (r.value !== null && r.value !== '' && r.value !== undefined) {
+    var u = r.unit === 'C' ? '°C' : (r.unit ? ' ' + r.unit : '');
+    base += ' ' + r.value + u;
+  }
+  if (r.note === 'left' || r.note === 'right') base += ', ' + r.note;
+  return base;
+}
+
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* Sleep pairing. An unpaired entry is a missed message and must stay visible. */
+function sleepIntervals(rows) {
+  var out = { pairs: [], unpaired: [] }, open = null;
+  rows.filter(function (r) { return r.type === 'sleep'; })
+      .sort(function (a, b) { return a.ms - b.ms; })
+      .forEach(function (r) {
+        if (r.subtype === 'start') { if (open) out.unpaired.push(open); open = r; }
+        else { if (!open) { out.unpaired.push(r); return; }
+               out.pairs.push({ start: open, end: r, ms: r.ms - open.ms }); open = null; }
+      });
+  if (open) out.unpaired.push(open);
+  return out;
+}
+
+/* ═══════════════════════ GitHub ═══════════════════════ */
+/* The browser calls the API directly. GitHub sends Access-Control-Allow-Origin: *,
+   so no server is needed anywhere. */
+
+function b64enc(str) {
+  var bytes = new TextEncoder().encode(str), bin = '';
+  for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64dec(s) {
+  var bin = atob(String(s).replace(/\s/g, ''));
+  var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function configured() { return !!(cfg.token && cfg.repo && cfg.device); }
+
+function gh(method, path, body) {
+  return fetch('https://api.github.com/repos/' + cfg.repo + path, {
+    method: method,
+    headers: {
+      Authorization: 'Bearer ' + cfg.token,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function (res) {
+    return res.text().then(function (txt) {
+      var json = null;
+      try { json = txt ? JSON.parse(txt) : null; } catch (e) {}
+      return { ok: res.ok, status: res.status, json: json, text: txt };
+    });
+  });
+}
+
+function dayPath(day) { return 'data/events/' + day + '/' + cfg.device + '.jsonl'; }
+
+function jsonlFor(day) {
+  return entries
+    .filter(function (r) { return r.own && daySG(r.ms) === day; })
+    .sort(function (a, b) { return a.ms - b.ms; })
+    .map(function (r) {
+      return JSON.stringify({
+        ts: r.ts, sender: r.sender, type: r.type, subtype: r.subtype,
+        value: r.value, unit: r.unit, note: r.note, raw: r.raw, msg_id: r.msg_id
+      });
+    }).join('\n') + '\n';
+}
+
+/* Rewrite this device's whole file for one day. Idempotent — safe to repeat. */
+function pushDay(day) {
+  var path = dayPath(day);
+  var body = {
+    message: 'Log ' + day + ' (' + cfg.device + ')',
+    content: b64enc(jsonlFor(day)),
+    branch: cfg.branch || 'main'
+  };
+  if (shas[path]) body.sha = shas[path];
+
+  return gh('PUT', '/contents/' + path, body).then(function (r) {
+    if (r.ok && r.json && r.json.content) {
+      shas[path] = r.json.content.sha;
+      saveShas();
+      return true;
+    }
+    // 409/422 with a sha problem: our cached sha is stale. Re-read it and retry once.
+    if (r.status === 409 || r.status === 422) {
+      return gh('GET', '/contents/' + path + '?ref=' + encodeURIComponent(cfg.branch || 'main'))
+        .then(function (g) {
+          if (g.ok && g.json && g.json.sha) { shas[path] = g.json.sha; saveShas(); }
+          else { delete shas[path]; saveShas(); }
+          var b2 = {
+            message: body.message, content: body.content, branch: body.branch
+          };
+          if (shas[path]) b2.sha = shas[path];
+          return gh('PUT', '/contents/' + path, b2).then(function (r2) {
+            if (r2.ok && r2.json && r2.json.content) {
+              shas[path] = r2.json.content.sha; saveShas(); return true;
+            }
+            throw new Error(ghErr(r2, path));
+          });
+        });
+    }
+    throw new Error(ghErr(r, path));
+  });
+}
+
+function ghErr(r, path) {
+  var msg = (r.json && r.json.message) ? r.json.message : (r.text || '').slice(0, 160);
+  if (r.status === 401) msg = 'Token rejected (401). It may be wrong, expired or revoked.';
+  if (r.status === 403) msg = 'Forbidden (403). The token is probably missing Contents: Read and write.';
+  if (r.status === 404) msg = 'Not found (404). Check the repo name and branch, and that the token can see this repo.';
+  return r.status + ' on ' + path + ' — ' + msg;
+}
+
+/* Push every day this device still owes, oldest first. */
+function flush(manual) {
+  if (pushing) return Promise.resolve();
+  if (!configured()) { paintSync(); return Promise.resolve(); }
+  var days = Object.keys(dirty).filter(function (d) { return dirty[d]; }).sort();
+  if (!days.length) { if (manual) pullToday(); paintSync(); return Promise.resolve(); }
+
+  pushing = true;
+  lastErr = '';
+  paintSync();
+
+  var i = 0;
+  function step() {
+    if (i >= days.length) {
+      pushing = false;
+      lastPush = isoSG(Date.now());
+      saveDirty();
+      paintSync(); renderDiag();
+      return pullToday();
+    }
+    var d = days[i++];
+    if (!entries.some(function (r) { return r.own && daySG(r.ms) === d; })) {
+      delete dirty[d]; saveDirty();   // nothing of ours on that day; nothing to write
+      return step();
+    }
+    return pushDay(d).then(function () {
+      delete dirty[d];
+      saveDirty(); paintSync();
+      return step();
+    }).catch(function (err) {
+      pushing = false;
+      lastErr = (err && err.message) ? err.message : String(err);
+      saveDirty(); paintSync(); renderDiag();
+      // nothing is lost: the day stays dirty and the next attempt picks it up
+    });
+  }
+  return step();
+}
+
+/* Pull the other devices' entries for today, so the summary is the whole picture. */
+function pullToday() {
+  if (!configured()) return Promise.resolve();
+  var day = daySG(Date.now());
+  return gh('GET', '/contents/data/events/' + day +
+                   '?ref=' + encodeURIComponent(cfg.branch || 'main'))
+    .then(function (r) {
+      if (!r.ok || !Array.isArray(r.json)) return null;   // folder not there yet: fine
+      var mine = cfg.device + '.jsonl';
+      var others = r.json.filter(function (f) {
+        return f.type === 'file' && /\.jsonl$/.test(f.name) && f.name !== mine;
+      });
+      return Promise.all(others.map(function (f) {
+        return gh('GET', '/contents/' + f.path +
+                         '?ref=' + encodeURIComponent(cfg.branch || 'main'))
+          .then(function (g) {
+            if (!g.ok || !g.json || !g.json.content) return;
+            mergeForeign(b64dec(g.json.content), f.name.replace(/\.jsonl$/, ''), day);
+          });
+      })).then(function () {
+        lastPull = isoSG(Date.now());
+        saveEntries(); render(); renderDiag();
+      });
+    })
+    .catch(function (err) {
+      lastErr = 'Read-back failed: ' + ((err && err.message) ? err.message : String(err));
+      renderDiag();
+    });
+}
+
+/* Entries from another device are read-only here. That device's file is the whole
+   truth for its own day, so replace exactly that device's entries for that day —
+   not its other days, which this pull says nothing about. */
+function mergeForeign(text, device, day) {
+  var incoming = [];
+  text.split('\n').forEach(function (line) {
+    line = line.trim();
+    if (!line) return;
+    try {
+      var r = JSON.parse(line);
+      r.own = false;
+      r.device = device;
+      r.ms = msFromIso(r.ts);
+      incoming.push(r);
+    } catch (e) { /* a half-written line: skip it, the next pull will have it whole */ }
+  });
+  entries = entries.filter(function (r) {
+    return r.own || r.device !== device || daySG(r.ms) !== day;
+  }).concat(incoming);
+  entries.sort(function (a, b) { return a.ms - b.ms; });
+}
+
+/* ═══════════════════════ rendering ═══════════════════════ */
+
+function $(id) { return document.getElementById(id); }
+
+function lastOf(pred) {
+  var rows = live().filter(pred);
+  return rows.length ? rows[rows.length - 1] : null;
+}
+
+function lcard(label, main, sub, stale) {
+  return '<div class="lcard' + (stale ? ' stale' : '') + '"><dt>' + label + '</dt>' +
+         '<dd>' + main + '<small>' + sub + '</small></dd></div>';
+}
+
+/* The "how long since" cards. This is the bit you read at 3am. */
+function renderLast() {
+  var feed  = lastOf(function (r) { return r.type === 'feed'; });
+  var poo   = lastOf(function (r) { return r.type === 'nappy' && (r.subtype === 'dirty' || r.subtype === 'both'); });
+  var wet   = lastOf(function (r) { return r.type === 'nappy' && (r.subtype === 'wet' || r.subtype === 'both'); });
+  var bath  = lastOf(function (r) { return r.type === 'hygiene' && r.subtype === 'bath'; }) ||
+              lastOf(function (r) { return r.type === 'bath'; });
+  var pump  = lastOf(function (r) { return r.type === 'pump'; });
+
+  function card(lbl, r, extra, staleAfterH) {
+    if (!r) return lcard(lbl, '—', 'nothing logged yet', false);
+    var h = (Date.now() - r.ms) / 3600000;
+    return lcard(lbl, ago(r.ms), (extra ? extra(r) + ' · ' : '') + hhmm(r.ms),
+                 staleAfterH && h > staleAfterH);
+  }
+
+  $('lastgrid').innerHTML =
+    card('Last feed', feed, function (r) {
+      return r.value !== null ? r.value + (r.unit === 'min' ? ' min' : ' ml') : label(r);
+    }, 4) +
+    card('Last poop', poo, null, 30) +
+    card('Last wet', wet, null, 6) +
+    card('Last bath', bath, null, null) +
+    (pump ? lcard('Mum last expressed', ago(pump.ms),
+                  (pump.value !== null ? pump.value + ' ml · ' : '') + hhmm(pump.ms), false) : '');
+}
+
+function renderState() {
+  var sleeps = live().filter(function (r) { return r.type === 'sleep'; });
+  var last = sleeps[sleeps.length - 1];
+  var asleep = last && last.subtype === 'start';
+  var el = $('state-lbl');
+  el.textContent = !last ? 'No sleep logged' : (asleep ? 'Asleep' : 'Awake');
+  el.className = 'state-lbl ' + (!last ? '' : asleep ? 'asleep' : 'awake');
+  $('state-dur').textContent = last ? ago(last.ms) : '—';
+  $('state-since').textContent = last ? 'since ' + hhmm(last.ms) : 'tap Sleep to start';
+}
+
+function renderTiles() {
+  var today = daySG(Date.now());
+  var rows = live().filter(function (r) { return daySG(r.ms) === today; });
+  function n(pred) { return rows.filter(pred).length; }
+  var feeds = rows.filter(function (r) { return r.type === 'feed'; });
+  var ml = feeds.reduce(function (a, r) { return a + (r.unit === 'ml' && r.value ? r.value : 0); }, 0);
+  var si = sleepIntervals(rows);
+  var slept = si.pairs.reduce(function (a, p) { return a + p.ms; }, 0);
+
+  $('tile-sleep').textContent   = si.pairs.length ? dur(slept) + ' today' : 'none today';
+  $('tile-feed').textContent    = feeds.length ? feeds.length + ' today' + (ml ? ' · ' + ml + ' ml' : '') : 'none today';
+  $('tile-nappy').textContent   = n(function (r) { return r.type === 'nappy'; }) + ' today';
+  $('tile-hygiene').textContent = n(function (r) { return r.type === 'hygiene' || r.type === 'bath'; }) + ' today';
+  $('tile-more').textContent    = n(function (r) { return CAT_OF[r.type] === 'more'; }) + ' today';
+}
+
+function rowHtml(r, showDate) {
+  var del = r.type === 'deleted';
+  var pending = r.own && dirty[daySG(r.ms)];
+  return '<div class="row' + (del ? ' del' : '') + (pending ? ' pend' : '') + '">' +
+    '<span class="row-t">' + hhmm(r.ms) + '</span>' +
+    '<span class="row-b"><strong>' + (del ? 'Undone' : esc(describe(r))) + '</strong>' +
+      (showDate ? '<em>' + dayShort(daySG(r.ms)) + (r.note && !del ? ' · ' + esc(r.note) : '') + '</em>'
+        : (del ? '<em><span class="del-tag">kept in the record</span> ' + esc(r.raw || r.note) + '</em>'
+               : (r.note && r.note !== 'left' && r.note !== 'right' ? '<em>' + esc(r.note) + '</em>' : ''))) +
+    '</span>' +
+    '<span class="row-who">' + esc(r.sender) + '</span>' +
+    (del ? '' : '<button class="row-x" data-del="' + esc(r.msg_id) + '" aria-label="Undo">&times;</button>') +
+  '</div>';
+}
+
+function renderHomeRecent() {
+  var rows = entries.slice(-6).reverse();
+  $('home-recent').innerHTML = rows.length
+    ? '<div class="sect"><h2>Just logged</h2><hr></div>' +
+      rows.map(function (r) { return rowHtml(r, false); }).join('')
+    : '<p class="info">Nothing logged yet. Pick a category above.</p>';
+}
+
+function renderCat() {
+  var c = CATS[curCat];
+  if (!c) return;
+  $('cat-title').textContent = c.title;
+
+  var html = '';
+  c.groups.forEach(function (g) {
+    if (g.head) html += '<div class="sect"><h2>' + g.head + '</h2><hr></div>';
+    html += '<div class="grid g' + (g.cols || 2) + '">';
+    g.items.forEach(function (it) {
+      if (it.sheet) {
+        var sc = SHEETS[it.sheet];
+        html += '<button class="btn ' + (c.tone || '') + '" data-sheet="' + it.sheet + '">' +
+                sc.title + '<small>' + (sc.unit === 'C' ? '°C' : sc.unit) + '</small></button>';
+      } else if (it.prefill) {
+        html += '<button class="btn quiet" data-prefill="' + esc(it.prefill) + '">' +
+                it.label + '<small>' + (it.sub || '') + '</small></button>';
+      } else {
+        var tone = it.tone === undefined ? (c.tone || '') : it.tone;
+        html += '<button class="btn ' + tone + (it.big ? ' big' : '') +
+                '" data-ev="' + it.t + ':' + it.s + '">' + it.label + '</button>';
+      }
+    });
+    html += '</div>';
+  });
+  if (c.hint) html += '<p class="info">' + c.hint + '</p>';
+  $('cat-body').innerHTML = html;
+
+  $('free').placeholder = c.free || '';
+  $('free-head').textContent = 'Or write it';
+
+  var rows = live().filter(function (r) { return CAT_OF[r.type] === curCat; }).slice(-8).reverse();
+  $('cat-recent').innerHTML = rows.length
+    ? rows.map(function (r) { return rowHtml(r, true); }).join('')
+    : '<p class="empty">Nothing in this category yet.</p>';
+}
+
+function renderSummary() {
+  var today = daySG(Date.now());
+  var rows = live().filter(function (r) { return daySG(r.ms) === today; });
+  var feeds = rows.filter(function (r) { return r.type === 'feed'; });
+  var ml = feeds.reduce(function (a, r) { return a + (r.unit === 'ml' && r.value ? r.value : 0); }, 0);
+  var bf = feeds.reduce(function (a, r) { return a + (r.unit === 'min' && r.value ? r.value : 0); }, 0);
+  var nap = rows.filter(function (r) { return r.type === 'nappy'; });
+  var wet = nap.filter(function (r) { return r.subtype === 'wet' || r.subtype === 'both'; }).length;
+  var dirt = nap.filter(function (r) { return r.subtype === 'dirty' || r.subtype === 'both'; }).length;
+  var si = sleepIntervals(rows);
+  var slept = si.pairs.reduce(function (a, p) { return a + p.ms; }, 0);
+  var longest = si.pairs.reduce(function (a, p) { return Math.max(a, p.ms); }, 0);
+  var cry = rows.filter(function (r) { return r.type === 'cry'; })
+                .reduce(function (a, r) { return a + (r.value || 0); }, 0);
+  var pumped = rows.filter(function (r) { return r.type === 'pump'; })
+                   .reduce(function (a, r) { return a + (r.value || 0); }, 0);
+
+  $('sum-today').innerHTML =
+    lcard('Feeds', feeds.length, ml ? ml + ' ml' + (bf ? ' + ' + bf + ' min' : '') : (bf ? bf + ' min' : 'no volumes'), false) +
+    lcard('Slept', si.pairs.length ? dur(slept) : '—', si.pairs.length ? 'longest ' + dur(longest) : 'no complete sleeps', false) +
+    lcard('Wet', wet, 'nappies', false) +
+    lcard('Dirty', dirt, 'nappies', dirt === 0) +
+    (cry ? lcard('Unsettled', cry, 'minutes', false) : '') +
+    (pumped ? lcard('Mum expressed', pumped, 'ml', false) : '');
+
+  $('sum-gaps').innerHTML = si.unpaired.length
+    ? '<div class="gap"><b>' + si.unpaired.length + ' unpaired sleep entr' +
+      (si.unpaired.length === 1 ? 'y' : 'ies') + '</b> today, at ' +
+      si.unpaired.map(function (r) { return hhmm(r.ms) + ' (' + r.subtype + ')'; }).join(', ') +
+      '. An entry was missed. The gap is left visible rather than guessed at, so today’s ' +
+      'sleep total is an undercount.</div>'
+    : '';
+
+  // seven days back, oldest at the bottom
+  var days = [];
+  for (var i = 0; i < 7; i++) days.push(daySG(Date.now() - i * 86400000));
+  var head = '<tr><th>Day</th><th>Feeds</th><th>ml</th><th>Wet</th><th>Dirty</th><th>Slept</th></tr>';
+  var body = days.map(function (d) {
+    var rr = live().filter(function (r) { return daySG(r.ms) === d; });
+    if (!rr.length) {
+      return '<tr' + (d === today ? ' class="today"' : '') + '><td>' + dayShort(d) +
+             '</td><td colspan="5" style="text-align:right;color:var(--ink-faint)">nothing logged</td></tr>';
+    }
+    var f = rr.filter(function (r) { return r.type === 'feed'; });
+    var v = f.reduce(function (a, r) { return a + (r.unit === 'ml' && r.value ? r.value : 0); }, 0);
+    var nn = rr.filter(function (r) { return r.type === 'nappy'; });
+    var s2 = sleepIntervals(rr);
+    var sl = s2.pairs.reduce(function (a, p) { return a + p.ms; }, 0);
+    return '<tr' + (d === today ? ' class="today"' : '') + '>' +
+      '<td>' + dayShort(d) + '</td>' +
+      '<td>' + f.length + '</td>' +
+      '<td>' + (v || '—') + '</td>' +
+      '<td>' + nn.filter(function (r) { return r.subtype === 'wet' || r.subtype === 'both'; }).length + '</td>' +
+      '<td>' + nn.filter(function (r) { return r.subtype === 'dirty' || r.subtype === 'both'; }).length + '</td>' +
+      '<td>' + (s2.pairs.length ? dur(sl) : '—') + (s2.unpaired.length ? '*' : '') + '</td></tr>';
+  }).join('');
+  $('sum-week').innerHTML = head + body;
+  $('sum-weeknote').innerHTML =
+    'Counts only what is in this app — this device plus whatever the other one had ' +
+    'pushed when it was last read. A <b>*</b> marks a day with an unpaired sleep entry, ' +
+    'so its total is an undercount. For anything beyond a week, ask a Claude Code session ' +
+    'to chart <code>data/raw/</code>.';
+
+  var growth = {};
+  live().filter(function (r) { return r.type === 'measure'; })
+        .forEach(function (r) { growth[r.subtype] = r; });
+  var gk = [['weight', 'kg'], ['length', 'cm'], ['head', 'cm'], ['temp', '°C']];
+  var any = gk.some(function (k) { return growth[k[0]]; });
+  $('sum-growth').innerHTML = any
+    ? '<dl class="lastgrid">' + gk.filter(function (k) { return growth[k[0]]; }).map(function (k) {
+        var r = growth[k[0]];
+        return lcard(LABELS['measure/' + k[0]], r.value + (k[1] === '°C' ? k[1] : ' ' + k[1]),
+                     dayShort(daySG(r.ms)), false);
+      }).join('') + '</dl>'
+    : '<p class="info">No measurements yet. Log one under <b>More</b>.</p>';
+
+  var all = entries.slice().reverse();
+  $('sum-timeline').innerHTML = all.length
+    ? all.slice(0, 120).map(function (r) { return rowHtml(r, true); }).join('') +
+      (all.length > 120 ? '<p class="info">Showing the most recent 120 of ' + all.length +
+       '. Everything is in the repo.</p>' : '')
+    : '<p class="empty">Nothing logged yet.</p>';
+}
+
+function render() {
+  renderState(); renderLast(); renderTiles(); renderHomeRecent();
+  if (screen === 'cat') renderCat();
+  if (!$('pane-sum').hidden) renderSummary();
+}
+
+/* ═══════════════════════ sync status & diagnostics ═══════════════════════ */
+
+function dirtyCount() {
+  var n = 0;
+  var days = Object.keys(dirty).filter(function (d) { return dirty[d]; });
+  entries.forEach(function (r) { if (r.own && days.indexOf(daySG(r.ms)) !== -1) n++; });
+  return n;
+}
+
+function paintSync() {
+  var el = $('sync'), txt = $('sync-txt'), btn = $('sync-btn');
+  if (!configured()) {
+    el.hidden = false; el.className = 'sync warn';
+    txt.textContent = 'Not connected — kept on this phone only';
+    btn.textContent = 'Set up';
+    return;
+  }
+  var n = dirtyCount();
+  if (lastErr) {
+    el.hidden = false; el.className = 'sync bad';
+    txt.textContent = (n ? n + ' waiting · ' : '') + 'sync failed';
+    btn.textContent = 'Retry';
+    return;
+  }
+  if (pushing) {
+    el.hidden = false; el.className = 'sync';
+    txt.textContent = 'Saving to the repo…';
+    btn.textContent = 'Wait';
+    return;
+  }
+  if (n) {
+    el.hidden = false; el.className = 'sync warn';
+    txt.textContent = n + (n === 1 ? ' entry' : ' entries') + ' not saved yet';
+    btn.textContent = 'Sync now';
+    return;
+  }
+  el.hidden = true;
+}
+
+function renderDiag() {
+  var L = [];
+  L.push((cfg.who ? 'ok       ' : 'not set  ') + 'name          ' + (cfg.who || ''));
+  L.push((cfg.device ? 'ok       ' : 'MISSING  ') + 'device        ' + (cfg.device || ''));
+  L.push((cfg.repo ? 'ok       ' : 'MISSING  ') + 'repo          ' + (cfg.repo || ''));
+  L.push('ok       branch        ' + (cfg.branch || 'main'));
+  L.push((cfg.token ? 'ok       ' : 'MISSING  ') + 'token         ' +
+         (cfg.token ? 'stored in this browser' : 'none'));
+  L.push('');
+  L.push('entries here  ' + entries.length + ' (' +
+         entries.filter(function (r) { return r.own; }).length + ' from this device)');
+  L.push('not yet saved ' + dirtyCount() +
+         (Object.keys(dirty).filter(function (d) { return dirty[d]; }).length
+           ? ' on ' + Object.keys(dirty).filter(function (d) { return dirty[d]; }).sort().join(', ')
+           : ''));
+  L.push('last push     ' + (lastPush || 'never'));
+  L.push('last read     ' + (lastPull || 'never'));
+  L.push('writes to     ' + (cfg.device ? dayPath(daySG(Date.now())) : '—'));
+  L.push('');
+  L.push(lastErr ? 'LAST ERROR\n' + lastErr : 'last error    none');
+  $('diag').textContent = L.join('\n');
+}
+
+function toast(msg) {
+  lastErr = msg;
+  paintSync(); renderDiag();
+}
+
+function buzz() { try { if (navigator.vibrate) navigator.vibrate(18); } catch (e) {} }
+
+/* Every write ends here: clear the backdate, redraw, buzz, push. */
+function afterWrite() {
+  offsetMin = 0; absTime = ''; $('when-time').value = '';
+  paintWhen(); render(); paintSync(); renderDiag(); buzz();
+  flush();
+}
+
+/* ═══════════════════════ navigation ═══════════════════════ */
+
+var curTab = 'log';
+
+function show(tab) {
+  curTab = tab;
+  ['log', 'sum', 'set'].forEach(function (n) {
+    $('tab-' + n).setAttribute('aria-selected', n === tab ? 'true' : 'false');
+  });
+  // every pane set explicitly, so two can never be visible at once
+  $('pane-home').hidden = !(tab === 'log' && screen === 'home');
+  $('pane-cat').hidden  = !(tab === 'log' && screen === 'cat');
+  $('pane-sum').hidden  = tab !== 'sum';
+  $('pane-set').hidden  = tab !== 'set';
+  if (tab === 'sum') renderSummary();
+  if (tab === 'set') renderDiag();
+}
+
+function goCat(name) {
+  curCat = name; screen = 'cat';
+  $('free').value = ''; $('preview').hidden = true;
+  closeSheet();
+  show('log'); renderCat();
+  $('pane-cat').scrollTop = 0;
+}
+function goHome() {
+  screen = 'home'; curCat = null;
+  show('log'); render();
+}
+
+$('pane-home').addEventListener('click', function (e) {
+  var t = e.target.closest('[data-go]');
+  if (t) goCat(t.dataset.go);
+  var x = e.target.closest('[data-del]');
+  if (x) undo(x.dataset.del);
+});
+$('cat-back').addEventListener('click', goHome);
+['log', 'sum', 'set'].forEach(function (n) {
+  $('tab-' + n).addEventListener('click', function () {
+    if (n === 'log' && screen === 'cat') { goHome(); return; }
+    show(n);
+  });
+});
+
+/* ═══════════════════════ when ═══════════════════════ */
+
+function paintWhen() {
+  document.querySelectorAll('#when .chip').forEach(function (b) {
+    b.setAttribute('aria-pressed', (!absTime && Number(b.dataset.off) === offsetMin) ? 'true' : 'false');
+  });
+  $('when').className = 'when' + ((offsetMin || absTime) ? ' armed' : '');
+  $('when-lbl').textContent = absTime ? 'at ' + absTime : (offsetMin ? offsetMin + ' min ago' : 'When');
+}
+$('when').addEventListener('click', function (e) {
+  var b = e.target.closest('.chip');
+  if (!b) return;
+  offsetMin = Number(b.dataset.off);
+  absTime = ''; $('when-time').value = '';
+  paintWhen();
+});
+$('when-time').addEventListener('change', function () {
+  absTime = this.value || '';
+  if (absTime) offsetMin = 0;
+  paintWhen();
+});
+
+/* ═══════════════════════ the amount sheet ═══════════════════════ */
+
+function openSheet(kind) {
+  var c = SHEETS[kind];
+  if (!c) return;
+  sheetKind = kind;
+  sheetVal = c.presets[Math.min(1, c.presets.length - 1)];
+  sheetSide = '';
+  var el = $('sheet');
+  el.className = 'sheet' + (c.tone ? ' ' + c.tone : '');
+  el.hidden = false;
+  $('sheet-title').textContent = c.title;
+  $('sheet-unit').textContent = c.unit === 'C' ? '°C' : ' ' + c.unit;
+  $('sheet-presets').innerHTML =
+    c.presets.map(function (p) {
+      return '<button class="chip" data-preset="' + p + '">' + p.toFixed(c.dec) + '</button>';
+    }).join('') +
+    '<button class="chip" data-nudge="-1" aria-label="Less">&minus;</button>' +
+    '<button class="chip" data-nudge="1" aria-label="More">+</button>';
+  $('sheet-side').innerHTML = c.sides
+    ? '<button class="chip" data-side="left">left</button><button class="chip" data-side="right">right</button>'
+    : '';
+  paintSheet();
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function paintSheet() {
+  var c = SHEETS[sheetKind];
+  if (!c) return;
+  $('sheet-num').textContent = sheetVal.toFixed(c.dec);
+  document.querySelectorAll('#sheet-presets .chip[data-preset]').forEach(function (b) {
+    b.setAttribute('aria-pressed', Number(b.dataset.preset) === sheetVal ? 'true' : 'false');
+  });
+  document.querySelectorAll('#sheet-side .chip').forEach(function (b) {
+    b.setAttribute('aria-pressed', b.dataset.side === sheetSide ? 'true' : 'false');
+  });
+}
+function closeSheet() { sheetKind = null; $('sheet').hidden = true; }
+
+$('sheet').addEventListener('click', function (e) {
+  var c = SHEETS[sheetKind];
+  if (!c) return;
+  var p = e.target.closest('[data-preset]');
+  if (p) { sheetVal = Number(p.dataset.preset); paintSheet(); return; }
+  var n = e.target.closest('[data-nudge]');
+  if (n) {
+    sheetVal = Math.max(0, Number((sheetVal + Number(n.dataset.nudge) * c.step).toFixed(c.dec)));
+    paintSheet(); return;
+  }
+  var sd = e.target.closest('[data-side]');
+  if (sd) { sheetSide = sheetSide === sd.dataset.side ? '' : sd.dataset.side; paintSheet(); }
+});
+$('sheet-cancel').addEventListener('click', closeSheet);
+$('sheet-save').addEventListener('click', function () {
+  var c = SHEETS[sheetKind];
+  if (!c) return;
+  var v = Number(sheetVal.toFixed(c.dec));
+  add(c.t, c.s, v, c.unit, sheetSide,
+      c.title.toLowerCase() + ' ' + v + ' ' + c.unit + (sheetSide ? ' ' + sheetSide : ''));
+  closeSheet();
+  afterWrite();
+});
+
+/* ═══════════════════════ category buttons ═══════════════════════ */
+
+$('cat-body').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-ev]');
+  if (b) {
+    var p = b.dataset.ev.split(':');
+    add(p[0], p[1] || '', '', '', '', b.textContent.trim().toLowerCase());
+    afterWrite();
+    return;
+  }
+  var s = e.target.closest('[data-sheet]');
+  if (s) { openSheet(s.dataset.sheet); return; }
+  var pf = e.target.closest('[data-prefill]');
+  if (pf) {
+    $('free').value = pf.dataset.prefill;
+    $('free').focus();
+    previewFree();
+  }
+});
+$('cat-recent').addEventListener('click', function (e) {
+  var x = e.target.closest('[data-del]');
+  if (x) { undo(x.dataset.del); renderCat(); }
+});
+$('sum-timeline').addEventListener('click', function (e) {
+  var x = e.target.closest('[data-del]');
+  if (x) { undo(x.dataset.del); renderSummary(); }
+});
+
+/* ═══════════════════════ free text ═══════════════════════ */
+
+function previewFree() {
+  var txt = $('free').value.trim();
+  var pv = $('preview');
+  if (!txt) { pv.hidden = true; return null; }
+  var r = parseMessage(txt, stamp());
+  pv.hidden = false;
+  if (r.matched && r.events[0].type === 'undo') {
+    pv.className = 'preview';
+    pv.innerHTML = 'That reads as <b>undo</b>. Use the × next to an entry instead.';
+    return null;
+  }
+  if (!r.matched) {
+    pv.className = 'preview note';
+    pv.innerHTML = 'Not a format I recognise, so it is kept as a <b>note</b>, word for word. ' +
+                   'Nothing is guessed at — ask a Claude Code session to structure it later.';
+    return r;
+  }
+  pv.className = 'preview';
+  pv.innerHTML = 'Reads as ' + r.events.map(function (ev) {
+    return '<b>' + esc(describe({ type: ev.type, subtype: ev.subtype,
+      value: ev.value === '' ? null : ev.value, unit: ev.unit, note: ev.note })) + '</b>';
+  }).join(' then ') + ' at <b>' + hhmm(r.events[0].ts) + '</b>.';
+  return r;
+}
+$('free').addEventListener('input', previewFree);
+$('free-clear').addEventListener('click', function () {
+  $('free').value = ''; $('preview').hidden = true;
+});
+$('free-save').addEventListener('click', function () {
+  var txt = $('free').value.trim();
+  if (!txt) return;
+  var r = previewFree();
+  if (!r) return;
+  if (!r.matched) add('note', '', '', '', txt, txt);
+  else r.events.forEach(function (ev) {
+    add(ev.type, ev.subtype, ev.value, ev.unit, ev.note, txt, ev.ts);
+  });
+  $('free').value = ''; $('preview').hidden = true;
+  afterWrite();
+  if (screen === 'cat') renderCat();
+});
+
+/* ═══════════════════════ setup ═══════════════════════ */
+
+function readCfgInputs() {
+  cfg.who    = $('in-who').value.trim();
+  cfg.device = $('in-device').value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
+  cfg.repo   = $('in-repo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/$/, '');
+  cfg.branch = $('in-branch').value.trim() || 'main';
+  var t = $('in-token').value.trim();
+  if (t) cfg.token = t;
+  $('in-device').value = cfg.device;
+  $('in-repo').value = cfg.repo;
+  saveCfg();
+}
+
+$('set-test').addEventListener('click', function () {
+  readCfgInputs();
+  lastErr = '';
+  if (!cfg.device || !cfg.repo || !cfg.token) {
+    lastErr = 'Fill in device, repo and token first.';
+    paintSync(); renderDiag(); return;
+  }
+  var btn = this;
+  btn.textContent = 'Testing…';
+  gh('GET', '/branches/' + encodeURIComponent(cfg.branch)).then(function (r) {
+    btn.textContent = 'Save and test';
+    if (!r.ok) {
+      lastErr = ghErr(r, 'branches/' + cfg.branch);
+      paintSync(); renderDiag(); return;
+    }
+    if (r.json && r.json.name && r.json.name !== cfg.branch) {
+      lastErr = 'Branch mismatch: GitHub returned ' + r.json.name;
+    }
+    lastPull = '';
+    renderDiag(); paintSync();
+    flush(true);
+  }).catch(function (err) {
+    btn.textContent = 'Save and test';
+    lastErr = 'Could not reach GitHub: ' + ((err && err.message) ? err.message : String(err)) +
+              '. If you are offline, nothing is lost — it will sync when you are back.';
+    paintSync(); renderDiag();
+  });
+});
+
+var clearArmed = false;
+$('set-clear').addEventListener('click', function () {
+  var btn = this;
+  if (!clearArmed) {
+    clearArmed = true;
+    btn.textContent = 'Tap again to forget';
+    setTimeout(function () { if (clearArmed) { clearArmed = false; btn.textContent = 'Forget token'; } }, 4000);
+    return;
+  }
+  clearArmed = false;
+  btn.textContent = 'Forget token';
+  cfg.token = '';
+  $('in-token').value = '';
+  saveCfg();
+  lastErr = '';
+  paintSync(); renderDiag();
+});
+
+$('set-push').addEventListener('click', function () {
+  // mark every day this device has as owing a push, then flush
+  entries.forEach(function (r) { if (r.own) dirty[daySG(r.ms)] = true; });
+  shas = {}; saveShas(); saveDirty();
+  lastErr = '';
+  flush(true);
+  renderDiag();
+});
+
+$('set-copy').addEventListener('click', function () {
+  var btn = this;
+  var txt = jsonlFor(daySG(Date.now()));
+  function done(msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = 'Copy today as JSONL'; }, 1800); }
+  try {
+    navigator.clipboard.writeText(txt).then(function () { done('Copied'); }, function () { done('Clipboard refused'); });
+  } catch (e) { done('Clipboard refused'); }
+});
+
+$('sync-btn').addEventListener('click', function () {
+  if (!configured()) { show('set'); return; }
+  lastErr = '';
+  flush(true);
+});
+
+/* ═══════════════════════ boot ═══════════════════════ */
+
+loadAll();
+$('in-who').value = cfg.who;
+$('in-device').value = cfg.device;
+$('in-repo').value = cfg.repo;
+$('in-branch').value = cfg.branch || 'main';
+$('in-token').value = cfg.token ? cfg.token : '';
+paintWhen();
+render();
+paintSync();
+renderDiag();
+show('log');
+
+setInterval(function () { renderState(); renderLast(); }, 30000);
+window.addEventListener('online', function () { lastErr = ''; flush(); });
+window.addEventListener('focus', function () { flush(); });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) flush(); });
+if (configured()) flush();
+
+/* Offline shell. Absent in previews and anywhere without a service worker; the app
+   works regardless, so a failure here is ignored on purpose. */
+if ('serviceWorker' in navigator) {
+  try {
+    var reg = navigator.serviceWorker.register('sw.js');
+    if (reg && reg.catch) reg.catch(function () {});   // blocked in previews; the app is fine without it
+  } catch (e) {}
+}
+</script>
