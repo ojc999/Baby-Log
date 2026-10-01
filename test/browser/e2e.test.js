@@ -42,6 +42,13 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
       const b = JSON.parse(req.postData());
       if (staleOnce) { staleOnce=false;
         return route.fulfill({status:409, contentType:'application/json', body:JSON.stringify({message:'is at 111 but expected 222'})}); }
+      // GitHub refuses a write to a file that already exists unless the request carries
+      // its current sha. Without this the stub is more permissive than the real API, and
+      // the overwrite protection never gets exercised on the path that matters.
+      const cur = repoFiles[decodeURIComponent(p)];
+      if (cur && b.sha !== cur.sha)
+        return route.fulfill({status:422, contentType:'application/json',
+          body:JSON.stringify({message: b.sha ? 'sha does not match' : '"sha" wasn\'t supplied.'})});
       const newSha = 'sha'+(++sha);
       repoFiles[decodeURIComponent(p)] = { content:b.content, sha:newSha };
       return route.fulfill({status:200, contentType:'application/json', body:JSON.stringify({content:{sha:newSha, path:p}})});
@@ -293,6 +300,47 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
       .filter(b=>foreign.has(b.dataset.del || b.dataset.fix)).length;
   });
   t('no undo or fix button on the other phone\'s entries', dead, 0);
+
+  console.log('\n--- setup survives without tapping Save and test ---');
+  // The token is the last box on the page, so it never loses focus and `change` never
+  // fires for it. Everything else was kept and the token was not, which made the app say
+  // "Not connected" with all five boxes looking correctly filled in.
+  const fresh = await ctx.newPage();
+  await fresh.goto('http://localhost:8766/', {waitUntil:'domcontentloaded'});
+  await fresh.waitForTimeout(300);
+  await fresh.click('#tab-set');
+  await fresh.fill('#in-who','Wife');
+  await fresh.fill('#in-device','wife-phone');
+  await fresh.fill('#in-repo','me/baby-data');
+  await fresh.fill('#in-branch','main');
+  await fresh.fill('#in-token','github_pat_TYPEDLAST');   // last box, never blurred
+  await fresh.reload({waitUntil:'domcontentloaded'});
+  await fresh.waitForTimeout(500);
+  t('the token survives a reload without Save and test',
+     await fresh.evaluate(()=>(cfg.token||'').length > 0), true);
+  t('and the app counts itself connected', await fresh.evaluate(()=>configured()), true);
+  t('so the Not connected strip is gone', await fresh.evaluate(()=>document.getElementById('sync').hidden), true);
+
+  console.log('\n--- the device box does not fight you while you type it ---');
+  await fresh.click('#tab-set');          // the reload above landed on the Log tab
+  await fresh.fill('#in-device','');
+  await fresh.type('#in-device','Wife Phone', {delay:12});
+  t('what was typed is still what is in the box', await fresh.inputValue('#in-device'), 'Wife Phone');
+  await fresh.click('#in-repo');                       // move away: now it tidies
+  t('and it is tidied once you leave it', await fresh.inputValue('#in-device'), 'wife-phone');
+
+  console.log('\n--- a successful test says so ---');
+  await fresh.fill('#in-token','github_pat_FAKE');
+  await fresh.click('#set-test');
+  await fresh.waitForTimeout(900);
+  t('a toast confirms the connection', /Connected/.test((await fresh.textContent('#toast-txt'))||''), true);
+  t('and names the file this phone writes', /wife-phone\.jsonl/.test((await fresh.textContent('#toast-txt'))||''), true);
+  await fresh.close();
+
+  console.log('\n--- the same device name on both phones is named, not left to be guessed ---');
+  const diag3 = (await page.textContent('#diag'))||'';
+  t('diagnostics says the name is shared', /SAME DEVICE NAME/.test(diag3), true);
+  t('and says neither phone can see the other', /cannot see|skips the file named after itself/.test(diag3), true);
 
   console.log('\n--- no request goes anywhere but GitHub and the page itself ---');
   const hosts = [...new Set(calls.map(c=>new URL(c.url).host))];

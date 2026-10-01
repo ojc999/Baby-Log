@@ -210,6 +210,8 @@ verbatim.
 
 | | |
 | --- | --- |
+| **`Not connected — kept on this phone only`** | One of **device**, **repo** or **token** is empty. It never means a wrong token — a wrong token says `sync failed` instead. Open **Setup → Diagnostics**: the empty one is marked `MISSING`. Fill it in and tap **Save and test**. |
+| Everything is filled in but it still says Not connected | Check the **token** box in particular. Scroll Diagnostics: if it says `token none`, the token did not save. Paste it again and tap **Save and test**. |
 | Amber strip says entries unsaved | They are safe on the phone. Tap **Sync now** and read any error. |
 | `401 Token rejected` | Expired, revoked or mistyped. Make a new one. |
 | `403 Forbidden` | Token is missing **Contents: Read and write**. |
@@ -219,7 +221,7 @@ verbatim.
 | An entry is wrong | Tap **Fix** on it to change the time, amount or side, or `×` to undo it. Either way the original is kept, marked `deleted` — nothing is ever removed. |
 | You just mis-tapped | **Undo** on the strip at the bottom, for five seconds after logging. |
 | Diagnostics says `recovered N row(s)` | The file held entries this phone had not seen, and they were kept rather than overwritten. Once, after clearing the browser, is expected. Every sync means **both phones are using the same device name** — change one of them on the Setup tab. |
-| The other phone's entries are not showing | They arrive on open and when you come back to the app, at most once a minute. If they never arrive, check both phones point at the same repo and branch, and read the last error in Diagnostics. |
+| The other phone's entries are not showing | Four things to check, in order. **1.** Both phones must have **different device names** — if they share one, each skips the file named after itself and neither sees the other. Diagnostics says `SAME DEVICE NAME ON BOTH PHONES` when it can tell. **2.** Both must have the same **repo** and **branch**. **3.** Only **today** is read back, so yesterday's entries from the other phone never appear. **4.** They arrive on open and when you return to the app, at most once a minute — not instantly. |
 | Offline | Everything queues. The strip shows how many are waiting. They go up on the next sync. |
 
 ## Tests

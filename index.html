@@ -817,6 +817,7 @@ var lastPull = '';
 var pushing = false;
 var lastPullMs = 0;        /* throttles the read-back of the other phone */
 var absorbed = 0;          /* rows recovered from our own remote file, see absorbOwn */
+var sharedName = false;    /* true once we see another person writing our own device file */
 
 var screen = 'home';         // home | cat
 var curCat = null;
@@ -1056,6 +1057,15 @@ function absorbOwn(text, day) {
     entries.sort(function (a, b) { return a.ms - b.ms; });
     saveEntries();
     absorbed += taken;
+    /* Rows in this device's own file written by somebody else is what two phones sharing
+       one device name looks like. Say that plainly rather than leaving it to be inferred:
+       while it lasts, neither phone can see the other's entries, because each one skips
+       the file named after itself. */
+    if (!sharedName && cfg.who) {
+      for (var j = entries.length - 1; j >= 0; j--) {
+        if (entries[j].own && entries[j].sender && entries[j].sender !== cfg.who) { sharedName = true; break; }
+      }
+    }
     render();
   }
   return taken;
@@ -1514,8 +1524,16 @@ function renderDiag() {
     L.push('');
     L.push('recovered     ' + absorbed + ' row(s) were already in this device\'s own file and');
     L.push('              this browser did not have them, so they were kept rather');
-    L.push('              than overwritten. If this keeps happening, two phones are');
-    L.push('              probably sharing one device name — give them different ones.');
+    L.push('              than overwritten.');
+  }
+  if (sharedName) {
+    L.push('');
+    L.push('SAME DEVICE NAME ON BOTH PHONES');
+    L.push('Entries by someone else are turning up in this phone\'s own file, which');
+    L.push('means the other phone is set to the same device name. Nothing is lost,');
+    L.push('but neither phone can see the other\'s entries while this lasts, because');
+    L.push('each one skips the file named after itself. Give this phone a different');
+    L.push('name on this tab, then tap Save and test.');
   }
   L.push('');
   L.push(lastErr ? 'LAST ERROR\n' + lastErr : 'last error    none');
@@ -1923,20 +1941,25 @@ $('free-save').addEventListener('click', function () {
 
 /* ═══════════════════════ setup ═══════════════════════ */
 
-function readCfgInputs() {
+/* `tidy` writes the cleaned-up device name and repo back into the boxes. That is wanted
+   when the field is finished with, and not while it is being typed: rewriting the box on
+   every keystroke moves the caret and fights the typist. */
+function readCfgInputs(tidy) {
   cfg.who    = $('in-who').value.trim();
   cfg.device = $('in-device').value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
   cfg.repo   = $('in-repo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/$/, '');
   cfg.branch = $('in-branch').value.trim() || 'main';
   var t = $('in-token').value.trim();
   if (t) cfg.token = t;
-  $('in-device').value = cfg.device;
-  $('in-repo').value = cfg.repo;
+  if (tidy) {
+    $('in-device').value = cfg.device;
+    $('in-repo').value = cfg.repo;
+  }
   saveCfg();
 }
 
 $('set-test').addEventListener('click', function () {
-  readCfgInputs();
+  readCfgInputs(true);
   lastErr = '';
   if (!cfg.device || !cfg.repo || !cfg.token) {
     lastErr = 'Fill in device, repo and token first.';
@@ -1952,9 +1975,14 @@ $('set-test').addEventListener('click', function () {
     }
     if (r.json && r.json.name && r.json.name !== cfg.branch) {
       lastErr = 'Branch mismatch: GitHub returned ' + r.json.name;
+      renderDiag(); paintSync();
+      return;
     }
     lastPull = '';
     renderDiag(); paintSync();
+    /* Say it worked. The strip hides itself when everything is fine, so a successful test
+       used to produce no sign at all - which looks exactly like a failed one. */
+    toast('Connected. This phone writes <b>' + esc(dayPath(daySG(Date.now()))) + '</b>');
     flush(true);
   }).catch(function (err) {
     btn.textContent = 'Save and test';
@@ -1980,6 +2008,21 @@ $('set-clear').addEventListener('click', function () {
   saveCfg();
   lastErr = '';
   paintSync(); renderDiag();
+});
+
+/* Keep the setup fields as they are typed. They used to be written only when "Save and
+   test" was tapped, so filling the form and switching tabs - or the phone reloading the
+   page, which iOS does freely to reclaim memory - threw all of it away and left the app
+   saying "Not connected". Nothing here contacts GitHub; the button still does the test.
+   The token is not normalised on the way in beyond trimming, so a half-typed one is kept
+   as typed and simply fails the test until it is finished. */
+['in-who', 'in-device', 'in-repo', 'in-branch', 'in-token'].forEach(function (id) {
+  /* `input`, not `change`. `change` only fires when a box loses focus, and the token is
+     the last box on the page - so it never lost focus, never fired, and was the one thing
+     not kept. Every other field survived, which made the app say "Not connected" with all
+     five boxes looking correctly filled in. */
+  $(id).addEventListener('input', function () { readCfgInputs(false); paintSync(); renderDiag(); });
+  $(id).addEventListener('change', function () { readCfgInputs(true); paintSync(); renderDiag(); });
 });
 
 $('set-push').addEventListener('click', function () {

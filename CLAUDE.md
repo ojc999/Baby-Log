@@ -37,6 +37,10 @@ what it is, and lists decisions that look arbitrary and are not.
   calls. They need Playwright; the app still has no dependencies. Logic tests cannot see
   a viewport, a tap target, a colour or a request, and every bug in those four classes
   found so far was invisible to `logic.test.js`.
+- **Keep a stub as strict as the real API.** The GitHub stub once accepted a PUT to an
+  existing file with no `sha`, which the real API refuses with 422. The overwrite
+  protection was never exercised on the path that triggers it. A lenient stub hides the
+  behaviour you are testing for.
 - **Render with data before judging a screen.** An empty app hides its own timeline rows,
   undo buttons and sheets. A whole round of UI bugs survived the first browser pass
   because every screenshot was of an empty app.

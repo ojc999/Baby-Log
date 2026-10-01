@@ -312,6 +312,28 @@ of its own UI, which is why the first pass missed all of these:
   said "sync failed" — so being told you cannot undo the other phone's entry looked like
   a network fault. It is a real toast now, and errors still go to `lastErr`.
 
+A third pass, after the app was first set up on a second phone and said it was not
+connected:
+
+- **The token was the one field that did not save.** Config was written only when "Save
+  and test" was tapped; a `change` listener would not have helped either, because
+  `change` fires on blur and the token is the last box on the page, so it never blurred.
+  Everything else was kept, which is the worst version of the bug: five boxes correctly
+  filled in and the app insisting it is not connected. Now saved on `input`, and the
+  tidying of the device name and repo happens only on blur so it does not fight the
+  typist.
+- **A successful "Save and test" produced no sign at all.** The strip hides itself when
+  everything is fine, so success and failure looked identical. It now says so, and names
+  the file this phone writes.
+- **Two phones on one device name were invisible.** Each skips the file named after
+  itself, so neither sees the other — while `absorbOwn` quietly keeps both sets of rows.
+  Diagnostics now names it when it sees entries by someone else in this device's own
+  file.
+- **The test stub was more permissive than GitHub**, accepting a PUT to an existing file
+  with no `sha`. The real API returns 422. The overwrite protection therefore was not
+  being exercised on the path that actually triggers it. Worth remembering when writing
+  any stub: a lenient one hides the behaviour you are trying to test.
+
 Still **not** verified, and only a real device can:
 
 - **Safari specifically.** Everything above was checked in Chromium. The viewport,
