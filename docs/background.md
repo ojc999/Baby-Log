@@ -277,7 +277,28 @@ out, and any later write to that day — backdating an entry into it — would r
 file without them. `absorbOwn` already does the right thing, so backfill reuses it,
 quietly. Backfill never marks a day as owing a push: it is reading, not writing.
 
-## 7c. Tummy time as its own category
+## 7c. What earns a tile
+
+Four tiles and a drawer. The line is **frequency, not importance**: a tile is for what
+happens many times a day, More is for what happens once a day or once a week and can
+afford two taps instead of one.
+
+By that rule tummy time was in the wrong place and hygiene was too, in opposite
+directions. Tummy time came out of More; hygiene went into it, as the first group, keeping
+its own green so it still reads as a set rather than dissolving into the miscellany. The
+home screen is a clean 2×2 again — sleep, feed, nappies, tummy time — and on the smallest
+iPhone the whole of it now fits above the fold, which it did not with five.
+
+**The input moved; the readout did not.** *Last bath* stays among the four status cards,
+because how long since the last bath is exactly the kind of thing you forget, and that is
+a different question from how often you log it. Demoting a category does not mean its
+answer stops mattering.
+
+Neither move touches the data. `hygiene`, `bath` and `tummy` are all unchanged types in
+the contract; what changed is `CAT_OF`, which decides only which screen an entry is
+offered on and filed under. Entries logged before either move read back identically.
+
+## 7d. Tummy time as its own category
 
 Promoted out of **More** to a tile of its own. It is logged many times a day, which is
 the line this app draws between a tile and the drawer: tiles are for what happens

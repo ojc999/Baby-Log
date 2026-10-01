@@ -38,9 +38,14 @@ just a static file, and an entry is in the repo within a second of the tap.
 | **Sleep** | Asleep now · Awake now |
 | **Feed** | Bottle · Breast (minutes, and which side) · Formula · EBM — then Mum's expressing, kept separate, and Vomit |
 | **Diapers** | Wet · Dirty · Both |
-| **Hygiene** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream |
 | **Tummy time** | How long was it (minutes) · Just log it, when you did not time it |
-| **More** | Weight · Length · Head · Temperature · Unsettled · Medicine · Vaccination · Milestone · Note |
+| **More** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream · Weight · Length · Head · Temperature · Unsettled · Medicine · Vaccination · Milestone · Note |
+
+Four tiles for the things that happen many times a day, and **More** for everything else.
+The split is frequency, not importance: anything in More is two taps rather than one, which
+is the right trade for something done once a day or once a week. **Last bath** stays on the
+home screen even so — the input moved, the readout did not, because how long since the last
+bath is exactly the sort of thing you forget.
 
 Breastfeeds show **which side comes next** — on the Last feed card, and on the Breast
 screen itself, where the side opposite the last one is already selected. It is a chip,

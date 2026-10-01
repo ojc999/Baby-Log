@@ -134,8 +134,8 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   console.log('\n--- an entry survives a failed push and is not lost ---');
   forceStatus = 401;
   await page.click('#cat-back');
-  await page.click('[data-go="hygiene"]');
-  await page.evaluate(()=>{ const b=[...document.querySelectorAll('#cat-body button')].find(x=>/bath/i.test(x.textContent)); b && b.click(); });
+  await page.click('[data-go="more"]');            // hygiene lives inside More now
+  await page.evaluate(()=>{ const b=[...document.querySelectorAll('#cat-body button')].find(x=>/^bath$/i.test(x.textContent.trim())); b && b.click(); });
   await page.waitForTimeout(900);
   const strip = (await page.textContent('#sync-txt'))||'';
   t('the amber strip reports it unsaved', /unsaved|not saved|waiting/i.test(strip), true);

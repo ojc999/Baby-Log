@@ -163,8 +163,6 @@ body{
 .tile.t-feed b{color:var(--amber)}
 .tile.t-nappy{background:var(--teal-bg);border-color:var(--teal-line)}
 .tile.t-nappy b{color:var(--teal)}
-.tile.t-hyg{background:var(--leaf-bg);border-color:var(--leaf-line)}
-.tile.t-hyg b{color:var(--leaf)}
 .tile.t-tummy{background:var(--play-bg);border-color:var(--play-line)}
 .tile.t-tummy b{color:var(--play)}
 
@@ -380,14 +378,11 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <button class="tile t-nappy" data-go="nappy">
         <b>Diapers</b><span>Wet, dirty, both</span><em id="tile-nappy"></em>
       </button>
-      <button class="tile t-hyg" data-go="hygiene">
-        <b>Hygiene</b><span>Bath, nails, hair</span><em id="tile-hygiene"></em>
-      </button>
-      <button class="tile wide t-tummy" data-go="tummy">
+      <button class="tile t-tummy" data-go="tummy">
         <b>Tummy time</b><span>Timed or not</span><em id="tile-tummy"></em>
       </button>
       <button class="tile wide" data-go="more">
-        <b>More</b><span>Growth, temperature, medicine, notes</span><em id="tile-more"></em>
+        <b>More</b><span>Hygiene, growth, medicine, notes</span><em id="tile-more"></em>
       </button>
     </div>
     <div id="home-recent"></div>
@@ -778,18 +773,6 @@ var CATS = {
     ] }],
     free: 'pee · poo · both'
   },
-  hygiene: {
-    title: 'Hygiene', tone: 'leafb',
-    groups: [{ cols: 2, items: [
-      { t: 'hygiene', s: 'bath',  label: 'Bath' },
-      { t: 'hygiene', s: 'wipe',  label: 'Top and tail' },
-      { t: 'hygiene', s: 'nails', label: 'Nails cut' },
-      { t: 'hygiene', s: 'hair',  label: 'Hair wash' },
-      { t: 'hygiene', s: 'cord',  label: 'Cord care' },
-      { t: 'hygiene', s: 'cream', label: 'Cream' }
-    ] }],
-    free: 'anything not on a button'
-  },
   tummy: {
     title: 'Tummy time', tone: 'playb',
     groups: [{ cols: 1, items: [
@@ -803,6 +786,14 @@ var CATS = {
   more: {
     title: 'More', tone: '',
     groups: [
+      { head: 'Washing and skin', cols: 2, items: [
+        { t: 'hygiene', s: 'bath',  label: 'Bath',         tone: 'leafb' },
+        { t: 'hygiene', s: 'wipe',  label: 'Top and tail', tone: 'leafb' },
+        { t: 'hygiene', s: 'nails', label: 'Nails cut',    tone: 'leafb' },
+        { t: 'hygiene', s: 'hair',  label: 'Hair wash',    tone: 'leafb' },
+        { t: 'hygiene', s: 'cord',  label: 'Cord care',    tone: 'leafb' },
+        { t: 'hygiene', s: 'cream', label: 'Cream',        tone: 'leafb' }
+      ] },
       { head: 'Growth', cols: 3, items: [
         { sheet: 'weight' }, { sheet: 'length' }, { sheet: 'head' }
       ] },
@@ -817,7 +808,7 @@ var CATS = {
     hint: 'The four on the bottom row fill in the box below and keep every word you ' +
           'write. Nothing after them is interpreted, so "note why is he not pooping" ' +
           'does not log a dirty nappy.',
-    free: '3.4kg · 50cm · head 35cm · temp 37.8'
+    free: 'bath · 3.4kg · 50cm · head 35cm · temp 37.8'
   }
 };
 
@@ -852,7 +843,7 @@ var LABELS = {
 /* which category a type belongs to, for the "recent" lists */
 var CAT_OF = {
   sleep: 'sleep', feed: 'feed', pump: 'feed', vomit: 'feed',
-  nappy: 'nappy', hygiene: 'hygiene', bath: 'hygiene',
+  nappy: 'nappy', hygiene: 'more', bath: 'more',
   measure: 'more', cry: 'more', tummy: 'tummy', med: 'more', vax: 'more',
   milestone: 'more', note: 'more'
 };
@@ -1544,7 +1535,6 @@ function renderTiles() {
   $('tile-sleep').textContent   = si.pairs.length ? dur(slept) + ' today' : 'none today';
   $('tile-feed').textContent    = feeds.length ? feeds.length + ' today' + (ml ? ' · ' + ml + ' ml' : '') : 'none today';
   $('tile-nappy').textContent   = n(function (r) { return r.type === 'nappy'; }) + ' today';
-  $('tile-hygiene').textContent = n(function (r) { return r.type === 'hygiene' || r.type === 'bath'; }) + ' today';
   var tum = live().filter(function (r) { return daySG(r.ms) === daySG(Date.now()) && r.type === 'tummy'; });
   var tumMin = tum.reduce(function (a, r) { return a + (r.unit === 'min' && r.value ? r.value : 0); }, 0);
   $('tile-tummy').textContent   = tum.length

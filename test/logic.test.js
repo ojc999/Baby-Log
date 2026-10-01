@@ -65,6 +65,18 @@ t('an untimed entry describes without minutes',
 t('a timed one keeps them',
   A.describe({type:'tummy',subtype:'',value:10,unit:'min',note:''}), 'Tummy time 10 min');
 
+console.log('\n--- hygiene lives inside More ---');
+t('it is no longer a category of its own', !!A.CATS.hygiene, false);
+t('its entries route to More', A.CAT_OF.hygiene, 'more');
+t("the bot's old bath type goes there too", A.CAT_OF.bath, 'more');
+t('and its buttons are offered inside More',
+  JSON.stringify(A.CATS.more.groups).indexOf('hygiene') > -1, true);
+t('all six survived the move',
+  JSON.stringify(A.CATS.more.groups).match(/"t":"hygiene"/g).length, 6);
+
+console.log('\n--- the five tiles on the home screen ---');
+t('four categories plus More', Object.keys(A.CATS).join(','), 'sleep,feed,nappy,tummy,more');
+
 console.log('\n--- writing, undo, and the export schema ---');
 A.cfg.who = 'Simon'; A.cfg.device = 'simon-phone';
 A.setEntries([]);
