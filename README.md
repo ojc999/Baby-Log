@@ -54,8 +54,17 @@ Each device writes **only its own file**: `data/events/2026-10-01/simon-phone.js
 Nobody else ever writes that file, so there is nothing to merge and no collision that
 could lose an entry. Each push rewrites that one file whole from the phone's own copy,
 which makes a push idempotent — repeating one is always safe, and a failed one costs
-nothing. On sync a phone also reads the other's file for today, so the shared
-asleep/awake state and the summary reflect both of you, a minute or two behind.
+nothing.
+
+Each phone also reads the other's file for today — on open, when you come back to it,
+and after each push, at most once a minute. So the shared asleep/awake state and the
+summary reflect both of you within a minute or so, without anyone tapping anything.
+
+**Give the two phones different device names.** If you do not, both write the same file.
+The app will not lose anything if that happens — before overwriting, it takes in any
+rows it has not seen and writes the union — but it is a muddle, and Diagnostics will
+say `recovered …` every time it happens. That line is the signal to go and fix the
+names.
 
 ## Hosting: public or private?
 
@@ -191,6 +200,8 @@ verbatim.
 | `409` / `422` | Handled automatically: re-reads the file version and retries once. If it sticks, use **Force full re-push**. |
 | Nothing pushes, no error | The device name is blank, so the app does not know which file to write. |
 | An entry is wrong | Tap its `×`. That marks it `deleted` and keeps it. To change one, undo and re-log with the right time. |
+| Diagnostics says `recovered N row(s)` | The file held entries this phone had not seen, and they were kept rather than overwritten. Once, after clearing the browser, is expected. Every sync means **both phones are using the same device name** — change one of them on the Setup tab. |
+| The other phone's entries are not showing | They arrive on open and when you come back to the app, at most once a minute. If they never arrive, check both phones point at the same repo and branch, and read the last error in Diagnostics. |
 | Offline | Everything queues. The strip shows how many are waiting. They go up on the next sync. |
 
 ## Tests
@@ -199,7 +210,18 @@ verbatim.
 node test/logic.test.js
 ```
 
-Reads the script straight out of `index.html` under a stubbed DOM. Checks the parser
-against its original 21 cases, the export schema against the archive format, Singapore
-time and the day boundary, both forms of backdating, sleep pairing with a deliberate
-gap, undo, and the two-phone merge. Run it after any edit.
+Needs nothing installed. Reads the script straight out of `index.html` under a stubbed
+DOM. Checks the parser against its original 21 cases, the export schema against the
+archive format, Singapore time and the day boundary, both forms of backdating, sleep
+pairing with a deliberate gap, undo, and the two-phone merge. Run it after any edit.
+
+```
+npm install playwright && npx playwright install chromium
+node test/browser/layout.test.js     # five phone sizes
+node test/browser/e2e.test.js        # the real page against a stubbed GitHub
+node test/browser/contrast.test.js   # text contrast, light and dark
+```
+
+Optional, and the only ones that can catch a layout or a network bug — the first run of
+these found three. See `test/browser/README.md`. The app itself still has no
+dependencies and no build step; these are development tools that sit beside it.

@@ -54,7 +54,14 @@ This is the load-bearing decision. Each device writes **only its own file**:
   choice of rewriting whole days, which also makes a push idempotent. Repeating one is
   always safe; a failed one costs nothing.
 - **Reading the other phone is one fetch**, so the shared asleep/awake state and the
-  "last poop" cards reflect both of you.
+  "last poop" cards reflect both of you. That fetch happens on open, focus and after a
+  push, throttled to once a minute — not only on a manual sync, which was the original
+  behaviour and meant a phone with an empty queue never saw the other one at all.
+- **A push never overwrites a row it has not seen.** Rewriting the file whole is only
+  safe if our copy is a superset of the remote one. When it is not — a cleared browser,
+  or two phones sharing one device name — `absorbOwn` takes the unknown rows in first
+  and pushes the union. The alternative was silent loss of the other parent's night
+  feeds, which is the one failure this design must not have.
 
 The app caches each file's blob SHA so a push needs no read first. A stale SHA returns
 409 or 422; the app re-reads the SHA and retries once. If that sticks, **Force full
@@ -228,13 +235,48 @@ the day boundary, both forms of backdating, sleep pairing with a deliberate gap,
 two-phone merge (including that re-pulling today does not clobber the other phone's
 earlier days). All pass. Run it after any edit.
 
-What is **not** tested, and should be verified on real devices:
+`node test/browser/*.test.js` — optional, needs Playwright and Chromium. These render
+the real page at five phone sizes and drive it against a stubbed `api.github.com`.
+See `test/browser/README.md`.
 
-- A live cross-origin write from a browser to the GitHub API. Everything rests on it and
-  the CORS header is documented, but I ran no browser.
-- The 409/422 retry path, which needs two devices genuinely racing.
-- iOS storage survival for an installed web app (§5).
-- Anything visual. No browser rendered this page before it was published.
+**This section used to list four things no browser had checked. Three of them were
+broken.** Written up here because the lesson generalises: logic tests cannot catch any
+of it.
+
+- The page had **no doctype, no charset and no viewport meta**. A phone laid it out at a
+  virtual 980px and scaled it down — text about 5px tall, unusable without pinch-zoom.
+  It had been designed for a phone throughout; it just never said so to the browser. The
+  stylesheet's `env(safe-area-inset-*)` rules were dead for the same reason: they only
+  resolve with `viewport-fit=cover`.
+- **A phone with nothing to push never read the other phone back.** `pullToday` ran only
+  on a manual sync, and the Sync now button is hidden whenever everything is saved — so
+  there was no way to ask for it either. If one parent did the night feeds, the other
+  opened the app and saw none of them. `flush` now reads back regardless, throttled.
+- **A push could silently destroy the other phone's entries.** A push rewrites the
+  device's file whole; if that file held rows this browser had not seen, they were gone.
+  Two ways in: a cleared browser, or — the dangerous one — both phones given the same
+  device name. `absorbOwn` now takes unknown rows into the local copy first and pushes
+  the union. See §2.
+- Text fields were under 16px, which makes iOS Safari zoom the page in on focus and
+  never zoom back out; tap targets were under the published 44px floor; twelve bits of
+  secondary text were below WCAG AA, worst at 2.75:1. All fixed.
+
+Now verified in Chromium: the cross-origin PUT and its exact shape, headers, base64
+round trip (including non-ASCII), the 409 retry, an entry surviving a failed push and
+recovering, the two-phone read-back, that nothing is requested from any host but
+`api.github.com`, and that Diagnostics shows the error without leaking entry content.
+
+Still **not** verified, and only a real device can:
+
+- **Safari specifically.** Everything above was checked in Chromium. The viewport,
+  16px-field and safe-area fixes are all aimed at Safari behaviour, so they are the
+  likeliest place for a surprise.
+- **A genuinely live write to GitHub.** The API was stubbed. The request the app builds
+  is checked against the documented contract, but no real token was used.
+- **iOS storage survival for an installed web app** (§5). Queue an entry offline, leave
+  it a week, check it survived.
+- **Two devices actually racing.** The 409 path is exercised by a stub that returns 409
+  on demand, which is not the same as two phones pushing in the same second.
 
 ---
 
