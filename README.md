@@ -171,9 +171,15 @@ sent to any server — but anyone holding the link can write to the repo. Send i
 open it, then delete the message. If it goes astray, revoke the token on GitHub and make
 a new one; nothing is lost, both phones just queue until you re-link them.
 
-She still needs her own **install to the home screen** (step 4). Opening the link in
-Safari and then adding to the home screen gives the home-screen app its own empty
-storage on iOS, so open the link *from* the home-screen app, or tap it again afterwards.
+**Order matters on iPhone, and getting it wrong is the commonest way this looks broken.**
+A home-screen web app has its own storage, separate from Safari. Set the app up in Safari,
+then add it to the home screen, and the home-screen copy opens with nothing in it — no
+token, and none of the entries you just watched arrive. Nothing is lost; they are still in
+Safari and in the repo. But it reads exactly like the app forgetting everything.
+
+So: **add to the home screen first, then open the setup link from the home-screen app.**
+If it has already happened, just open the link again from the home-screen app. The app now
+says which of the two you are in rather than leaving you to guess.
 
 ### 6. Set it up in the app
 
@@ -243,6 +249,9 @@ verbatim.
 | Nothing pushes, no error | The device name is blank, so the app does not know which file to write. |
 | An entry is wrong | Tap **Fix** on it to change the time, amount or side, or `×` to undo it. Either way the original is kept, marked `deleted` — nothing is ever removed. |
 | You just mis-tapped | **Undo** on the strip at the bottom, for five seconds after logging. |
+| She saw your entries, then they vanished | Almost certainly the iPhone storage split: she set up in Safari, then opened the home-screen app, which has its own empty storage. The Setup tab says so when it detects it. Open the setup link again from the home-screen app. Nothing is lost. |
+| Every entry says `me` instead of a name | The **Your name** box on Setup is empty. Fill it in and tap Save and test. It only affects entries logged from then on — earlier ones keep `me`. |
+| Nothing from the other phone is in the repo at all | Check the repo itself: `data/events/<today>/` should hold **one file per phone**. If there is only one, the other phone has never pushed — it is not connected, not merely slow. Read its Diagnostics. |
 | Diagnostics says `recovered N row(s)` | The file held entries this phone had not seen, and they were kept rather than overwritten. Once, after clearing the browser, is expected. Every sync means **both phones are using the same device name** — change one of them on the Setup tab. |
 | The app is only showing today | The app reads today automatically. For older days, **Setup → Load 90 days of history**. A phone set up from a link pulls the last seven days by itself. |
 | The other phone's entries are not showing | Four things to check, in order. **1.** Both phones must have **different device names** — if they share one, each skips the file named after itself and neither sees the other. Diagnostics says `SAME DEVICE NAME ON BOTH PHONES` when it can tell. **2.** Both must have the same **repo** and **branch**. **3.** Only **today** is read back, so yesterday's entries from the other phone never appear. **4.** They arrive on open and when you return to the app, at most once a minute — not instantly. |

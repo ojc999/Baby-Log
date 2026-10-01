@@ -385,6 +385,23 @@ A fourth pass, while adding the sharing above:
   when we positively know it has not moved": a wasted request costs nothing, a missed
   entry costs the night.
 
+A fifth pass, from the first real two-phone setup. The repo is the thing to read first:
+one commit per push, carrying the device name in its message, and one file per phone. That
+answered in two requests what the symptoms could not — one commit, one device, so the
+second phone had never written at all, and there was nothing to merge rather than a merge
+going wrong.
+
+- **The iPhone home-screen app has its own storage, separate from Safari.** Set up in
+  Safari, add to the home screen, and the home-screen copy opens empty: no token, and
+  none of the entries you watched arrive. It reads as the app forgetting everything, or
+  as the other parent's entries vanishing. §5 had this the right way round for eviction
+  but never drew out that the two are different jars from the start. The app now detects
+  which it is running as and says so, because "Not connected" sends you hunting for a
+  token you already pasted.
+- **`sender` falls back to `me` when the name box is empty**, so every row in the first
+  real day reads `me` and you cannot tell who logged what. Harmless to the data and
+  recorded here because it looks like a bug.
+
 Still **not** verified, and only a real device can:
 
 - **Safari specifically.** Everything above was checked in Chromium. The viewport,

@@ -292,6 +292,19 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
   text-transform:uppercase;border-radius:8px;padding:0 12px;min-height:44px;cursor:pointer;
 }
 
+/* ───── first run ─────
+   On iOS the home-screen app and Safari keep separate storage, so setting the app up in
+   Safari and then adding it to the home screen gives you a second, empty copy. That is
+   the commonest way this app looks broken: entries you watched arrive are suddenly gone,
+   and the app asks to be set up again. Say so, rather than leaving someone to work it
+   out from an empty screen. */
+.firstrun{
+  margin:2px 0 4px;padding:11px 12px;border-radius:11px;font-size:13px;line-height:1.5;
+  background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);
+}
+.firstrun[hidden]{display:none!important}
+.firstrun b{font-weight:700}
+
 /* ───── correct an entry ─────
    The single commonest request across every commercial baby tracker: let me fix a row
    instead of deleting the day. Undo-and-re-log already did this in two steps; this is
@@ -435,6 +448,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 
   <!-- ═══════════ SETUP ═══════════ -->
   <div class="pane" id="pane-set" hidden>
+    <div class="firstrun" id="firstrun" hidden></div>
     <div class="sect"><h2>Who and where</h2><hr></div>
     <div class="field">
       <label for="in-who">Your name</label>
@@ -1013,6 +1027,19 @@ function b64dec(s) {
 }
 
 function configured() { return !!(cfg.token && cfg.repo && cfg.device); }
+
+/* True when running from the home screen rather than in the browser. On iOS the two have
+   SEPARATE storage: a phone set up in Safari and then added to the home screen opens the
+   home-screen copy with nothing in it - no token, no entries - which reads as the app
+   having forgotten everything, or as the other parent's entries having vanished. It has
+   not forgotten; this is a different jar. Worth naming on screen, because "Not connected"
+   sends you hunting for a token you already pasted. */
+function installed() {
+  try {
+    if (window.navigator && window.navigator.standalone === true) return true;      /* iOS */
+    return !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  } catch (e) { return false; }
+}
 
 function gh(method, path, body) {
   return fetch('https://api.github.com/repos/' + cfg.repo + path, {
@@ -1650,7 +1677,9 @@ function paintSync() {
   var el = $('sync'), txt = $('sync-txt'), btn = $('sync-btn');
   if (!configured()) {
     el.hidden = false; el.className = 'sync warn';
-    txt.textContent = 'Not connected — kept on this phone only';
+    txt.textContent = installed()
+      ? 'Home screen app — not set up yet'
+      : 'Not connected — kept on this phone only';
     btn.textContent = 'Set up';
     return;
   }
@@ -1674,6 +1703,20 @@ function paintSync() {
     return;
   }
   el.hidden = true;
+}
+
+function renderFirstRun() {
+  var el = $('firstrun');
+  if (configured()) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = installed()
+    ? '<b>This is the home-screen app, and it has its own storage.</b> On iPhone that is ' +
+      'separate from Safari, so anything set up in Safari is not here and entries you saw ' +
+      'there will not be either. Nothing is lost — they are still in Safari and in the repo. ' +
+      'Open your setup link again <b>from this app</b>, or fill the boxes below by hand.'
+    : '<b>Not set up yet.</b> Either open the setup link you were sent, or fill in the boxes ' +
+      'below. If you are going to add this to your home screen, do that <b>first</b> and then ' +
+      'open the link from the home-screen app — on iPhone the two keep separate storage.';
 }
 
 function renderDiag() {
@@ -1894,7 +1937,7 @@ function show(tab) {
   $('pane-sum').hidden  = tab !== 'sum';
   $('pane-set').hidden  = tab !== 'set';
   if (tab === 'sum') renderSummary();
-  if (tab === 'set') renderDiag();
+  if (tab === 'set') { renderFirstRun(); renderDiag(); }
 }
 
 function goCat(name) {
@@ -2199,8 +2242,8 @@ $('set-clear').addEventListener('click', function () {
      the last box on the page - so it never lost focus, never fired, and was the one thing
      not kept. Every other field survived, which made the app say "Not connected" with all
      five boxes looking correctly filled in. */
-  $(id).addEventListener('input', function () { readCfgInputs(false); paintSync(); renderDiag(); });
-  $(id).addEventListener('change', function () { readCfgInputs(true); paintSync(); renderDiag(); });
+  $(id).addEventListener('input', function () { readCfgInputs(false); paintSync(); renderDiag(); renderFirstRun(); });
+  $(id).addEventListener('change', function () { readCfgInputs(true); paintSync(); renderDiag(); renderFirstRun(); });
 });
 
 $('link-make').addEventListener('click', function () {
@@ -2269,6 +2312,7 @@ paintWhen();
 render();
 paintSync();
 renderDiag();
+renderFirstRun();
 show('log');
 
 setInterval(function () { renderState(); renderLast(); }, 30000);

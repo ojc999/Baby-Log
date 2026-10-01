@@ -51,6 +51,10 @@ what it is, and lists decisions that look arbitrary and are not.
   existing file with no `sha`, which the real API refuses with 422. The overwrite
   protection was never exercised on the path that triggers it. A lenient stub hides the
   behaviour you are testing for.
+- **Read the data repo first when sync looks wrong.** One commit per push, device name in
+  the message, one file per phone. `list_commits` and a directory listing say in two
+  requests which phones have ever written — which is usually a different question from
+  the one the symptoms suggest.
 - **Render with data before judging a screen.** An empty app hides its own timeline rows,
   undo buttons and sheets. A whole round of UI bugs survived the first browser pass
   because every screenshot was of an empty app.
