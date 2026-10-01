@@ -58,7 +58,7 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
     const kids = Object.keys(repoFiles).filter(k => k.startsWith(dec+'/'));
     if (kids.length && !repoFiles[dec])
       return route.fulfill({status:200, contentType:'application/json',
-        body:JSON.stringify(kids.map(k=>({type:'file', name:k.split('/').pop(), path:k})))});
+        body:JSON.stringify(kids.map(k=>({type:'file', name:k.split('/').pop(), path:k, sha:repoFiles[k].sha})))});
     if (repoFiles[dec])
       return route.fulfill({status:200, contentType:'application/json',
         body:JSON.stringify({sha:repoFiles[dec].sha, content:repoFiles[dec].content, path:dec})});

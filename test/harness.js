@@ -30,8 +30,12 @@ global.document = {
   querySelectorAll(){ return []; },
   addEventListener(){}, hidden: false
 };
-global.window = { addEventListener(){} };
-global.navigator = {};
+global.location = {
+  origin: 'https://example.github.io', pathname: '/baby-log/', search: '', hash: ''
+};
+global.history = { replaceState(_a, _b, url){ global.location.hash = ''; } };
+global.window = { addEventListener(){}, location: global.location };
+global.navigator = { onLine: true };
 global.fetch = () => Promise.reject(new Error('no network in tests'));
 global.btoa = s => Buffer.from(s, 'binary').toString('base64');
 global.atob = s => Buffer.from(s, 'base64').toString('binary');

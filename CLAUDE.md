@@ -17,6 +17,9 @@ what it is, and lists decisions that look arbitrary and are not.
 - **Never swallow a write error.** Surface it verbatim in Diagnostics and keep the entry
   queued. The predecessor to this app posted `Commit FAILED` into a chat, deliberately —
   that is how a silent breakage got noticed.
+- **Never bring a past day back as foreign if it is this device's own file.** `jsonlFor()`
+  exports own rows only, so a backfilled day marked foreign would be dropped the moment
+  anything wrote to that day. Backfill uses `absorbOwn` for this device's own file.
 - **Never overwrite a row this device has not seen.** A push rewrites a day's file whole,
   which is only safe while our copy is a superset of the remote one. `absorbOwn` takes in
   anything unknown first. Removing that check loses the other parent's night feeds.
@@ -37,6 +40,13 @@ what it is, and lists decisions that look arbitrary and are not.
   calls. They need Playwright; the app still has no dependencies. Logic tests cannot see
   a viewport, a tap target, a colour or a request, and every bug in those four classes
   found so far was invisible to `logic.test.js`.
+- **An optimisation that skips work must fail towards doing the work.** The poll's
+  skip-if-unchanged check was written as `seen[path] !== f.sha`, which against a listing
+  with no shas compares undefined with undefined, matches, and skips every file forever.
+  A wasted request costs nothing; a missed entry costs the night.
+- **The token may appear in a setup link, and nowhere else.** It belongs after the `#`,
+  which browsers never send to a server, and the app strips it from the address bar as
+  soon as it has read it. Never put it in a query string, a path, a log or a commit.
 - **Keep a stub as strict as the real API.** The GitHub stub once accepted a PUT to an
   existing file with no `sha`, which the real API refuses with 422. The overwrite
   protection was never exercised on the path that triggers it. A lenient stub hides the

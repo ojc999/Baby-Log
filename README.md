@@ -73,9 +73,15 @@ could lose an entry. Each push rewrites that one file whole from the phone's own
 which makes a push idempotent — repeating one is always safe, and a failed one costs
 nothing.
 
-Each phone also reads the other's file for today — on open, when you come back to it,
-and after each push, at most once a minute. So the shared asleep/awake state and the
-summary reflect both of you within a minute or so, without anyone tapping anything.
+Each phone also reads the other's file. While the app is **on screen** it checks every
+ten seconds; it stops the moment the app is backgrounded, so it costs nothing in a
+pocket. A check where nothing has changed is a single request — the folder listing
+carries each file's version, so a file that has not moved is not downloaded again.
+
+In practice: one of you logs "asleep", the other sees it within about ten seconds
+without touching anything, or instantly on opening the app. Sleep pairs across the two
+phones — she can log the down, you can log the up, and the Summary shows one complete
+sleep rather than two orphaned events.
 
 **Give the two phones different device names.** If you do not, both write the same file.
 The app will not lose anything if that happens — before overwriting, it takes in any
@@ -148,9 +154,26 @@ GitHub → **Settings → Developer settings → Personal access tokens → Fine
 Installing it matters for more than looks: an installed web app is exempt from the
 storage eviction that would otherwise clear an unsynced entry on iOS.
 
-### 5. Repeat 3–4 on the second phone
+### 5. Set up the second phone with a link
 
-Each phone needs its own install and its own **device name**. The token can be shared.
+Do steps 3–4 and 6 on your phone first. Then, on the **Setup** tab, under **Set up the
+other phone**: type a name for it (`wife-phone`), tap **Make the link**, tap **Copy it**,
+and send it across.
+
+She opens the link once. The app configures itself — repo, branch, token and her device
+name — pulls the last week of entries, and is ready. Nothing to type.
+
+*It worked if* her app shows your entries from the past few days rather than an empty
+summary, and Setup shows her own device name.
+
+**The link is the key.** Everything after the `#` is the token, and that part is never
+sent to any server — but anyone holding the link can write to the repo. Send it, let her
+open it, then delete the message. If it goes astray, revoke the token on GitHub and make
+a new one; nothing is lost, both phones just queue until you re-link them.
+
+She still needs her own **install to the home screen** (step 4). Opening the link in
+Safari and then adding to the home screen gives the home-screen app its own empty
+storage on iOS, so open the link *from* the home-screen app, or tap it again afterwards.
 
 ### 6. Set it up in the app
 
@@ -221,6 +244,7 @@ verbatim.
 | An entry is wrong | Tap **Fix** on it to change the time, amount or side, or `×` to undo it. Either way the original is kept, marked `deleted` — nothing is ever removed. |
 | You just mis-tapped | **Undo** on the strip at the bottom, for five seconds after logging. |
 | Diagnostics says `recovered N row(s)` | The file held entries this phone had not seen, and they were kept rather than overwritten. Once, after clearing the browser, is expected. Every sync means **both phones are using the same device name** — change one of them on the Setup tab. |
+| The app is only showing today | The app reads today automatically. For older days, **Setup → Load 90 days of history**. A phone set up from a link pulls the last seven days by itself. |
 | The other phone's entries are not showing | Four things to check, in order. **1.** Both phones must have **different device names** — if they share one, each skips the file named after itself and neither sees the other. Diagnostics says `SAME DEVICE NAME ON BOTH PHONES` when it can tell. **2.** Both must have the same **repo** and **branch**. **3.** Only **today** is read back, so yesterday's entries from the other phone never appear. **4.** They arrive on open and when you return to the app, at most once a minute — not instantly. |
 | Offline | Everything queues. The strip shows how many are waiting. They go up on the next sync. |
 

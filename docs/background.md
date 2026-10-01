@@ -237,6 +237,46 @@ child profiles, and anything that needs a server or an account. They are what th
 tiers are for, and each would cost the thing this app is — one file, no dependencies, and
 a record you own.
 
+## 7b. Sharing between the two phones
+
+Three things, added once the app was actually being set up on a second phone.
+
+**The setup link.** Everything the other phone needs — repo, branch, token, and the
+device name it should take — packed into the part of the URL after the `#`. Browsers
+never send that part to any server, so the token travels between the two phones and
+nowhere else. The app reads it, saves it, and strips it from the address bar with
+`history.replaceState` so it is not left sitting there or re-read on a refresh.
+
+The device name in the link is only taken by a phone that has not got one. A phone that
+already has a name keeps it and says so. Changing it would move which file that phone
+writes while leaving its earlier entries in the old one under the same ids — two copies
+of the same rows, in two files.
+
+The link is a secret in a URL, which is a real cost, accepted deliberately: it is the
+only thing that makes a new phone work without typing a token. The mitigation is that it
+is revocable in one click and that losing it costs nothing but a re-link.
+
+**Polling while on screen.** The read-back used to happen only on open and on focus, so
+an app left open never refreshed. It now polls every ten seconds while the page is
+visible and stops on `visibilitychange`. A quiet poll is one request: the directory
+listing carries each file's sha, so an unchanged file is not downloaded again. Measured
+at two requests per twelve idle seconds, against a limit of 5,000 an hour.
+
+A read that fails while `navigator.onLine` is false is swallowed rather than painted
+red — at one poll per ten seconds it would otherwise never stop shouting. A failed
+*write* still surfaces verbatim, as §10 requires.
+
+**History.** The app only ever fetched today, so a phone set up from scratch opened on
+an empty week while the days sat in the repo. It now pulls `BACKFILL_DAYS` (7) on setup
+or on opening a link, with a button for 90 days. Measured: 60 days of history is 150
+requests and finishes in about a second against a local stub.
+
+One subtlety worth keeping. A past day's file belonging to *this* device must come back
+marked as ours. If it came back as the other phone's, `jsonlFor()` would leave those rows
+out, and any later write to that day — backdating an entry into it — would rewrite the
+file without them. `absorbOwn` already does the right thing, so backfill reuses it,
+quietly. Backfill never marks a day as owing a push: it is reading, not writing.
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.
@@ -333,6 +373,17 @@ connected:
   with no `sha`. The real API returns 422. The overwrite protection therefore was not
   being exercised on the path that actually triggers it. Worth remembering when writing
   any stub: a lenient one hides the behaviour you are trying to test.
+
+A fourth pass, while adding the sharing above:
+
+- **A skip-if-unchanged check written the wrong way round skipped everything.** The poll
+  compared `seenShas[path] !== f.sha` to decide whether to download a file. Against a
+  listing with no shas that is `undefined !== undefined`, which is false, so every file
+  was skipped forever and no entry from the other phone ever arrived. Real GitHub does
+  send shas, so this would have worked in production and failed silently anywhere that
+  did not — including the test stub, which is what caught it. Written now as "skip only
+  when we positively know it has not moved": a wasted request costs nothing, a missed
+  entry costs the night.
 
 Still **not** verified, and only a real device can:
 

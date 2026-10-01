@@ -468,11 +468,28 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <button class="btn solid" id="set-test">Save and test</button>
     </div>
 
+    <div class="sect"><h2>Set up the other phone</h2><hr></div>
+    <div class="field">
+      <label for="in-other">Name for the other phone</label>
+      <input id="in-other" type="text" autocomplete="off" placeholder="wife-phone">
+      <p>Must differ from this phone's name. Whoever opens the link becomes this device.</p>
+    </div>
+    <div class="grid g2">
+      <button class="btn quiet" id="link-make">Make the link</button>
+      <button class="btn quiet" id="link-copy">Copy it</button>
+    </div>
+    <div class="diag" id="link-out" hidden></div>
+    <p class="info" id="link-note">The link carries the repo and the token, so the other
+    phone needs nothing typed. <b>Anyone holding it can write to the repo</b> — send it,
+    let them open it once, then delete the message. If it ever goes astray, revoke the
+    token on GitHub and make a new one.</p>
+
     <div class="sect"><h2>Diagnostics</h2><hr></div>
     <div class="diag" id="diag">&mdash;</div>
     <div class="grid g2" style="margin-top:9px">
       <button class="btn quiet" id="set-copy">Copy today as JSONL</button>
       <button class="btn quiet" id="set-push">Force full re-push</button>
+      <button class="btn quiet" id="set-hist">Load 90 days of history</button>
     </div>
 
     <div class="foot">
@@ -810,7 +827,9 @@ var entries = [];            // every entry this device knows: its own plus any 
 var dirty   = {};            // { 'YYYY-MM-DD': true } days this device still owes GitHub
 var shas    = {};            // { path: blob sha } so a push does not need a read first
 var cfg     = { who: '', device: '', repo: '', branch: 'main', token: '' };
-var PULL_EVERY_MS = 60000;   /* at most one read-back a minute unless asked */
+var PULL_EVERY_MS = 60000;   /* read-back throttle when the app is merely focused */
+var LIVE_EVERY_MS = 10000;   /* read-back while the app is actually on screen */
+var BACKFILL_DAYS = 7;       /* days of history a newly set-up phone pulls down */
 var lastErr = '';
 var lastPush = '';
 var lastPull = '';
@@ -818,6 +837,9 @@ var pushing = false;
 var lastPullMs = 0;        /* throttles the read-back of the other phone */
 var absorbed = 0;          /* rows recovered from our own remote file, see absorbOwn */
 var sharedName = false;    /* true once we see another person writing our own device file */
+var seenShas = {};         /* { path: sha } of foreign files already merged, so a poll skips them */
+var liveT = null;          /* the on-screen poll timer */
+var backfilling = false;
 
 var screen = 'home';         // home | cat
 var curCat = null;
@@ -1035,7 +1057,7 @@ function jsonlFor(day) {
    what every push does — would delete the other phone's night feeds without a word.
    Taking the unknown rows into our copy first means the push writes the union, so
    whichever phone pushes last, nothing is lost. Returns how many were taken. */
-function absorbOwn(text, day) {
+function absorbOwn(text, day, quiet) {
   var have = {};
   entries.forEach(function (r) { have[r.msg_id] = true; });
   var taken = 0;
@@ -1056,6 +1078,7 @@ function absorbOwn(text, day) {
   if (taken) {
     entries.sort(function (a, b) { return a.ms - b.ms; });
     saveEntries();
+    if (quiet) return taken;        /* backfilling history is not a recovery; say nothing */
     absorbed += taken;
     /* Rows in this device's own file written by somebody else is what two phones sharing
        one device name looks like. Say that plainly rather than leaving it to be inferred:
@@ -1179,8 +1202,16 @@ function pullToday() {
     .then(function (r) {
       if (!r.ok || !Array.isArray(r.json)) return null;   // folder not there yet: fine
       var mine = cfg.device + '.jsonl';
+      /* The listing already carries each file's sha, so a file that has not moved since
+         the last poll needs no second request. That is what makes polling every ten
+         seconds cheap: a quiet minute costs six listings and nothing else. */
       var others = r.json.filter(function (f) {
-        return f.type === 'file' && /\.jsonl$/.test(f.name) && f.name !== mine;
+        if (f.type !== 'file' || !/\.jsonl$/.test(f.name) || f.name === mine) return false;
+        /* Skip only when we positively know the file has not moved. Written the other way
+           round - `seenShas[path] !== f.sha` - a listing without shas compares undefined
+           with undefined, matches, and silently skips every file forever. Fail towards
+           fetching: a wasted request costs nothing, a missed entry costs the night. */
+        return !(f.sha && seenShas[f.path] === f.sha);
       });
       return Promise.all(others.map(function (f) {
         return gh('GET', '/contents/' + f.path +
@@ -1188,6 +1219,7 @@ function pullToday() {
           .then(function (g) {
             if (!g.ok || !g.json || !g.json.content) return;
             mergeForeign(b64dec(g.json.content), f.name.replace(/\.jsonl$/, ''), day);
+            if (f.sha) seenShas[f.path] = f.sha;
           });
       })).then(function () {
         lastPull = isoSG(Date.now());
@@ -1195,9 +1227,151 @@ function pullToday() {
       });
     })
     .catch(function (err) {
+      /* A read that fails because the phone is offline is not worth painting the strip
+         red for - it polls every ten seconds, so it would never stop shouting. The
+         online event brings it back. */
+      if (navigator.onLine === false) return;
       lastErr = 'Read-back failed: ' + ((err && err.message) ? err.message : String(err));
       renderDiag();
     });
+}
+
+/* ───── the setup link ─────
+   Everything the other phone needs, carried in the part of the URL after the '#'. That
+   part is never sent to any server - not to GitHub Pages, not to anyone - so the token
+   travels only between the two phones. It is still a secret in a link: whoever holds it
+   can write. The app strips it out of the address bar the moment it has read it, so it
+   does not sit in the address bar or get re-read on a refresh.
+
+   encodeURIComponent before btoa because a token is ASCII but a device name may not be. */
+function makeLink(otherDevice) {
+  var payload = {
+    r: cfg.repo, b: cfg.branch || 'main', t: cfg.token, d: otherDevice
+  };
+  var packed = btoa(encodeURIComponent(JSON.stringify(payload)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return location.origin + location.pathname + '#s=' + packed;
+}
+
+/* Returns true if a link was found and applied. */
+function applyLink() {
+  var h = location.hash || '';
+  var m = h.match(/[#&]s=([A-Za-z0-9\-_]+)/);
+  if (!m) return false;
+
+  /* Clear it first, whatever happens next: a malformed link should not linger either. */
+  try { history.replaceState(null, '', location.pathname + location.search); }
+  catch (e) { location.hash = ''; }
+
+  var data = null;
+  try {
+    var b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    data = JSON.parse(decodeURIComponent(atob(b64)));
+  } catch (e) { return false; }
+  if (!data || !data.r || !data.t) return false;
+
+  cfg.repo   = data.r;
+  cfg.branch = data.b || 'main';
+  cfg.token  = data.t;
+  /* The device name is taken only by a phone that has not got one. A phone already
+     carrying a name keeps it: changing it would move which file this phone writes, and
+     leave its earlier entries sitting in the old one under the same ids. */
+  var kept = false;
+  if (!cfg.device) cfg.device = data.d || '';
+  else if (data.d && data.d !== cfg.device) kept = true;
+  saveCfg();
+
+  $('in-repo').value = cfg.repo;
+  $('in-branch').value = cfg.branch;
+  $('in-token').value = cfg.token;
+  $('in-device').value = cfg.device;
+  return kept ? 'kept' : true;
+}
+
+/* ───── history ─────
+   The app only ever read today, so a phone set up from scratch opened on an empty week
+   even though the days were sitting in the repo. This walks back a given number of days
+   and merges what it finds.
+
+   The subtle part: a past day's file belonging to THIS device has to come back as ours,
+   not as the other phone's. If it came back foreign, jsonlFor() would leave those rows
+   out, and a later write to that day - backdating an entry into it, say - would rewrite
+   the file without them. absorbOwn already does exactly the right thing, so it is reused
+   here, quietly, because this is history arriving rather than a collision being survived. */
+function backfillDay(day) {
+  return gh('GET', '/contents/data/events/' + day +
+                   '?ref=' + encodeURIComponent(cfg.branch || 'main'))
+    .then(function (r) {
+      if (!r.ok || !Array.isArray(r.json)) return 0;      /* nothing logged that day */
+      var mine = cfg.device + '.jsonl';
+      var files = r.json.filter(function (f) {
+        return f.type === 'file' && /\.jsonl$/.test(f.name);
+      });
+      return Promise.all(files.map(function (f) {
+        return gh('GET', '/contents/' + f.path + '?ref=' + encodeURIComponent(cfg.branch || 'main'))
+          .then(function (g) {
+            if (!g.ok || !g.json || !g.json.content) return;
+            var text = b64dec(g.json.content);
+            if (f.name === mine) absorbOwn(text, day, true);
+            else {
+              mergeForeign(text, f.name.replace(/\.jsonl$/, ''), day);
+              if (f.sha) seenShas[f.path] = f.sha;
+            }
+          });
+      })).then(function () { return files.length; });
+    })
+    .catch(function () { return 0; });                     /* one bad day must not stop the rest */
+}
+
+/* Walk back `days` days before today, a few at a time so the phone is not firing fifty
+   requests at once. Never marks a day as owing a push: this is reading, not writing. */
+function backfill(days) {
+  if (!configured() || backfilling) return Promise.resolve();
+  backfilling = true;
+  var list = [];
+  for (var i = 1; i <= days; i++) list.push(daySG(Date.now() - i * 86400000));
+  var found = 0, done = 0;
+
+  function batch() {
+    if (!list.length) return Promise.resolve();
+    var chunk = list.splice(0, 5);
+    return Promise.all(chunk.map(function (d) {
+      return backfillDay(d).then(function (n) { found += n; done++; });
+    })).then(function () {
+      if (days > 14) toast('Loading history… ' + done + ' of ' + days + ' days');
+      return batch();
+    });
+  }
+
+  return batch().then(function () {
+    backfilling = false;
+    saveEntries(); render(); renderDiag();
+    toast(found ? 'History loaded — ' + days + ' days checked' : 'No earlier days found in the repo');
+  }).catch(function () {
+    backfilling = false;
+    render(); renderDiag();
+  });
+}
+
+/* ───── live read-back ─────
+   The app used to look for the other phone's entries only when opened or returned to.
+   Left open on the counter it never refreshed at all, so "she logs sleep, he logs wake"
+   needed one of you to close and reopen the app. This polls while the page is actually
+   on screen and stops the moment it is not, so it costs nothing in a pocket. */
+function liveTick() {
+  if (!configured() || document.hidden || navigator.onLine === false) return;
+  lastPullMs = Date.now();          /* keep the focus path from pulling again straight after */
+  pullToday();
+}
+function startLive() {
+  if (liveT || !configured()) return;
+  liveT = setInterval(liveTick, LIVE_EVERY_MS);
+}
+function stopLive() {
+  if (!liveT) return;
+  clearInterval(liveT);
+  liveT = null;
 }
 
 /* Entries from another device are read-only here. That device's file is the whole
@@ -1984,6 +2158,10 @@ $('set-test').addEventListener('click', function () {
        used to produce no sign at all - which looks exactly like a failed one. */
     toast('Connected. This phone writes <b>' + esc(dayPath(daySG(Date.now()))) + '</b>');
     flush(true);
+    startLive();
+    /* A phone that has barely any entries of its own has just been set up, so fetch a
+       week of history rather than leaving it staring at an empty summary. */
+    if (entries.length < 5) backfill(BACKFILL_DAYS);
   }).catch(function (err) {
     btn.textContent = 'Save and test';
     lastErr = 'Could not reach GitHub: ' + ((err && err.message) ? err.message : String(err)) +
@@ -2025,6 +2203,34 @@ $('set-clear').addEventListener('click', function () {
   $(id).addEventListener('change', function () { readCfgInputs(true); paintSync(); renderDiag(); });
 });
 
+$('link-make').addEventListener('click', function () {
+  readCfgInputs(true);
+  var other = $('in-other').value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
+  $('in-other').value = other;
+  if (!configured()) { toast('Fill in this phone\'s setup first, then make the link.'); return; }
+  if (!other) { toast('Give the other phone a name first.'); return; }
+  if (other === cfg.device) {
+    toast('That is this phone\'s name. The other phone needs a different one, or neither of you will see the other.');
+    return;
+  }
+  $('link-out').hidden = false;
+  $('link-out').textContent = makeLink(other);
+});
+
+$('link-copy').addEventListener('click', function () {
+  var btn = this, txt = $('link-out').textContent;
+  if (!txt) { toast('Tap "Make the link" first.'); return; }
+  function done(m) { btn.textContent = m; setTimeout(function () { btn.textContent = 'Copy it'; }, 1800); }
+  try {
+    navigator.clipboard.writeText(txt).then(function () { done('Copied'); }, function () { done('Clipboard refused'); });
+  } catch (e) { done('Clipboard refused'); }
+});
+
+$('set-hist').addEventListener('click', function () {
+  if (!configured()) { toast('Set this phone up first.'); return; }
+  backfill(90);
+});
+
 $('set-push').addEventListener('click', function () {
   // mark every day this device has as owing a push, then flush
   entries.forEach(function (r) { if (r.own) dirty[daySG(r.ms)] = true; });
@@ -2057,6 +2263,8 @@ $('in-device').value = cfg.device;
 $('in-repo').value = cfg.repo;
 $('in-branch').value = cfg.branch || 'main';
 $('in-token').value = cfg.token ? cfg.token : '';
+
+var linked = applyLink();     /* a setup link, if this was opened from one */
 paintWhen();
 render();
 paintSync();
@@ -2064,10 +2272,22 @@ renderDiag();
 show('log');
 
 setInterval(function () { renderState(); renderLast(); }, 30000);
-window.addEventListener('online', function () { lastErr = ''; flush(); });
-window.addEventListener('focus', function () { flush(); });
-document.addEventListener('visibilitychange', function () { if (!document.hidden) flush(); });
-if (configured()) flush();
+window.addEventListener('online', function () { lastErr = ''; flush(); startLive(); });
+window.addEventListener('focus', function () { flush(); startLive(); });
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) { stopLive(); return; }
+  flush(); startLive();
+});
+if (configured()) { flush(); if (!document.hidden) startLive(); }
+
+if (linked) {
+  if (linked === 'kept') {
+    toast('Set up from the link. This phone kept the name <b>' + esc(cfg.device) + '</b>.');
+  } else {
+    toast('Set up from the link as <b>' + esc(cfg.device) + '</b>. Loading the last week…');
+  }
+  backfill(BACKFILL_DAYS);
+}
 
 /* Offline shell. Absent in previews and anywhere without a service worker; the app
    works regardless, so a failure here is ignored on purpose. */
