@@ -86,6 +86,31 @@ async function phone(b){
   t('and from the whole URL', (await W.evaluate(()=>location.href)).indexOf('github_pat'), -1);
   t('she sees his history, not an empty week', await W.evaluate(()=>entries.length) >= 5, true);
 
+  console.log('\n--- the home-screen app: pasting the link, since iOS cannot open one into it ---');
+  const hs = await phone(b);
+  await hs.addInitScript(()=>{ Object.defineProperty(window.navigator,'standalone',{get:()=>true}); });
+  const HS = await hs.newPage();
+  await HS.goto('http://localhost:8800/', {waitUntil:'domcontentloaded'});   // no fragment
+  await HS.waitForTimeout(400);
+  t('it opens unconfigured, as the separate storage jar does',
+     await HS.evaluate(()=>configured()), false);
+  await HS.click('#tab-set'); await HS.waitForTimeout(200);
+  t('and says it is the home-screen copy',
+     /own storage/.test((await HS.textContent('#firstrun'))||''), true);
+  await HS.fill('#in-paste','not a link at all');
+  await HS.click('#paste-use'); await HS.waitForTimeout(250);
+  t('rubbish in the box is refused', await HS.evaluate(()=>configured()), false);
+  t('and says so', /does not look like a setup link/.test((await HS.textContent('#toast-txt'))||''), true);
+  await HS.fill('#in-paste', link);
+  await HS.click('#paste-use'); await HS.waitForTimeout(2500);
+  const hcfg = await HS.evaluate(()=>({ok:configured(), device:cfg.device, repo:cfg.repo, n:entries.length}));
+  t('pasting the link sets it up', hcfg.ok, true);
+  t('with the right device name', hcfg.device, 'wife-phone');
+  t('and it pulls the history too', hcfg.n >= 5, true);
+  t('the box is cleared after use', await HS.inputValue('#in-paste'), '');
+  t('the banner goes', await HS.isHidden('#firstrun'), true);
+  await hs.close();
+
   console.log('\n--- live: he logs, she sees it without touching her phone ---');
   const before = await W.evaluate(()=>entries.length);
   await H.click('#tab-log');

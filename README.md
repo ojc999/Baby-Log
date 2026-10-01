@@ -171,15 +171,23 @@ sent to any server — but anyone holding the link can write to the repo. Send i
 open it, then delete the message. If it goes astray, revoke the token on GitHub and make
 a new one; nothing is lost, both phones just queue until you re-link them.
 
-**Order matters on iPhone, and getting it wrong is the commonest way this looks broken.**
-A home-screen web app has its own storage, separate from Safari. Set the app up in Safari,
-then add it to the home screen, and the home-screen copy opens with nothing in it — no
-token, and none of the entries you just watched arrive. Nothing is lost; they are still in
-Safari and in the repo. But it reads exactly like the app forgetting everything.
+**On iPhone, do not tap the link.** Tapping a link opens Safari, and a home-screen web app
+on iOS keeps its own storage, separate from Safari — so setting up by tapping the link sets
+up *Safari*, not the app on the home screen. The home-screen copy then opens with nothing
+in it: no token, and none of the entries you just watched arrive. Nothing is lost, but it
+reads exactly like the app forgetting everything.
 
-So: **add to the home screen first, then open the setup link from the home-screen app.**
-If it has already happened, just open the link again from the home-screen app. The app now
-says which of the two you are in rather than leaving you to guess.
+There is no address bar inside a home-screen app, so the link cannot be opened in it
+either. The way in is to paste it:
+
+1. Open the site in Safari once and **Add to Home Screen**.
+2. **Copy** the setup link (long-press the message → Copy).
+3. Open the app **from the home-screen icon**.
+4. **Setup → Paste a setup link →** paste → **Use this link**.
+
+The app says which of the two it is running as, so it is obvious if you set up the wrong
+one. On Android this does not arise — Chrome and the installed app share storage — so
+tapping the link is fine there.
 
 ### 6. Set it up in the app
 

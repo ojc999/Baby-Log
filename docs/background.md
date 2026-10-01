@@ -398,6 +398,12 @@ going wrong.
   but never drew out that the two are different jars from the start. The app now detects
   which it is running as and says so, because "Not connected" sends you hunting for a
   token you already pasted.
+- **And the setup link could not reach the installed app at all.** Tapping a link on iOS
+  opens Safari, and a home-screen app has no address bar, so "open the link from the
+  home-screen app" — which is what the README said — was not a thing anyone could do. The
+  Setup tab now takes a pasted link, which is the only route in. The advice was wrong for
+  a week before anyone tried it on an iPhone, which is the §9 lesson again: a browser is
+  the only thing that can catch this, and the right browser is the one in your pocket.
 - **`sender` falls back to `me` when the name box is empty**, so every row in the first
   real day reads `me` and you cannot tell who logged what. Harmless to the data and
   recorded here because it looks like a bug.
