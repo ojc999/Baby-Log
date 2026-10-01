@@ -17,9 +17,14 @@ what it is, and lists decisions that look arbitrary and are not.
 - **Never swallow a write error.** Surface it verbatim in Diagnostics and keep the entry
   queued. The predecessor to this app posted `Commit FAILED` into a chat, deliberately —
   that is how a silent breakage got noticed.
+- **Never overwrite a row this device has not seen.** A push rewrites a day's file whole,
+  which is only safe while our copy is a superset of the remote one. `absorbOwn` takes in
+  anything unknown first. Removing that check loses the other parent's night feeds.
 - **Never silently repair data.** An unpaired sleep entry is a missed message and must
   stay visible as a gap, named on the screen, not quietly paired with the next event.
-- **Never delete an entry.** Undo marks `type: "deleted"` and keeps the row.
+- **Never delete an entry.** Undo marks `type: "deleted"` and keeps the row. A correction
+  is the same thing twice over: mark the original `deleted`, write a new entry. Never
+  edit a row in place, however much easier it looks.
 - **Never rename or repurpose a field** in the data contract. Add one if you must.
 - **Never add a build step, a framework, or a bundler.** One HTML file, plain
   JavaScript, no dependencies. If something seems to need React, it does not.
@@ -28,6 +33,13 @@ what it is, and lists decisions that look arbitrary and are not.
 
 - Run `node test/logic.test.js` before claiming a change works, and add a case for
   anything you fix.
+- Run `test/browser/*.test.js` too for anything touching layout, colour or the GitHub
+  calls. They need Playwright; the app still has no dependencies. Logic tests cannot see
+  a viewport, a tap target, a colour or a request, and every bug in those four classes
+  found so far was invisible to `logic.test.js`.
+- **Render with data before judging a screen.** An empty app hides its own timeline rows,
+  undo buttons and sheets. A whole round of UI bugs survived the first browser pass
+  because every screenshot was of an empty app.
 - Keep `LABELS` and `CAT_OF` in step with `CATS` and `SHEETS`. The tests fail otherwise,
   which is intended.
 - Edit the parser in `docs/parser-source.gs`, run its tests, then copy it into

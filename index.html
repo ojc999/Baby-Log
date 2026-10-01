@@ -15,15 +15,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <style>
-/* Colours are checked against WCAG AA (4.5:1 for body text) by the dark/contrast
-   harness in the development notes. --ink-faint and --amber were nudged after that
-   check; if you change them, re-run it.
+/* Colours are checked against WCAG AA (4.5:1 for body text) by test/browser/contrast.js,
+   which measures every rendered text node against its own background. --ink-faint has to
+   clear 4.5:1 on all eight light backgrounds, the five category tints included - it was
+   first set against the plain ones only and still failed on every tint. Re-run the check
+   if you change --ink-faint, --ink-dim or any *-bg.
    Layout: full-height shell. Sticky state header, one screen at a time
    (home → category → back), sticky tab bar. Tokens follow
    apps/early-labour-timer so the repo's apps look like one family. */
 :root{
   --ground:#f4f6f5; --surface:#ffffff; --surface-2:#eceff0; --line:#d8dedd;
-  --ink:#141a1f; --ink-dim:#5d6a73; --ink-faint:#66727a;
+  --ink:#141a1f; --ink-dim:#5d6a73; --ink-faint:#5f6b73;
   --amber:#a75c00; --amber-bg:#fdf1de; --amber-line:#e8c48c;
   --teal:#0f7d6b; --teal-bg:#def0ec; --teal-line:#8dc9bd;
   --alert:#c0392b; --alert-bg:#fbe6e3; --alert-line:#e7a79f;
@@ -196,7 +198,14 @@ body{
 .sheet-head{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim)}
 .sheet-val{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--ink);margin-left:auto;font-variant-numeric:tabular-nums}
 .sheet-row{display:flex;flex-wrap:wrap;gap:6px}
-.sheet-row .chip{background:var(--surface)}
+/* The unpressed chip inside a sheet sits on the sheet's own tint, so it needs a plain
+   background to read against it. This has the same specificity as the pressed rule above
+   and comes after it, so for a long time it also overrode the pressed background while
+   leaving the pressed text colour in place - a selected preset or side rendered at about
+   1.1:1, which is invisible. The selected amount and the selected side are the two things
+   you have to be able to read before tapping Save. Keep the :not() so the pressed state
+   always wins, whatever order these end up in. */
+.sheet-row .chip:not([aria-pressed="true"]){background:var(--surface)}
 .sheet-act{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:10px}
 .sheet-act .btn{min-height:50px;font-size:15px}
 
@@ -217,11 +226,17 @@ body{
 .row-b strong{font-weight:600;font-size:14px}
 .row-b em{font-style:normal;color:var(--ink-faint);font-size:12px;display:block;margin-top:1px;word-break:break-word}
 .row-who{flex:none;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);padding-top:3px}
-.row.del{opacity:.42}
 .row.del strong{text-decoration:line-through}
 .row.pend .row-t::after{content:"\00B7";color:var(--amber);font-size:20px;vertical-align:middle}
 .del-tag{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--alert);text-transform:uppercase}
-.row-x{appearance:none;flex:none;background:transparent;border:0;color:var(--ink-faint);font-size:17px;line-height:1;padding:5px 7px;cursor:pointer;border-radius:7px;min-height:34px}
+.row-x{appearance:none;flex:none;background:transparent;border:0;color:var(--ink-faint);font-size:19px;line-height:1;
+  cursor:pointer;border-radius:9px;min-height:44px;min-width:44px;display:flex;align-items:center;justify-content:center}
+.row-fix{appearance:none;flex:none;background:transparent;border:0;color:var(--ink-faint);font-family:var(--sans);
+  font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border-radius:9px;
+  min-height:44px;min-width:44px;padding:0 6px}
+.row-fix:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+.row.del{opacity:1}
+.row.del strong,.row.del .row-t,.row.del .row-who{color:var(--ink-faint)}
 .row-x:focus-visible{outline:2px solid var(--alert);outline-offset:1px}
 .empty{padding:26px 12px;text-align:center;color:var(--ink-faint);font-size:13px}
 
@@ -253,6 +268,58 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 .foot{margin-top:20px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint)}
 .foot p{margin:0 0 8px}
 .foot code{font-family:var(--mono);font-size:11px;background:var(--surface-2);padding:1px 4px;border-radius:4px}
+
+/* ───── toast ─────
+   A real one. `toast()` used to set lastErr, which turned the sync strip red and said
+   "sync failed" - so refusing to undo another phone's entry looked like a network fault.
+   It also carries the Undo for the entry just logged, because a mis-tap while holding a
+   baby is the commonest way a wrong row gets in, and hunting for a small × in a list is
+   the wrong answer to it. */
+.toast{
+  position:fixed;left:12px;right:12px;z-index:40;
+  bottom:calc(env(safe-area-inset-bottom,0px) + 66px);
+  display:flex;align-items:center;gap:10px;
+  background:var(--ink);color:var(--ground);border-radius:12px;padding:11px 12px;
+  font-size:14px;font-weight:500;box-shadow:0 6px 22px rgba(0,0,0,.26);
+  transition:opacity .16s ease,transform .16s ease;
+}
+.toast[hidden]{display:none!important}
+.toast.out{opacity:0;transform:translateY(6px)}
+.toast b{font-weight:700}
+.toast-act{
+  appearance:none;margin-left:auto;flex:none;background:transparent;border:1px solid currentColor;
+  color:inherit;font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;border-radius:8px;padding:0 12px;min-height:44px;cursor:pointer;
+}
+
+/* ───── correct an entry ─────
+   The single commonest request across every commercial baby tracker: let me fix a row
+   instead of deleting the day. Undo-and-re-log already did this in two steps; this is
+   the same two steps behind one button, so the audit trail is unchanged - the old row
+   stays, marked deleted, and the correction is a new row. */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:flex-end}
+.modal[hidden]{display:none!important}
+.modal-card{
+  width:100%;background:var(--ground);border-radius:16px 16px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 16px);
+  max-height:88%;overflow-y:auto;border-top:1px solid var(--line);
+}
+.modal-card h3{margin:0 0 3px;font-size:17px;font-weight:700}
+.modal-card .was{margin:0 0 13px;font-size:12.5px;color:var(--ink-faint)}
+.fixrow{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.fixrow label{flex:none;width:76px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint)}
+.fixrow input{
+  flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);
+  font-family:var(--mono);font-size:16px;padding:10px 12px;min-height:48px;
+}
+.fixrow input:focus{outline:2px solid var(--teal);outline-offset:-1px}
+.fixrow .unit{flex:none;font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
+
+/* ───── which side next ───── */
+.sidehint{
+  margin:9px 0 0;padding:9px 11px;border-radius:10px;font-size:13px;
+  background:var(--mum-bg);border:1px solid var(--mum-line);color:var(--mum);
+}
+.sidehint b{font-weight:700}
 
 /* ───── tabs ───── */
 .tabs{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -329,6 +396,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       </div>
       <div class="sheet-row" id="sheet-presets"></div>
       <div class="sheet-row" id="sheet-side" style="margin-top:6px"></div>
+    <p class="sidehint" id="sheet-hint" hidden></p>
       <div class="sheet-act">
         <button class="btn" id="sheet-cancel">Cancel</button>
         <button class="btn solid" id="sheet-save">Save</button>
@@ -418,11 +486,42 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     </div>
   </div>
 
+  <div class="toast" id="toast" hidden role="status" aria-live="polite">
+    <span id="toast-txt"></span>
+    <button class="toast-act" id="toast-act" hidden></button>
+  </div>
+
   <nav class="tabs" role="tablist">
     <button class="tab" id="tab-log" role="tab" aria-selected="true">Log</button>
     <button class="tab" id="tab-sum" role="tab" aria-selected="false">Summary</button>
     <button class="tab" id="tab-set" role="tab" aria-selected="false">Setup</button>
   </nav>
+
+<div class="modal" id="fix" hidden role="dialog" aria-modal="true" aria-labelledby="fix-h">
+  <div class="modal-card">
+    <h3 id="fix-h">Correct this entry</h3>
+    <p class="was" id="fix-was"></p>
+    <div class="fixrow">
+      <label for="fix-time">Time</label>
+      <input id="fix-time" type="time">
+    </div>
+    <div class="fixrow" id="fix-amt-row" hidden>
+      <label for="fix-amt">Amount</label>
+      <input id="fix-amt" type="number" inputmode="decimal" step="any">
+      <span class="unit" id="fix-unit"></span>
+    </div>
+    <div class="fixrow" id="fix-side-row" hidden>
+      <label>Side</label>
+      <div class="sheet-row" id="fix-side"></div>
+    </div>
+    <p class="was">The entry as it stands is kept, marked undone. The correction is saved
+    as a new entry, so the record still shows what was first logged and when it changed.</p>
+    <div class="grid g2">
+      <button class="btn quiet" id="fix-cancel">Cancel</button>
+      <button class="btn solid" id="fix-save">Save correction</button>
+    </div>
+  </div>
+</div>
 </div>
 
 <script>
@@ -825,12 +924,16 @@ function live() { return entries.filter(function (r) { return r.type !== 'delete
 function undo(id) {
   for (var i = entries.length - 1; i >= 0; i--) {
     if (entries[i].msg_id === id && entries[i].type !== 'deleted') {
-      if (!entries[i].own) { toast('That one was logged on another device. Undo it there.'); return; }
+      if (!entries[i].own) {
+        toast('That one was logged on the other phone. It can only be undone there.');
+        return;
+      }
       entries[i].type = 'deleted';
       entries[i].subtype = '';
       dirty[daySG(entries[i].ms)] = true;
       saveEntries(); saveDirty();
       afterWrite();
+      hideToast();
       return;
     }
   }
@@ -1113,6 +1216,20 @@ function mergeForeign(text, device, day) {
 
 function $(id) { return document.getElementById(id); }
 
+/* Which breast to start on. Every breastfeeding app in common use shows this, because
+   it is the one thing nobody can remember at 3am. It needs no new field: the side is
+   already kept in `note` on a feed/breast row. Returns '' when there is nothing to go on. */
+function lastSide() {
+  var r = lastOf(function (x) {
+    return x.type === 'feed' && x.subtype === 'breast' && (x.note === 'left' || x.note === 'right');
+  });
+  return r ? r.note : '';
+}
+function nextSide() {
+  var l = lastSide();
+  return l === 'left' ? 'right' : (l === 'right' ? 'left' : '');
+}
+
 function lastOf(pred) {
   var rows = live().filter(pred);
   return rows.length ? rows[rows.length - 1] : null;
@@ -1139,9 +1256,14 @@ function renderLast() {
                  staleAfterH && h > staleAfterH);
   }
 
+  /* Which breast comes next rides on the Last feed line rather than taking a card of its
+     own: six cards pushed the logging tiles off the first screen on a small phone, and
+     tapping a category is the thing this app is for. */
+  var nxt = nextSide();
   $('lastgrid').innerHTML =
     card('Last feed', feed, function (r) {
-      return r.value !== null ? r.value + (r.unit === 'min' ? ' min' : ' ml') : label(r);
+      return (r.value !== null ? r.value + (r.unit === 'min' ? ' min' : ' ml') : label(r)) +
+             (nxt ? ' · next ' + nxt : '');
     }, 4) +
     card('Last poop', poo, null, 30) +
     card('Last wet', wet, null, 6) +
@@ -1188,7 +1310,11 @@ function rowHtml(r, showDate) {
                : (r.note && r.note !== 'left' && r.note !== 'right' ? '<em>' + esc(r.note) + '</em>' : ''))) +
     '</span>' +
     '<span class="row-who">' + esc(r.sender) + '</span>' +
-    (del ? '' : '<button class="row-x" data-del="' + esc(r.msg_id) + '" aria-label="Undo">&times;</button>') +
+    /* Only our own rows get controls. The other phone's file is not ours to write, so a
+       x there was a button that could only ever refuse. */
+    (del || !r.own ? '' :
+      '<button class="row-fix" data-fix="' + esc(r.msg_id) + '" aria-label="Correct this entry">Fix</button>' +
+      '<button class="row-x" data-del="' + esc(r.msg_id) + '" aria-label="Undo this entry">&times;</button>') +
   '</div>';
 }
 
@@ -1396,18 +1522,169 @@ function renderDiag() {
   $('diag').textContent = L.join('\n');
 }
 
-function toast(msg) {
-  lastErr = msg;
-  paintSync(); renderDiag();
+/* A real toast. This used to set lastErr, which painted the sync strip red and said
+   "sync failed" - so being told you cannot undo the other phone's entry looked like a
+   network fault and sent you to Diagnostics for nothing. Errors still go to lastErr;
+   this is for things that are not errors.
+   `undoId` adds an Undo button, which is the answer to the commonest way a wrong entry
+   gets in: a mis-tap while holding the baby. */
+var toastT = null;
+function toast(msg, undoId) {
+  var el = $('toast'), act = $('toast-act');
+  $('toast-txt').innerHTML = msg;
+  if (undoId) {
+    act.hidden = false;
+    act.textContent = 'Undo';
+    act.dataset.undo = undoId;
+  } else {
+    act.hidden = true;
+    delete act.dataset.undo;
+  }
+  el.hidden = false;
+  el.classList.remove('out');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(hideToast, undoId ? 5200 : 3400);
+}
+function hideToast() {
+  var el = $('toast');
+  if (el.hidden) return;
+  el.classList.add('out');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () { el.hidden = true; el.classList.remove('out'); }, 180);
 }
 
 function buzz() { try { if (navigator.vibrate) navigator.vibrate(18); } catch (e) {} }
 
-/* Every write ends here: clear the backdate, redraw, buzz, push. */
-function afterWrite() {
+/* Every write ends here: clear the backdate, redraw, buzz, push. `e` is the entry just
+   written, if there is one - it gets a toast with an Undo, so a mis-tap is one tap to
+   put right rather than a hunt for a small x in a list. */
+function afterWrite(e) {
   offsetMin = 0; absTime = ''; $('when-time').value = '';
   paintWhen(); render(); paintSync(); renderDiag(); buzz();
+  if (e && e.msg_id && e.type !== 'deleted') {
+    toast('<b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms), e.msg_id);
+  }
   flush();
+}
+
+/* ═══════════════════════ correcting an entry ═══════════════════════
+
+   Across every baby tracker in common use, the most asked-for thing is being able to fix
+   a row rather than throw the day away. The rule here does not bend for it: nothing is
+   edited in place and nothing is removed. A correction marks the original `deleted` and
+   writes a new entry, which is exactly undo-and-re-log - the two steps a parent already
+   had to do - behind one button. The record still shows what was first logged, so a
+   correction is visible as a correction rather than a rewrite of history. */
+
+var fixing = null;        /* msg_id of the entry being corrected */
+var fixSide = '';
+
+function openFix(id) {
+  var r = null;
+  for (var i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].msg_id === id) { r = entries[i]; break; }
+  }
+  if (!r) return;
+  if (!r.own) { toast('That one was logged on the other phone. It can only be changed there.'); return; }
+  if (r.type === 'deleted') return;
+
+  fixing = id;
+  fixSide = (r.note === 'left' || r.note === 'right') ? r.note : '';
+  $('fix-was').textContent = 'Logged as ' + describe(r) + ' at ' + hhmm(r.ms) + '.';
+  $('fix-time').value = hhmm(r.ms);
+
+  var hasAmt = r.value !== null && r.value !== undefined && r.value !== '';
+  $('fix-amt-row').hidden = !hasAmt;
+  $('fix-amt').value = hasAmt ? r.value : '';
+  $('fix-unit').textContent = r.unit === 'C' ? '°C' : (r.unit || '');
+
+  var sides = r.type === 'feed' && r.subtype === 'breast';
+  $('fix-side-row').hidden = !sides;
+  $('fix-side').innerHTML = sides
+    ? '<button class="chip" data-fixside="left">left</button><button class="chip" data-fixside="right">right</button>'
+    : '';
+  paintFixSide();
+
+  $('fix').hidden = false;
+}
+
+function paintFixSide() {
+  $('fix-side').querySelectorAll('[data-fixside]').forEach(function (b) {
+    b.setAttribute('aria-pressed', b.dataset.fixside === fixSide ? 'true' : 'false');
+  });
+}
+
+function closeFix() { $('fix').hidden = true; fixing = null; }
+
+/* Build a timestamp from an HH:MM typed into the correction box, on the same day the
+   entry already belongs to - not today. Correcting a 23:50 feed the next morning must
+   not move it to tonight. */
+function fixStamp(day, hhmmStr) {
+  var hm = String(hhmmStr || '').split(':');
+  if (hm.length !== 2) return null;
+  var t = Date.parse(day + 'T' + ('0' + hm[0]).slice(-2) + ':' + ('0' + hm[1]).slice(-2) + ':00+08:00');
+  return isNaN(t) ? null : t;
+}
+
+function saveFix() {
+  if (!fixing) return;
+  var old = null;
+  for (var i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].msg_id === fixing) { old = entries[i]; break; }
+  }
+  if (!old || !old.own || old.type === 'deleted') { closeFix(); return; }
+
+  /* Read everything off the original before anything is changed. */
+  var oldDay   = daySG(old.ms);
+  var oldType  = old.type;
+  var oldSub   = old.subtype;
+  var oldUnit  = old.unit || '';
+  var oldRaw   = old.raw || '';
+  var oldNote  = old.note || '';
+  var oldSend  = old.sender;
+
+  var ms = fixStamp(oldDay, $('fix-time').value);
+  if (ms === null) { toast('That time did not make sense, so nothing was changed.'); return; }
+  /* Nothing can have happened yet. Everywhere else that takes a time refuses the future
+     too; a corrected entry in the future would read as a negative "time since". */
+  if (ms > Date.now() + 60000) {
+    toast('That time has not happened yet, so nothing was changed.');
+    return;
+  }
+
+  var value = old.value;
+  if (!$('fix-amt-row').hidden) {
+    var typed = String($('fix-amt').value).trim();
+    if (typed === '') { value = null; }
+    else {
+      var n = Number(typed);
+      if (isNaN(n)) { toast('That amount did not make sense, so nothing was changed.'); return; }
+      value = n;
+    }
+  }
+  var note = $('fix-side-row').hidden ? oldNote : fixSide;
+
+  /* Nothing has been written yet, so a bad input above leaves the entry untouched.
+     From here on both halves happen together. */
+  old.type = 'deleted';
+  old.subtype = '';
+  dirty[oldDay] = true;
+
+  var e = {
+    ms: ms, ts: isoSG(ms), sender: cfg.who || oldSend || 'me',
+    type: oldType, subtype: oldSub,
+    value: (value === '' || value === undefined) ? null : value,
+    unit: oldUnit, note: note, raw: oldRaw, msg_id: uid(),
+    own: true, device: cfg.device || 'this-device'
+  };
+  entries.push(e);
+  entries.sort(function (a, b) { return a.ms - b.ms; });
+  dirty[daySG(ms)] = true;
+  saveEntries(); saveDirty();
+
+  closeFix();
+  afterWrite();
+  toast('Corrected to <b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms));
 }
 
 /* ═══════════════════════ navigation ═══════════════════════ */
@@ -1444,7 +1721,9 @@ $('pane-home').addEventListener('click', function (e) {
   var t = e.target.closest('[data-go]');
   if (t) goCat(t.dataset.go);
   var x = e.target.closest('[data-del]');
-  if (x) undo(x.dataset.del);
+  if (x) { undo(x.dataset.del); return; }
+  var f = e.target.closest('[data-fix]');
+  if (f) openFix(f.dataset.fix);
 });
 $('cat-back').addEventListener('click', goHome);
 ['log', 'sum', 'set'].forEach(function (n) {
@@ -1483,7 +1762,10 @@ function openSheet(kind) {
   if (!c) return;
   sheetKind = kind;
   sheetVal = c.presets[Math.min(1, c.presets.length - 1)];
-  sheetSide = '';
+  /* Start on the side that was not used last. Pre-selected rather than merely suggested,
+     because the whole point is that it is one tap at 3am - but it is still a chip you can
+     tap off or change, so a guess is never forced into the record. */
+  sheetSide = c.sides ? nextSide() : '';
   var el = $('sheet');
   el.className = 'sheet' + (c.tone ? ' ' + c.tone : '');
   el.hidden = false;
@@ -1498,6 +1780,14 @@ function openSheet(kind) {
   $('sheet-side').innerHTML = c.sides
     ? '<button class="chip" data-side="left">left</button><button class="chip" data-side="right">right</button>'
     : '';
+  var hint = $('sheet-hint');
+  if (c.sides && lastSide()) {
+    hint.hidden = false;
+    hint.innerHTML = 'Last feed was on the <b>' + lastSide() + '</b>, so this one starts on the <b>' +
+                     nextSide() + '</b>. Tap to change it.';
+  } else {
+    hint.hidden = true;
+  }
   paintSheet();
   el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
@@ -1527,15 +1817,29 @@ $('sheet').addEventListener('click', function (e) {
   var sd = e.target.closest('[data-side]');
   if (sd) { sheetSide = sheetSide === sd.dataset.side ? '' : sd.dataset.side; paintSheet(); }
 });
+$('toast-act').addEventListener('click', function () {
+  var id = this.dataset.undo;
+  if (id) undo(id);
+  hideToast();
+});
+
+$('fix-cancel').addEventListener('click', closeFix);
+$('fix-save').addEventListener('click', saveFix);
+$('fix').addEventListener('click', function (e) {
+  if (e.target === this) closeFix();            /* tap the dimmed area to back out */
+  var sd = e.target.closest('[data-fixside]');
+  if (sd) { fixSide = fixSide === sd.dataset.fixside ? '' : sd.dataset.fixside; paintFixSide(); }
+});
+
 $('sheet-cancel').addEventListener('click', closeSheet);
 $('sheet-save').addEventListener('click', function () {
   var c = SHEETS[sheetKind];
   if (!c) return;
   var v = Number(sheetVal.toFixed(c.dec));
-  add(c.t, c.s, v, c.unit, sheetSide,
+  var e = add(c.t, c.s, v, c.unit, sheetSide,
       c.title.toLowerCase() + ' ' + v + ' ' + c.unit + (sheetSide ? ' ' + sheetSide : ''));
   closeSheet();
-  afterWrite();
+  afterWrite(e);
 });
 
 /* ═══════════════════════ category buttons ═══════════════════════ */
@@ -1544,8 +1848,7 @@ $('cat-body').addEventListener('click', function (e) {
   var b = e.target.closest('[data-ev]');
   if (b) {
     var p = b.dataset.ev.split(':');
-    add(p[0], p[1] || '', '', '', '', b.textContent.trim().toLowerCase());
-    afterWrite();
+    afterWrite(add(p[0], p[1] || '', '', '', '', b.textContent.trim().toLowerCase()));
     return;
   }
   var s = e.target.closest('[data-sheet]');
@@ -1559,11 +1862,15 @@ $('cat-body').addEventListener('click', function (e) {
 });
 $('cat-recent').addEventListener('click', function (e) {
   var x = e.target.closest('[data-del]');
-  if (x) { undo(x.dataset.del); renderCat(); }
+  if (x) { undo(x.dataset.del); renderCat(); return; }
+  var f = e.target.closest('[data-fix]');
+  if (f) openFix(f.dataset.fix);
 });
 $('sum-timeline').addEventListener('click', function (e) {
   var x = e.target.closest('[data-del]');
-  if (x) { undo(x.dataset.del); renderSummary(); }
+  if (x) { undo(x.dataset.del); renderSummary(); return; }
+  var f = e.target.closest('[data-fix]');
+  if (f) openFix(f.dataset.fix);
 });
 
 /* ═══════════════════════ free text ═══════════════════════ */
@@ -1601,12 +1908,16 @@ $('free-save').addEventListener('click', function () {
   if (!txt) return;
   var r = previewFree();
   if (!r) return;
-  if (!r.matched) add('note', '', '', '', txt, txt);
+  var made = [];
+  if (!r.matched) made.push(add('note', '', '', '', txt, txt));
   else r.events.forEach(function (ev) {
-    add(ev.type, ev.subtype, ev.value, ev.unit, ev.note, txt, ev.ts);
+    made.push(add(ev.type, ev.subtype, ev.value, ev.unit, ev.note, txt, ev.ts));
   });
   $('free').value = ''; $('preview').hidden = true;
-  afterWrite();
+  /* One entry gets an Undo. A compound like "30ml then down" makes several, and a single
+     Undo would be a lie about which one it removes - so it only says what happened. */
+  afterWrite(made.length === 1 ? made[0] : null);
+  if (made.length > 1) toast(made.length + ' entries saved');
   if (screen === 'cat') renderCat();
 });
 

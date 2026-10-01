@@ -10,12 +10,18 @@ function el() {
   const e = {
     _h: '', _t: '', hidden: false, value: '', placeholder: '', className: '', scrollTop: 0,
     dataset: {}, style: {},
+    classList: { _s: new Set(),
+      add(...c){ c.forEach(x => this._s.add(x)); },
+      remove(...c){ c.forEach(x => this._s.delete(x)); },
+      toggle(c, on){ on === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : (on ? this._s.add(c) : this._s.delete(c)); },
+      contains(c){ return this._s.has(c); } },
     setAttribute(){}, getAttribute(){ return null; }, addEventListener(){},
     scrollIntoView(){}, focus(){}, closest(){ return null; },
     querySelectorAll(){ return []; },
     get innerHTML(){ return this._h; }, set innerHTML(v){ this._h = String(v); },
     get textContent(){ return this._t; }, set textContent(v){ this._t = String(v); }
   };
+  e.classList._s = new Set();   // one set per element, not the shared prototype literal
   return e;
 }
 const nodes = {};

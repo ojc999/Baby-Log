@@ -41,12 +41,29 @@ just a static file, and an entry is in the repo within a second of the tap.
 | **Hygiene** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream |
 | **More** | Weight · Length · Head · Temperature · Unsettled · Tummy time · Medicine · Vaccination · Milestone · Note |
 
+Breastfeeds show **which side comes next** — on the Last feed card, and on the Breast
+screen itself, where the side opposite the last one is already selected. It is a chip,
+so a guess is never forced into the record.
+
 Every category screen also has a **when** row — `now`, `−5`, `−15`, `−30`, `−60`, or a
 time picker — and a **free-text box** for anything the buttons miss. The box shows what
 it understood *before* saving, so a wrong reading is caught before it is in the record.
 
 The **Summary** tab gives time since the last feed, poop, wet nappy and bath, then
 today's totals, the last seven days, latest measurements, and everything logged.
+
+Every entry you logged carries two buttons: **Fix** and **×**. `×` undoes it. **Fix**
+opens the time, the amount and the side so a wrong one can be put right — it keeps the
+original, marked undone, and saves the correction as a new entry, so the record still
+shows what was first logged and when it changed. You can change the time within the
+entry's own day; to move one to a different day, undo it and log it again.
+
+Entries logged on the other phone have neither button. That file is not this phone's to
+write.
+
+Right after you log something a strip appears at the bottom with **Undo** on it, for
+about five seconds. A mis-tap while holding the baby is the commonest way a wrong row
+gets in, and that is quicker than finding the row again.
 
 ## Why two phones never clash
 
@@ -199,7 +216,8 @@ verbatim.
 | `404 Not found` | Wrong repo or branch, or the token was not granted that repo. A private repo returns 404 rather than 403 when a token cannot see it, so this usually means access, not a typo. |
 | `409` / `422` | Handled automatically: re-reads the file version and retries once. If it sticks, use **Force full re-push**. |
 | Nothing pushes, no error | The device name is blank, so the app does not know which file to write. |
-| An entry is wrong | Tap its `×`. That marks it `deleted` and keeps it. To change one, undo and re-log with the right time. |
+| An entry is wrong | Tap **Fix** on it to change the time, amount or side, or `×` to undo it. Either way the original is kept, marked `deleted` — nothing is ever removed. |
+| You just mis-tapped | **Undo** on the strip at the bottom, for five seconds after logging. |
 | Diagnostics says `recovered N row(s)` | The file held entries this phone had not seen, and they were kept rather than overwritten. Once, after clearing the browser, is expected. Every sync means **both phones are using the same device name** — change one of them on the Setup tab. |
 | The other phone's entries are not showing | They arrive on open and when you come back to the app, at most once a minute. If they never arrive, check both phones point at the same repo and branch, and read the last error in Diagnostics. |
 | Offline | Everything queues. The strip shows how many are waiting. They go up on the next sync. |

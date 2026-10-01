@@ -209,6 +209,34 @@ split on `,` `+` `then`; backdating with `-N` or `@0214`; and the consuming keyw
 
 ---
 
+## 7a. What the commercial trackers do, and which of it was worth taking
+
+Checked against Huckleberry, Nara, Baby Tracker, Glow Baby, ParentLove, BoobieTime and
+Amme, plus their review pages. Three things are near-universal and were missing here.
+
+**Which breast comes next.** Every breastfeeding tracker surfaces it, because it is the
+one thing nobody can recall at 3am. It needed no new field — the side was already kept
+in `note` on a `feed/breast` row — so it is derived, not stored: the opposite of the last
+side used, shown on the Last feed card and pre-selected on the Breast screen. Pre-selected
+rather than merely suggested, because one tap is the point; still a chip, so a guess is
+never written in as fact.
+
+**Correcting an entry.** The single most-requested feature across every tracker's
+reviews, where the complaint is having to throw away a day to fix one row. It does not
+bend §7.2: nothing is edited in place and nothing is removed. A correction marks the
+original `deleted` and writes a new entry — exactly the undo-and-re-log those reviews
+describe as the workaround, behind one button. The record still shows what was first
+logged, so a correction reads as a correction rather than a rewrite.
+
+**An Undo in reach of the thing just logged.** The other recurring complaint is
+mis-tapping while holding the baby. A five-second strip with Undo answers it; hunting a
+small × in a list does not.
+
+Deliberately **not** taken: running timers, charts and sleep-trend prediction, multiple
+child profiles, and anything that needs a server or an account. They are what the paid
+tiers are for, and each would cost the thing this app is — one file, no dependencies, and
+a record you own.
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.
@@ -265,6 +293,24 @@ Now verified in Chromium: the cross-origin PUT and its exact shape, headers, bas
 round trip (including non-ASCII), the 409 retry, an entry surviving a failed push and
 recovering, the two-phone read-back, that nothing is requested from any host but
 `api.github.com`, and that Diagnostics shows the error without leaking entry content.
+
+A second pass, with a day of entries seeded before each render — an empty app hides most
+of its own UI, which is why the first pass missed all of these:
+
+- **The selected chip on every amount sheet rendered at about 1.1:1 — invisible.**
+  `.sheet-row .chip` and `.chip[aria-pressed="true"]` have equal specificity and the
+  first came later, so it overrode the pressed background while leaving the pressed text
+  colour. The selected amount and the selected side are the two things you must be able
+  to read before tapping Save. Fixed with a `:not()` so the pressed state wins whatever
+  the order.
+- **`--ink-faint` failed AA on all five category tints** (4.12–4.42:1). It had been
+  checked against the plain backgrounds only.
+- **The undo `×` was 24×34px** — under the tap floor, and destructive.
+- **The other phone's rows carried an `×` that could only refuse**, because that file is
+  not ours to write.
+- **`toast()` was not a toast.** It set `lastErr`, which painted the sync strip red and
+  said "sync failed" — so being told you cannot undo the other phone's entry looked like
+  a network fault. It is a real toast now, and errors still go to `lastErr`.
 
 Still **not** verified, and only a real device can:
 

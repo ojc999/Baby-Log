@@ -196,6 +196,104 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   const diag2 = (await page.textContent('#diag'))||'';
   t('and the recovery is named in diagnostics, not silent', /recovered/.test(diag2), true);
 
+  console.log('\n--- the undo toast after a mis-tap ---');
+  await page.click('#tab-log');
+  await page.evaluate(()=>{ const b=document.querySelector('#cat-back'); b && b.click(); });
+  await page.click('[data-go="nappy"]');
+  await page.evaluate(()=>{ const b=[...document.querySelectorAll('#cat-body button')].find(x=>/^wet/i.test(x.textContent.trim())); b && b.click(); });
+  await page.waitForTimeout(350);
+  t('a toast appears after logging', await page.isVisible('#toast'), true);
+  t('and it offers an Undo', await page.isVisible('#toast-act'), true);
+  const nBefore = await page.evaluate(()=>entries.filter(r=>r.type!=='deleted').length);
+  await page.click('#toast-act');
+  await page.waitForTimeout(500);
+  t('tapping Undo removes it from the live log',
+     await page.evaluate(()=>entries.filter(r=>r.type!=='deleted').length), nBefore-1);
+  t('but the row is kept, marked deleted',
+     await page.evaluate(()=>entries.some(r=>r.type==='deleted')), true);
+  t('the toast goes away', await page.isHidden('#toast'), true);
+
+  console.log('\n--- correcting an entry keeps the original ---');
+  await page.evaluate(()=>{ const b=document.querySelector('#cat-back'); b && b.click(); });
+  await page.click('[data-go="feed"]');
+  await page.click('[data-sheet="bottle"]');
+  await page.waitForTimeout(200);
+  await page.click('#sheet-presets .chip:nth-child(1)');
+  await page.click('#sheet-save');
+  await page.waitForTimeout(700);
+  const target = await page.evaluate(()=>{ const r=entries.filter(x=>x.type==='feed'&&x.subtype==='bottle').pop(); return {id:r.msg_id, v:r.value}; });
+  await page.click('#tab-sum'); await page.waitForTimeout(300);
+  await page.evaluate(id=>{ const b=document.querySelector(`#sum-timeline [data-fix="${id}"]`); b && b.click(); }, target.id);
+  await page.waitForTimeout(300);
+  t('the correction box opens', await page.isVisible('#fix'), true);
+  await page.fill('#fix-time','04:30');
+  await page.fill('#fix-amt','125');
+  await page.click('#fix-save');
+  await page.waitForTimeout(900);
+  const fixed = await page.evaluate(id=>({
+    original: entries.find(r=>r.msg_id===id),
+    corrected: entries.filter(r=>r.type==='feed'&&r.subtype==='bottle'&&r.value===125)[0] || null,
+  }), target.id);
+  t('the original is kept and marked deleted', fixed.original && fixed.original.type, 'deleted');
+  t('the correction exists with the new amount', !!fixed.corrected, true);
+  t('and it has its own msg_id', fixed.corrected && fixed.corrected.msg_id !== target.id, true);
+  t('and the corrected time was applied', fixed.corrected && /T04:30:/.test(fixed.corrected.ts), true);
+  await page.waitForTimeout(600);
+  const pushedRows = Buffer.from(JSON.parse(calls.filter(c=>c.method==='PUT').pop().body).content,'base64')
+    .toString('utf8').trim().split('\n').map(JSON.parse);
+  t('both the deleted original and the correction are pushed',
+     pushedRows.some(r=>r.msg_id===target.id && r.type==='deleted') &&
+     pushedRows.some(r=>r.value===125), true);
+
+  // a correction must refuse a time that has not happened yet
+  await page.evaluate(()=>{ const b=document.querySelector('#sum-timeline [data-fix]'); b&&b.click(); });
+  await page.waitForTimeout(250);
+  const beforeCount = await page.evaluate(()=>entries.length);
+  // Two hours ahead in Singapore, computed rather than hard-coded: a fixed "23:58" is in
+  // the past whenever the suite runs late in the evening.
+  const soon = await page.evaluate(()=>{
+    const d = new Date(Date.now() + 2*3600000);
+    const f = new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Singapore',hour:'2-digit',minute:'2-digit',hour12:false});
+    const o={}; f.formatToParts(d).forEach(p=>o[p.type]=p.value);
+    return {hm:`${o.hour}:${o.minute}`, wraps: Number(o.hour) < 2};
+  });
+  if (soon.wraps) {
+    console.log('skip  future-time guard: +2h crosses midnight in Singapore, so it is not a future time on this entry\'s day');
+    await page.click('#fix-cancel');
+  } else {
+    await page.fill('#fix-time', soon.hm);
+    await page.click('#fix-save');
+    await page.waitForTimeout(400);
+    t('a correction into the future changes nothing', await page.evaluate(()=>entries.length), beforeCount);
+    t('and says so', /has not happened yet/.test((await page.textContent('#toast-txt'))||''), true);
+    await page.click('#fix-cancel');
+  }
+
+  console.log('\n--- which breast comes next ---');
+  const side = await page.evaluate(()=>{ try { return {last:lastSide(), next:nextSide()}; } catch(e){ return {err:String(e)}; } });
+  t('the app knows the last side used', side.last === 'left' || side.last === 'right', true);
+  t('and proposes the other one', side.next, side.last === 'left' ? 'right' : 'left');
+  await page.click('#tab-log');
+  await page.evaluate(()=>{ const b=document.querySelector('#cat-back'); b && b.click(); });
+  await page.click('[data-go="feed"]');
+  await page.click('[data-sheet="breast"]');
+  await page.waitForTimeout(250);
+  t('the breast sheet pre-selects that side',
+     await page.getAttribute(`#sheet-side [data-side="${side.next}"]`, 'aria-pressed'), 'true');
+  t('and says why', /last feed was on the/i.test((await page.textContent('#sheet-hint'))||''), true);
+  await page.click('#sheet-cancel');
+
+  console.log('\n--- the other phone\'s rows carry no controls we cannot honour ---');
+  await page.click('#tab-sum'); await page.waitForTimeout(300);
+  // Check by ownership, not by the sender's name: a row absorbed from our own remote file
+  // can carry another person's name and still be ours to write.
+  const dead = await page.evaluate(()=>{
+    const foreign = new Set(entries.filter(r=>!r.own).map(r=>r.msg_id));
+    return [...document.querySelectorAll('.pane:not([hidden]) [data-del],.pane:not([hidden]) [data-fix]')]
+      .filter(b=>foreign.has(b.dataset.del || b.dataset.fix)).length;
+  });
+  t('no undo or fix button on the other phone\'s entries', dead, 0);
+
   console.log('\n--- no request goes anywhere but GitHub and the page itself ---');
   const hosts = [...new Set(calls.map(c=>new URL(c.url).host))];
   t('only api.github.com was called', JSON.stringify(hosts), JSON.stringify(['api.github.com']));

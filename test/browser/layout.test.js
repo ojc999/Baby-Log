@@ -37,6 +37,42 @@ const VIEWPORTS = [
       timezoneId:'Asia/Singapore',
     });
     // Block Google Fonts so we see the real offline/airplane-mode rendering too
+    // Seed a realistic day before loading. An empty app hides most of its own UI - the
+    // timeline rows, the undo buttons, the summary tables - so an empty page is the one
+    // state worth testing least. The undo button being under the tap-target floor was
+    // missed exactly this way.
+    await ctx.addInitScript(() => {
+      const TZ = 'Asia/Singapore';
+      const dayOf = ms => new Intl.DateTimeFormat('en-CA', {timeZone:TZ, year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date(ms));
+      const iso = ms => { const f = new Intl.DateTimeFormat('en-GB',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+        const o={}; f.formatToParts(new Date(ms)).forEach(p=>o[p.type]=p.value);
+        return `${o.year}-${o.month}-${o.day}T${o.hour}:${o.minute}:${o.second}+08:00`; };
+      const H = 3600000, now = Date.now();
+      const mk = (mins, sender, own, type, subtype, value, unit, note, raw) => {
+        const ms = now - mins*60000;
+        return { ms, ts: iso(ms), sender, type, subtype, value, unit, note, raw,
+                 msg_id: 'seed-'+mins+'-'+type, own, device: own ? 'simon-phone' : 'wife-phone' };
+      };
+      const rows = [
+        mk(620,'Simon',true ,'sleep','start',null,'','','asleep now'),
+        mk(500,'Simon',true ,'sleep','end'  ,null,'','','up'),
+        mk(495,'Wife' ,false,'feed','breast',22,'min','left','bf 22 left'),
+        mk(430,'Simon',true ,'nappy','dirty',null,'','','poo'),
+        mk(300,'Wife' ,false,'feed','bottle',90,'ml','','90ml'),
+        mk(240,'Simon',true ,'pump','',120,'ml','','expressed 120'),
+        mk(180,'Simon',true ,'measure','weight',3.84,'kg','','3.84kg'),
+        mk(150,'Wife' ,false,'hygiene','bath',null,'','','bath'),
+        mk(90 ,'Simon',true ,'feed','breast',18,'min','right','bf 18 right'),
+        mk(45 ,'Simon',true ,'nappy','both',null,'','','both'),
+        mk(20 ,'Simon',true ,'note','',null,'','','','note a bit unsettled after the feed'),
+        mk(10 ,'Simon',true ,'deleted','',null,'','','mis-tap'),
+      ];
+      localStorage.setItem('babylog.entries.v2', JSON.stringify(rows));
+      localStorage.setItem('babylog.dirty.v2', JSON.stringify({[dayOf(now)]: true}));
+      localStorage.setItem('babylog.cfg.v2', JSON.stringify(
+        {who:'Simon', device:'simon-phone', repo:'me/data', branch:'main', token:''}));
+    });
+
     const page = await ctx.newPage();
     const errs = [];
     page.on('pageerror', e => errs.push(String(e)));
@@ -100,6 +136,19 @@ const VIEWPORTS = [
     await page.screenshot({ path: `${SHOTS}/${name}-summary.png`, fullPage: true });
     const m3 = await page.evaluate(() => ({ scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth }));
     if (m3.scrollW > m3.clientW + 1) note(name, `horizontal overflow on Summary: ${m3.scrollW} > ${m3.clientW}`);
+
+    // Rows only exist once there is data: check their controls too.
+    await page.click('#tab-sum'); await page.waitForTimeout(300);
+    // Only the visible pane: a .row-x inside a hidden pane measures 0x0 and is not a finding.
+    const rowBtns = await page.evaluate(() => [...document.querySelectorAll('.pane:not([hidden]) .row-x')]
+      .map(el => { const r = el.getBoundingClientRect(); return {w:Math.round(r.width), h:Math.round(r.height)}; })
+      .filter(b => b.w > 0 || b.h > 0));
+    for (const b of rowBtns) if (b.w < 44 || b.h < 44) { note(name, `undo button on a log row is ${b.w}x${b.h}px (<44) - and it is destructive`); break; }
+    const foreignX = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('.pane:not([hidden]) .row')];
+      return rows.filter(r => { const who = r.querySelector('.row-who');
+        return who && /wife/i.test(who.textContent) && r.querySelector('.row-x'); }).length; });
+    if (foreignX) note(name, `${foreignX} row(s) from the other phone show an undo button that cannot work`);
 
     // Setup tab
     await page.click('#tab-set'); await page.waitForTimeout(250);
