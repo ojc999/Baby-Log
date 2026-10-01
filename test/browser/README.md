@@ -14,6 +14,7 @@ Run them when you change the layout, the stylesheet, or anything that talks to G
 | --- | --- |
 | `layout.test.js` | Loads the page at five real phone sizes and fails on quirks mode, a viewport that is not honoured, sideways overflow, a tap target under 44px, a text field under 16px, or a JavaScript error. |
 | `e2e.test.js` | Drives the real page against a stubbed `api.github.com`: checks the exact PUT the app sends, the base64 round trip, the 409 retry, an entry surviving a failed push, the other phone's entries arriving, and that nothing is requested from any other host. |
+| `pages-subdir.test.js` | Serves the app from a subdirectory, the way GitHub Pages serves a project repo (`/<repo>/`, not the domain root), and checks every relative path, the manifest, the icons and the service worker's scope still resolve. |
 | `contrast.test.js` | Measures every text node against its own background in both light and dark, and reports anything under WCAG AA. |
 
 Each writes screenshots to the system temp directory, or to `$SHOTS` if you set it.
