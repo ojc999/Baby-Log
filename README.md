@@ -39,7 +39,8 @@ just a static file, and an entry is in the repo within a second of the tap.
 | **Feed** | Bottle · Breast (minutes, and which side) · Formula · EBM — then Mum's expressing, kept separate, and Vomit |
 | **Diapers** | Wet · Dirty · Both |
 | **Hygiene** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream |
-| **More** | Weight · Length · Head · Temperature · Unsettled · Tummy time · Medicine · Vaccination · Milestone · Note |
+| **Tummy time** | How long was it (minutes) · Just log it, when you did not time it |
+| **More** | Weight · Length · Head · Temperature · Unsettled · Medicine · Vaccination · Milestone · Note |
 
 Breastfeeds show **which side comes next** — on the Last feed card, and on the Breast
 screen itself, where the side opposite the last one is already selected. It is a chip,

@@ -50,6 +50,21 @@ for (const [k, c] of Object.entries(A.CATS))
   }
 t('unlabelled buttons', unlabelled.join(',') || 'none', 'none');
 
+console.log('\n--- tummy time is its own category ---');
+t('it has a catalogue entry', !!A.CATS.tummy, true);
+t('its buttons route to it, not to More', A.CAT_OF.tummy, 'tummy');
+t('it is no longer offered inside More',
+  JSON.stringify(A.CATS.more.groups).indexOf('tummy'), -1);
+t('the timed button still has its amount picker', !!A.SHEETS.tummy, true);
+t('and an untimed button that carries no value',
+  A.CATS.tummy.groups.some(g => g.items.some(i => i.t === 'tummy' && !i.sheet)), true);
+t('a sheet button can be relabelled without changing what is stored',
+  A.SHEETS.tummy.title, 'Tummy time');
+t('an untimed entry describes without minutes',
+  A.describe({type:'tummy',subtype:'',value:null,unit:'',note:''}), 'Tummy time');
+t('a timed one keeps them',
+  A.describe({type:'tummy',subtype:'',value:10,unit:'min',note:''}), 'Tummy time 10 min');
+
 console.log('\n--- writing, undo, and the export schema ---');
 A.cfg.who = 'Simon'; A.cfg.device = 'simon-phone';
 A.setEntries([]);

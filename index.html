@@ -32,6 +32,7 @@
   --night:#3f4b8f; --night-bg:#e7eaf8; --night-line:#aeb6e0;
   --mum:#8a4a86; --mum-bg:#f6e9f5; --mum-line:#d4aed1;
   --leaf:#4a6a2f; --leaf-bg:#eaf2e0; --leaf-line:#b6cf98;
+  --play:#9c3f63; --play-bg:#fbe9ef; --play-line:#e3aec0;
   --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
 }
@@ -44,6 +45,7 @@
   --night:#8e9ae8; --night-bg:#1a1e35; --night-line:#39406b;
   --mum:#cd90c8; --mum-bg:#2a1a29; --mum-line:#5a3657;
   --leaf:#a3c479; --leaf-bg:#1b2414; --leaf-line:#44572c;
+  --play:#e998b2; --play-bg:#2c1720; --play-line:#5e3344;
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
@@ -55,6 +57,7 @@
   --night:#8e9ae8; --night-bg:#1a1e35; --night-line:#39406b;
   --mum:#cd90c8; --mum-bg:#2a1a29; --mum-line:#5a3657;
   --leaf:#a3c479; --leaf-bg:#1b2414; --leaf-line:#44572c;
+  --play:#e998b2; --play-bg:#2c1720; --play-line:#5e3344;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -112,6 +115,7 @@ body{
 
 /* ───── buttons ───── */
 .grid{display:grid;gap:9px}
+.g1{grid-template-columns:1fr}
 .g2{grid-template-columns:repeat(2,1fr)}
 .g3{grid-template-columns:repeat(3,1fr)}
 .btn{
@@ -130,6 +134,7 @@ body{
 .btn.tealb{background:var(--teal-bg);border-color:var(--teal-line);color:var(--teal)}
 .btn.mumb{background:var(--mum-bg);border-color:var(--mum-line);color:var(--mum)}
 .btn.leafb{background:var(--leaf-bg);border-color:var(--leaf-line);color:var(--leaf)}
+.btn.playb{background:var(--play-bg);border-color:var(--play-line);color:var(--play)}
 .btn.quiet{font-size:13px;min-height:50px;color:var(--ink-dim);font-weight:600}
 .btn.solid{background:var(--ink);border-color:var(--ink);color:var(--ground)}
 
@@ -150,7 +155,7 @@ body{
   color:var(--ink-dim);font-variant-numeric:tabular-nums;
 }
 .tile.wide{grid-column:1/-1;min-height:66px;flex-direction:row;align-items:center;gap:10px}
-.tile.wide b{font-size:15px}
+.tile.wide b{font-size:15px;flex:none}   /* a two-word name must not wrap in a row-layout tile */
 .tile.wide em{margin:0 0 0 auto}
 .tile.t-sleep{background:var(--night-bg);border-color:var(--night-line)}
 .tile.t-sleep b{color:var(--night)}
@@ -160,6 +165,8 @@ body{
 .tile.t-nappy b{color:var(--teal)}
 .tile.t-hyg{background:var(--leaf-bg);border-color:var(--leaf-line)}
 .tile.t-hyg b{color:var(--leaf)}
+.tile.t-tummy{background:var(--play-bg);border-color:var(--play-line)}
+.tile.t-tummy b{color:var(--play)}
 
 /* ───── back bar ───── */
 .back{display:flex;align-items:center;gap:10px;margin-bottom:4px}
@@ -375,6 +382,9 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       </button>
       <button class="tile t-hyg" data-go="hygiene">
         <b>Hygiene</b><span>Bath, nails, hair</span><em id="tile-hygiene"></em>
+      </button>
+      <button class="tile wide t-tummy" data-go="tummy">
+        <b>Tummy time</b><span>Timed or not</span><em id="tile-tummy"></em>
       </button>
       <button class="tile wide" data-go="more">
         <b>More</b><span>Growth, temperature, medicine, notes</span><em id="tile-more"></em>
@@ -780,6 +790,16 @@ var CATS = {
     ] }],
     free: 'anything not on a button'
   },
+  tummy: {
+    title: 'Tummy time', tone: 'playb',
+    groups: [{ cols: 1, items: [
+      { sheet: 'tummy', label: 'How long was it' },
+      { t: 'tummy', s: '', label: 'Just log it' }
+    ] }],
+    hint: 'Use the second one when you did not time it. The entry still counts towards ' +
+          'the day, it just carries no minutes — which is honest, rather than a guess.',
+    free: 'tummy 10 · tummytime 5'
+  },
   more: {
     title: 'More', tone: '',
     groups: [
@@ -787,7 +807,6 @@ var CATS = {
         { sheet: 'weight' }, { sheet: 'length' }, { sheet: 'head' }
       ] },
       { head: 'Unwell', cols: 2, items: [{ sheet: 'temp' }, { sheet: 'cry' }] },
-      { head: 'Play', cols: 2, items: [{ sheet: 'tummy' }] },
       { head: 'Needs a few words', cols: 2, items: [
         { prefill: 'med ',       label: 'Medicine',    sub: 'then type it' },
         { prefill: 'vax ',       label: 'Vaccination', sub: 'then type it' },
@@ -834,7 +853,7 @@ var LABELS = {
 var CAT_OF = {
   sleep: 'sleep', feed: 'feed', pump: 'feed', vomit: 'feed',
   nappy: 'nappy', hygiene: 'hygiene', bath: 'hygiene',
-  measure: 'more', cry: 'more', tummy: 'more', med: 'more', vax: 'more',
+  measure: 'more', cry: 'more', tummy: 'tummy', med: 'more', vax: 'more',
   milestone: 'more', note: 'more'
 };
 
@@ -1526,6 +1545,11 @@ function renderTiles() {
   $('tile-feed').textContent    = feeds.length ? feeds.length + ' today' + (ml ? ' · ' + ml + ' ml' : '') : 'none today';
   $('tile-nappy').textContent   = n(function (r) { return r.type === 'nappy'; }) + ' today';
   $('tile-hygiene').textContent = n(function (r) { return r.type === 'hygiene' || r.type === 'bath'; }) + ' today';
+  var tum = live().filter(function (r) { return daySG(r.ms) === daySG(Date.now()) && r.type === 'tummy'; });
+  var tumMin = tum.reduce(function (a, r) { return a + (r.unit === 'min' && r.value ? r.value : 0); }, 0);
+  $('tile-tummy').textContent   = tum.length
+    ? tum.length + ' today' + (tumMin ? ' · ' + tumMin + ' min' : '')
+    : 'none today';
   $('tile-more').textContent    = n(function (r) { return CAT_OF[r.type] === 'more'; }) + ' today';
 }
 
@@ -1568,8 +1592,10 @@ function renderCat() {
     g.items.forEach(function (it) {
       if (it.sheet) {
         var sc = SHEETS[it.sheet];
+        /* `label` overrides only what the button says. The sheet's own title still names
+           the picker and still goes into `raw`, which must stay the words actually used. */
         html += '<button class="btn ' + (c.tone || '') + '" data-sheet="' + it.sheet + '">' +
-                sc.title + '<small>' + (sc.unit === 'C' ? '°C' : sc.unit) + '</small></button>';
+                (it.label || sc.title) + '<small>' + (sc.unit === 'C' ? '°C' : sc.unit) + '</small></button>';
       } else if (it.prefill) {
         html += '<button class="btn quiet" data-prefill="' + esc(it.prefill) + '">' +
                 it.label + '<small>' + (it.sub || '') + '</small></button>';

@@ -277,6 +277,29 @@ out, and any later write to that day — backdating an entry into it — would r
 file without them. `absorbOwn` already does the right thing, so backfill reuses it,
 quietly. Backfill never marks a day as owing a push: it is reading, not writing.
 
+## 7c. Tummy time as its own category
+
+Promoted out of **More** to a tile of its own. It is logged many times a day, which is
+the line this app draws between a tile and the drawer: tiles are for what happens
+repeatedly, More is for what happens occasionally and can afford two extra taps.
+
+No schema change — `tummy` was already a type in the contract, already had an amount
+picker in minutes, and already had a label. The move is `CAT_OF.tummy` from `'more'` to
+`'tummy'`, a catalogue entry, a tile and a colour. Entries logged before the move read
+back identically; nothing needs migrating.
+
+Two buttons rather than one. **How long was it** opens the minutes picker; **Just log
+it** writes the entry with `value: null`. That second one exists because the alternative
+is a guessed number, and a guess in the record is worse than an honest blank — the same
+reasoning as §7.3 on sleep. The tile's count says `3 today · 15 min`, where the minutes
+are only the timed ones, so an untimed session is visible as a session without inflating
+the total.
+
+The colour is a sixth pair, `--play`, checked against WCAG AA in both themes by
+`contrast.test.js`, which now walks this screen. A `label` on a sheet item overrides what
+its button says and nothing else: the picker's own title still goes into `raw`, which has
+to stay the words actually used.
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.
