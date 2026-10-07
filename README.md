@@ -262,6 +262,7 @@ verbatim.
 | `409` / `422` | Handled automatically: re-reads the file version and retries once. If it sticks, use **Force full re-push**. |
 | Nothing pushes, no error | The device name is blank, so the app does not know which file to write. |
 | An entry is wrong | Tap **Fix** on it to change the time, amount or side, or `×` to undo it. Either way the original is kept, marked `deleted` — nothing is ever removed. |
+| Clearing practice entries before going live | **Setup → Start fresh → Clear this phone**, twice, on **each** phone. Then remove the files from the data repo separately — the button does not touch it, and a phone that still holds the old entries will push them back. Phones first, repo second. |
 | You just mis-tapped | **Undo** on the strip at the bottom, for five seconds after logging. |
 | She saw your entries, then they vanished | Almost certainly the iPhone storage split: she set up in Safari, then opened the home-screen app, which has its own empty storage. The Setup tab says so when it detects it. Open the setup link again from the home-screen app. Nothing is lost. |
 | Every entry says `me` instead of a name | The **Your name** box on Setup is empty. Fill it in and tap Save and test. It only affects entries logged from then on — earlier ones keep `me`. |

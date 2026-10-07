@@ -522,6 +522,19 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <button class="btn quiet" id="set-hist">Load 90 days of history</button>
     </div>
 
+    <div class="sect"><h2>Start fresh</h2><hr></div>
+    <p class="info">Throws away every entry held on <b>this phone</b> and starts it empty.
+    The setup stays, so you do not have to paste the token again. Meant for clearing
+    practice entries before the real logging starts — not for tidying up a wrong entry,
+    which is what <b>Fix</b> and <b>&times;</b> on each row are for.</p>
+    <p class="info"><b>It does not clear the repo.</b> Entries already pushed stay there
+    until they are removed separately, and this phone will pull back anything the other
+    phone still holds.</p>
+    <div class="grid g2" style="margin-top:9px">
+      <button class="btn quiet" id="set-wipe">Clear this phone</button>
+      <span></span>
+    </div>
+
     <div class="foot">
       <p><b>Nothing is ever deleted here.</b> Undo marks an entry <code>deleted</code> and
       keeps it, the way the archive does.</p>
@@ -2316,6 +2329,36 @@ $('link-copy').addEventListener('click', function () {
   try {
     navigator.clipboard.writeText(txt).then(function () { done('Copied'); }, function () { done('Clipboard refused'); });
   } catch (e) { done('Clipboard refused'); }
+});
+
+/* Clearing practice data before the real logging starts. This is the one place the app
+   throws entries away, and it is deliberately not the same thing as undo: undo keeps the
+   row because the audit trail is the point, whereas this exists because a scratch dataset
+   should not become the first week of a child's record. Two taps, named plainly, and it
+   leaves the setup alone so nobody has to paste a token again. The repo is untouched —
+   that is a separate, visible act. */
+var wipeArmed = false;
+$('set-wipe').addEventListener('click', function () {
+  var btn = this;
+  if (!wipeArmed) {
+    wipeArmed = true;
+    btn.textContent = 'Tap again to clear';
+    setTimeout(function () { if (wipeArmed) { wipeArmed = false; btn.textContent = 'Clear this phone'; } }, 4000);
+    return;
+  }
+  wipeArmed = false;
+  btn.textContent = 'Clear this phone';
+  var had = entries.length;
+  entries = [];
+  dirty = {};
+  shas = {};            /* so the next push does not carry a sha for a file that may be gone */
+  seenShas = {};
+  absorbed = 0;
+  sharedName = false;
+  lastErr = '';
+  saveEntries(); saveDirty(); saveShas();
+  render(); paintSync(); renderDiag();
+  toast(had + (had === 1 ? ' entry' : ' entries') + ' cleared from this phone');
 });
 
 $('set-hist').addEventListener('click', function () {

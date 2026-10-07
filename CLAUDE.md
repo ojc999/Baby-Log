@@ -28,6 +28,11 @@ what it is, and lists decisions that look arbitrary and are not.
 - **Never delete an entry.** Undo marks `type: "deleted"` and keeps the row. A correction
   is the same thing twice over: mark the original `deleted`, write a new entry. Never
   edit a row in place, however much easier it looks.
+  The one exception is **Setup → Clear this phone**, which empties the whole device on
+  purpose. It exists so a scratch dataset does not become the first week of a child's
+  record, it is two taps and named plainly, and it touches only this browser — never the
+  repo, where history keeps everything anyway. Do not reuse it for anything narrower: if
+  a single entry is wrong, that is what Fix and undo are for.
 - **Never rename or repurpose a field** in the data contract. Add one if you must.
 - **Never add a build step, a framework, or a bundler.** One HTML file, plain
   JavaScript, no dependencies. If something seems to need React, it does not.

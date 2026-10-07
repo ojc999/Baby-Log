@@ -342,6 +342,32 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   t('diagnostics says the name is shared', /SAME DEVICE NAME/.test(diag3), true);
   t('and says neither phone can see the other', /cannot see|skips the file named after itself/.test(diag3), true);
 
+  console.log('\n--- clearing this phone before the real logging starts ---');
+  await page.click('#tab-set'); await page.waitForTimeout(200);
+  const hadEntries = await page.evaluate(()=>entries.length);
+  t('there is something to clear', hadEntries > 0, true);
+  await page.click('#set-wipe'); await page.waitForTimeout(250);
+  t('one tap alone clears nothing', await page.evaluate(()=>entries.length), hadEntries);
+  t('and the button asks again', /Tap again/.test((await page.textContent('#set-wipe'))||''), true);
+  await page.click('#set-wipe'); await page.waitForTimeout(400);
+  const wiped = await page.evaluate(()=>({
+    n: entries.length,
+    stored: JSON.parse(localStorage.getItem('babylog.entries.v2')||'[]').length,
+    dirty: Object.keys(JSON.parse(localStorage.getItem('babylog.dirty.v2')||'{}')).length,
+    shas: Object.keys(JSON.parse(localStorage.getItem('babylog.shas.v2')||'{}')).length,
+    stillSetUp: configured(), device: cfg.device, tokenLen: (cfg.token||'').length
+  }));
+  t('the second tap empties the phone', wiped.n, 0);
+  t('and empties the stored copy too', wiped.stored, 0);
+  t('nothing is left owing a push', wiped.dirty, 0);
+  t('the cached file versions go as well', wiped.shas, 0);
+  t('but the setup survives', wiped.stillSetUp, true);
+  t('device name kept', wiped.device, 'simon-phone');
+  t('token kept', wiped.tokenLen > 0, true);
+  const puts0 = calls.filter(c=>c.method==='PUT').length;
+  await page.waitForTimeout(1200);
+  t('clearing pushes nothing to the repo', calls.filter(c=>c.method==='PUT').length, puts0);
+
   console.log('\n--- no request goes anywhere but GitHub and the page itself ---');
   const hosts = [...new Set(calls.map(c=>new URL(c.url).host))];
   t('only api.github.com was called', JSON.stringify(hosts), JSON.stringify(['api.github.com']));
