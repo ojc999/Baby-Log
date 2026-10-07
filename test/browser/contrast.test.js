@@ -42,7 +42,22 @@ const parse=s=>{const m=s.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);retur
     // The amount sheet and the correction box only exist once opened, and a pressed chip
     // is a different colour pair from an unpressed one. Both were unchecked before.
     await page.click('#cat-back');
-    await page.click('[data-go="feed"]'); await page.click('[data-sheet="breast"]');
+    await page.click('[data-go="feed"]');
+    await page.waitForTimeout(250);
+    // the Feed screen itself, which now carries the vomit button in its own colour
+    const lowF = await page.evaluate(()=>{
+      const out=[];
+      const bgOf=el=>{let n=el;while(n){const c=getComputedStyle(n).backgroundColor;
+        if(c&&!/rgba\(0, 0, 0, 0\)|transparent/.test(c))return c;n=n.parentElement}return 'rgb(255,255,255)'};
+      for(const el of document.querySelectorAll('#cat-body button,#cat-body h2,#cat-body small')){
+        const txt=(el.textContent||'').trim(); if(!txt||el.children.length)continue;
+        const r=el.getBoundingClientRect(); if(r.width<2||r.height<2)continue;
+        const cs=getComputedStyle(el);
+        out.push({txt:txt.slice(0,20),fg:cs.color,bg:bgOf(el),size:parseFloat(cs.fontSize),weight:cs.fontWeight});
+      }
+      return out;
+    });
+    await page.click('[data-sheet="breast"]');
     await page.waitForTimeout(300);
     // contrast of every bit of text against its own background
     let low = await page.evaluate(()=>{
@@ -57,6 +72,8 @@ const parse=s=>{const m=s.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);retur
       }
       return out;
     });
+    low.push(...lowF);          // the Feed screen, swept before the sheet was opened
+
     // the tummy-time screen, which carries its own colour pair
     await page.click('#sheet-cancel').catch(()=>{});
     await page.click('#cat-back').catch(()=>{});

@@ -65,6 +65,19 @@ t('an untimed entry describes without minutes',
 t('a timed one keeps them',
   A.describe({type:'tummy',subtype:'',value:10,unit:'min',note:''}), 'Tummy time 10 min');
 
+console.log('\n--- the vomit button sits where you look for it ---');
+(function () {
+  var g = A.CATS.feed.groups;
+  var vomitAt = g.findIndex(x => x.items.some(i => i.t === 'vomit'));
+  var pumpAt  = g.findIndex(x => x.items.some(i => i.sheet === 'pump'));
+  t('it is on the Feed screen', vomitAt > -1, true);
+  t('directly after the feed buttons, not below Mum', vomitAt < pumpAt, true);
+  t('and full width', g[vomitAt].cols, 1);
+  t('it logs its own type, never a feed',
+    A.describe({type:'vomit',subtype:'',value:null,unit:'',note:''}), 'Vomit');
+  t('which is filed under Feed for reading back', A.CAT_OF.vomit, 'feed');
+})();
+
 console.log('\n--- hygiene lives inside More ---');
 t('it is no longer a category of its own', !!A.CATS.hygiene, false);
 t('its entries route to More', A.CAT_OF.hygiene, 'more');

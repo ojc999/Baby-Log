@@ -36,7 +36,7 @@ just a static file, and an entry is in the repo within a second of the tap.
 | | |
 | --- | --- |
 | **Sleep** | Asleep now · Awake now |
-| **Feed** | Bottle · Breast (minutes, and which side) · Formula · EBM — then Mum's expressing, kept separate, and Vomit |
+| **Feed** | Bottle · Breast (minutes, and which side) · Formula · EBM · **Vomit** — then Mum's expressing, kept separate |
 | **Diapers** | Wet · Dirty · Both |
 | **Tummy time** | How long was it (minutes) · Just log it, when you did not time it |
 | **More** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream · Weight · Length · Head · Temperature · Unsettled · Medicine · Vaccination · Milestone · Note |

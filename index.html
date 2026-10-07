@@ -134,6 +134,7 @@ body{
 .btn.tealb{background:var(--teal-bg);border-color:var(--teal-line);color:var(--teal)}
 .btn.mumb{background:var(--mum-bg);border-color:var(--mum-line);color:var(--mum)}
 .btn.leafb{background:var(--leaf-bg);border-color:var(--leaf-line);color:var(--leaf)}
+.btn.alertb{background:var(--alert-bg);border-color:var(--alert-line);color:var(--alert)}
 .btn.playb{background:var(--play-bg);border-color:var(--play-line);color:var(--play)}
 .btn.quiet{font-size:13px;min-height:50px;color:var(--ink-dim);font-weight:600}
 .btn.solid{background:var(--ink);border-color:var(--ink);color:var(--ground)}
@@ -770,8 +771,14 @@ var CATS = {
       { cols: 2, items: [
         { sheet: 'bottle' }, { sheet: 'breast' }, { sheet: 'formula' }, { sheet: 'expressed' }
       ] },
-      { head: 'Mum', cols: 2, items: [{ sheet: 'pump' }] },
-      { head: 'Came back up', cols: 2, items: [{ t: 'vomit', s: '', label: 'Vomit', tone: '' }] }
+      /* Straight under the feed buttons, full width. It used to sit third, below Mum's
+         expressing and under the heading "Came back up", and was missed entirely - asked
+         for as a feature that had been there all along. The moment you need it is the
+         moment just after a feed, so that is where it goes. */
+      { head: 'Came back up', cols: 1, items: [
+        { t: 'vomit', s: '', label: 'Vomit', tone: 'alertb' }
+      ] },
+      { head: 'Mum', cols: 2, items: [{ sheet: 'pump' }] }
     ],
     hint: 'Expressing is stored as its own kind of entry, never as a feed. Expressing ' +
           '80 ml and him drinking 80 ml are different events and must not be added together.',

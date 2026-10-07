@@ -277,6 +277,20 @@ out, and any later write to that day — backdating an entry into it — would r
 file without them. `absorbOwn` already does the right thing, so backfill reuses it,
 quietly. Backfill never marks a day as owing a push: it is reading, not writing.
 
+## 7b2. Where a button sits is whether it exists
+
+The vomit button was asked for as a new feature. It had been on the Feed screen since
+the app was built — third in the list, below Mum's expressing, under the heading "Came
+back up". Nobody found it.
+
+It is now directly under the four feed buttons, full width, in the alert colour. The
+moment you need it is the moment just after a feed, and that is where the eye already
+is; three groups down, behind a heading that avoids the word, it may as well not have
+been there.
+
+Worth keeping as a general finding: a feature request for something that already exists
+is a report that its placement is wrong. The fix is to move it, not to add a second one.
+
 ## 7c. What earns a tile
 
 Four tiles and a drawer. The line is **frequency, not importance**: a tile is for what
