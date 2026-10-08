@@ -368,6 +368,32 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   await page.waitForTimeout(1200);
   t('clearing pushes nothing to the repo', calls.filter(c=>c.method==='PUT').length, puts0);
 
+  console.log('\n--- when both phones carry the same name, rows are still telling apart ---');
+  await page.evaluate(day => {
+    cfg.who = 'Simon';
+    add('nappy', 'wet', '', '', '', 'wet');          // one of ours, so both kinds are on screen
+    mergeForeign(JSON.stringify({ts:day+'T05:00:00+08:00',sender:'Simon',type:'feed',subtype:'bottle',
+      value:40,unit:'ml',note:'',raw:'40ml',msg_id:'twin-1'}) + '\n', 'beam', day);
+    saveEntries(); render();
+  }, day);
+  await page.click('#tab-sum'); await page.waitForTimeout(400);
+  const who = await page.evaluate(()=>{
+    const foreign = new Set(entries.filter(r=>!r.own).map(r=>r.msg_id));
+    return [...document.querySelectorAll('.pane:not([hidden]) .row')].map(row=>{
+      const fix = row.querySelector('[data-fix]'); const x = row.querySelector('[data-del]');
+      const id = fix ? fix.dataset.fix : (x ? x.dataset.del : null);
+      return {who:(row.querySelector('.row-who')||{}).textContent, mine: id ? !foreign.has(id) : false};
+    });
+  });
+  const twinRow = who.find(r => r.who === 'beam');
+  t('the other phone\'s row is labelled by device, not by the shared name', !!twinRow, true);
+  t('and our own rows still show the name', who.some(r=>r.who==='Simon'), true);
+  await page.click('#tab-set'); await page.waitForTimeout(200);
+  const d = (await page.textContent('#diag'))||'';
+  t('diagnostics names the clash', /SAME NAME ON BOTH PHONES/.test(d), true);
+  t('and names the device it came from', /beam/.test(d), true);
+  t('and says the link does not carry the name', /does not carry it/.test(d), true);
+
   console.log('\n--- no request goes anywhere but GitHub and the page itself ---');
   const hosts = [...new Set(calls.map(c=>new URL(c.url).host))];
   t('only api.github.com was called', JSON.stringify(hosts), JSON.stringify(['api.github.com']));

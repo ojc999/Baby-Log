@@ -277,6 +277,25 @@ out, and any later write to that day — backdating an entry into it — would r
 file without them. `absorbOwn` already does the right thing, so backfill reuses it,
 quietly. Backfill never marks a day as owing a push: it is reading, not writing.
 
+## 7b1. Arriving and being seen are different things
+
+Reported as the other phone's entries not appearing. They were appearing. Both phones
+had **Your name** set to the same thing, so every row on the timeline read the same name
+and there was no way to tell whose was whose — which looks identical to nothing arriving.
+
+The name is per phone and the setup link deliberately does not carry it: it is the one
+field that must differ, and copying it across would guarantee the collision. But nothing
+checked, and the failure is silent and confusing rather than loud.
+
+A foreign row whose sender matches this phone's own name is now labelled with its device
+name instead, which is unique by construction, and Diagnostics names the clash and says
+where to fix it. The structural tell was always there — a row from the other phone has no
+Fix or × button, because that file is not ours to write — but that is far too subtle to
+rely on at 3am.
+
+Worth generalising: when two things that must differ are set by hand on two devices, one
+of them will eventually match, and the display has to survive it.
+
 ## 7b2. Where a button sits is whether it exists
 
 The vomit button was asked for as a new feature. It had been on the Feed screen since

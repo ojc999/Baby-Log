@@ -1573,7 +1573,13 @@ function rowHtml(r, showDate) {
         : (del ? '<em><span class="del-tag">kept in the record</span> ' + esc(r.raw || r.note) + '</em>'
                : (r.note && r.note !== 'left' && r.note !== 'right' ? '<em>' + esc(r.note) + '</em>' : ''))) +
     '</span>' +
-    '<span class="row-who">' + esc(r.sender) + '</span>' +
+    /* Who logged it. When the other phone carries the same name as this one — both set
+       to "Simon", say — the sender tells you nothing and every row looks like your own,
+       which reads exactly like the other phone's entries never arriving. Fall back to
+       the device name, which is unique by construction. */
+    '<span class="row-who">' +
+      esc(!r.own && cfg.who && r.sender === cfg.who ? (r.device || r.sender) : r.sender) +
+    '</span>' +
     /* Only our own rows get controls. The other phone's file is not ours to write, so a
        x there was a button that could only ever refuse. */
     (del || !r.own ? '' :
@@ -1797,6 +1803,19 @@ function renderDiag() {
     L.push('recovered     ' + absorbed + ' row(s) were already in this device\'s own file and');
     L.push('              this browser did not have them, so they were kept rather');
     L.push('              than overwritten.');
+  }
+  var twins = {};
+  entries.forEach(function (r) {
+    if (!r.own && cfg.who && r.sender === cfg.who && r.device) twins[r.device] = true;
+  });
+  var twinList = Object.keys(twins);
+  if (twinList.length) {
+    L.push('');
+    L.push('SAME NAME ON BOTH PHONES');
+    L.push('Entries from ' + twinList.join(', ') + ' carry the name "' + cfg.who + '",');
+    L.push('which is this phone\'s name too, so every row looks like your own even');
+    L.push('though they arrived fine. Change "Your name" on the other phone — it is');
+    L.push('per phone and the setup link does not carry it.');
   }
   if (sharedName) {
     L.push('');
