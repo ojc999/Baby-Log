@@ -340,6 +340,22 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 }
 .sidehint b{font-weight:700}
 
+/* ───── day navigation on the log ───── */
+.daynav{
+  display:flex;align-items:center;gap:8px;margin:0 0 9px;
+  border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:4px;
+}
+.daynav-arrow{
+  appearance:none;flex:none;background:transparent;border:0;color:var(--ink);
+  font-size:20px;line-height:1;min-width:52px;min-height:52px;border-radius:10px;cursor:pointer;
+}
+.daynav-arrow:disabled{color:var(--ink-faint);opacity:.45}
+.daynav-arrow:active:not(:disabled){background:var(--surface-2)}
+.daynav-arrow:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+.daynav-mid{flex:1;min-width:0;text-align:center}
+.daynav-mid b{display:block;font-size:15px;font-weight:700}
+.daynav-mid span{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin-top:1px}
+
 /* ───── tabs ───── */
 .tabs{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tab{
@@ -448,7 +464,16 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <div class="sect"><h2>Growth</h2><hr></div>
     <div id="sum-growth"></div>
 
-    <div class="sect"><h2>Everything logged</h2><hr></div>
+    <div class="sect"><h2>The log</h2><hr></div>
+    <div class="daynav">
+      <button class="daynav-arrow" id="day-prev" aria-label="The day before">&larr;</button>
+      <div class="daynav-mid">
+        <b id="day-label">&mdash;</b>
+        <span id="day-sub"></span>
+      </div>
+      <button class="daynav-arrow" id="day-next" aria-label="The day after">&rarr;</button>
+    </div>
+    <button class="btn quiet" id="day-today" hidden style="width:100%;margin-bottom:9px">Back to today</button>
     <div id="sum-timeline"></div>
   </div>
 
@@ -1262,9 +1287,11 @@ function flush(manual) {
 }
 
 /* Pull the other devices' entries for today, so the summary is the whole picture. */
-function pullToday() {
+/* Read one day's folder back. `pullToday` is this for today; the poll also reaches
+   yesterday, because an entry keyed after midnight for the night before lands in
+   yesterday's file and would otherwise never reach the other phone at all. */
+function pullDay(day) {
   if (!configured()) return Promise.resolve();
-  var day = daySG(Date.now());
   return gh('GET', '/contents/data/events/' + day +
                    '?ref=' + encodeURIComponent(cfg.branch || 'main'))
     .then(function (r) {
@@ -1302,6 +1329,20 @@ function pullToday() {
       lastErr = 'Read-back failed: ' + ((err && err.message) ? err.message : String(err));
       renderDiag();
     });
+}
+
+/* Yesterday is checked too, but not on every tick - it rarely changes, and a listing is
+   the one part of a poll that cannot be skipped by sha. One in six ticks is about once a
+   minute, which is soon enough for an entry someone keyed in about last night. */
+var yestTick = 0;
+function pullToday() {
+  var today = daySG(Date.now());
+  var p = pullDay(today);
+  if (yestTick++ % 6 === 0) {
+    var yest = daySG(Date.now() - 86400000);
+    if (yest !== today) pullDay(yest);
+  }
+  return p;
 }
 
 /* ───── the setup link ─────
@@ -1711,12 +1752,54 @@ function renderSummary() {
       }).join('') + '</dl>'
     : '<p class="info">No measurements yet. Log one under <b>More</b>.</p>';
 
-  var all = entries.slice().reverse();
-  $('sum-timeline').innerHTML = all.length
-    ? all.slice(0, 120).map(function (r) { return rowHtml(r, true); }).join('') +
-      (all.length > 120 ? '<p class="info">Showing the most recent 120 of ' + all.length +
-       '. Everything is in the repo.</p>' : '')
-    : '<p class="empty">Nothing logged yet.</p>';
+  renderTimeline();
+}
+
+/* ───── the log, one day at a time ─────
+   It used to be the most recent 120 entries in one list, which answers "what happened
+   just now" and nothing else. A night is the unit people think in, so the log shows one
+   day and steps back through them. A day with nothing held locally is fetched from the
+   repo on arrival, which is what makes a phone set up last week able to show last week. */
+
+var logDay = null;          /* null means today */
+var dayTried = {};          /* days already fetched, so a genuinely empty day is not refetched */
+
+function shiftDay(day, by) { return daySG(msFromIso(day + 'T12:00:00+08:00') + by * 86400000); }
+
+function renderTimeline() {
+  var today = daySG(Date.now());
+  var day = logDay || today;
+  var isToday = day === today;
+
+  $('day-label').textContent = dayLabel(day) + (isToday ? ' · today' : '');
+  $('day-next').disabled = isToday;
+  $('day-today').hidden = isToday;
+
+  var rows = entries.filter(function (r) { return daySG(r.ms) === day; });
+  var live_ = rows.filter(function (r) { return r.type !== 'deleted'; });
+  $('day-sub').textContent = rows.length
+    ? live_.length + (live_.length === 1 ? ' entry' : ' entries') +
+      (rows.length > live_.length ? ' · ' + (rows.length - live_.length) + ' undone' : '')
+    : '';
+
+  if (rows.length) {
+    $('sum-timeline').innerHTML =
+      rows.slice().reverse().map(function (r) { return rowHtml(r, false); }).join('');
+    return;
+  }
+  /* Nothing held for this day. If it is in the past and we have not looked, go and look:
+     the repo may well have it even though this phone does not. */
+  if (!isToday && configured() && !dayTried[day]) {
+    dayTried[day] = true;
+    $('sum-timeline').innerHTML = '<p class="info">Looking in the repo for this day…</p>';
+    backfillDay(day).then(function () {
+      saveEntries();
+      if (!$('pane-sum').hidden) renderTimeline();
+      renderDiag();
+    });
+    return;
+  }
+  $('sum-timeline').innerHTML = '<p class="empty">Nothing logged on this day.</p>';
 }
 
 function render() {
@@ -2175,9 +2258,21 @@ $('cat-recent').addEventListener('click', function (e) {
   var f = e.target.closest('[data-fix]');
   if (f) openFix(f.dataset.fix);
 });
+$('day-prev').addEventListener('click', function () {
+  logDay = shiftDay(logDay || daySG(Date.now()), -1);
+  renderTimeline();
+});
+$('day-next').addEventListener('click', function () {
+  var today = daySG(Date.now());
+  var next = shiftDay(logDay || today, 1);
+  logDay = (next >= today) ? null : next;
+  renderTimeline();
+});
+$('day-today').addEventListener('click', function () { logDay = null; renderTimeline(); });
+
 $('sum-timeline').addEventListener('click', function (e) {
   var x = e.target.closest('[data-del]');
-  if (x) { undo(x.dataset.del); renderSummary(); return; }
+  if (x) { undo(x.dataset.del); renderSummary(); return; }   /* keeps logDay, so the view stays put */
   var f = e.target.closest('[data-fix]');
   if (f) openFix(f.dataset.fix);
 });

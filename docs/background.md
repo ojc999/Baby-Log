@@ -277,6 +277,30 @@ out, and any later write to that day — backdating an entry into it — would r
 file without them. `absorbOwn` already does the right thing, so backfill reuses it,
 quietly. Backfill never marks a day as owing a push: it is reading, not writing.
 
+## 7a1. The day boundary, checked rather than assumed
+
+Logging last night's feed at 00:30 was tested against a pinned clock. The timestamp side
+was already right and needs no change: the time picker builds the chosen wall clock in
+Singapore, sees it is in the future, and steps back a day, so 23:40 keyed at 00:30 lands
+on the previous day. The `−60` chip agrees. Both were verified rather than reasoned
+about.
+
+What was wrong was downstream. **The live poll only ever read today's folder**, so an
+entry that landed in yesterday's file never reached the other phone — it arrived only if
+that phone happened to be set up afresh and ran its seven-day backfill. A parent keying
+in the 23:40 feed while the kettle boiled would have been the only one who could see it.
+
+The poll now reads yesterday as well, one tick in six — about once a minute. Not every
+tick, because a directory listing is the one part of a poll that cannot be skipped by
+sha, and yesterday rarely changes. Measured: twelve listings of today to one of
+yesterday.
+
+A known limit, left as it is: **nothing can be backdated further than 24 hours.** The
+picker is a wall clock with no date, so the furthest back it reaches is yesterday's
+23:59. Giving it a date field would widen what a mis-tap can do at 3am, for something
+needed rarely; the honest fallback is to log at the nearest reachable time and put the
+real one in a note, where `raw` keeps it forever.
+
 ## 7b1. Arriving and being seen are different things
 
 Reported as the other phone's entries not appearing. They were appearing. Both phones
@@ -295,6 +319,20 @@ rely on at 3am.
 
 Worth generalising: when two things that must differ are set by hand on two devices, one
 of them will eventually match, and the display has to survive it.
+
+## 7b15. The log is a day, not a feed of the last 120 entries
+
+The log used to be the most recent 120 rows in one list, which answers "what just
+happened" and nothing else. A night is the unit a parent thinks in — how many feeds, how
+long asleep, who did which — so the log shows one day and steps between them.
+
+Stepping to a day this phone does not hold fetches it from the repo on arrival, once per
+day visited. That is what makes the history reachable from a phone set up last week, and
+it is the same `backfillDay` the setup path uses, so there is one code path for "go and
+get a day" rather than two.
+
+It will not step past today. There is no such thing as tomorrow's log, and an arrow that
+goes nowhere is a bug report waiting to happen.
 
 ## 7b2. Where a button sits is whether it exists
 
