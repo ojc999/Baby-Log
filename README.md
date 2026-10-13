@@ -58,9 +58,11 @@ it understood *before* saving, so a wrong reading is caught before it is in the 
 The **Summary** tab gives time since the last feed, poop, wet nappy and bath, then
 today's totals, the last seven days, latest measurements, and **the log**.
 
-The log shows one day at a time, with `←` and `→` to step between them. It opens on
-today and will not go past it. Stepping back to a day this phone does not hold fetches it
-from the repo, so a phone set up last week can still show last week.
+The log is one continuous list, newest first, with a heading at each day boundary that
+stays in view while you read that day. Keep scrolling and earlier days load themselves. A
+day this phone does not hold is fetched from the repo as you reach it, so a phone set up
+last week can still show last week. It stops after a week of empty days rather than
+scrolling back forever.
 
 Every entry you logged carries two buttons: **Fix** and **×**. `×` undoes it. **Fix**
 opens the time, the amount and the side so a wrong one can be put right — it keeps the

@@ -340,21 +340,18 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 }
 .sidehint b{font-weight:700}
 
-/* ───── day navigation on the log ───── */
-.daynav{
-  display:flex;align-items:center;gap:8px;margin:0 0 9px;
-  border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:4px;
+/* ───── the log's day headings ─────
+   Sticky, so while you are deep inside a day you can still see which day it is. */
+.logday{
+  position:sticky;top:0;z-index:3;
+  display:flex;align-items:baseline;gap:8px;
+  margin:14px 0 0;padding:7px 0 6px;
+  background:var(--ground);border-bottom:1px solid var(--line);
 }
-.daynav-arrow{
-  appearance:none;flex:none;background:transparent;border:0;color:var(--ink);
-  font-size:20px;line-height:1;min-width:52px;min-height:52px;border-radius:10px;cursor:pointer;
-}
-.daynav-arrow:disabled{color:var(--ink-faint);opacity:.45}
-.daynav-arrow:active:not(:disabled){background:var(--surface-2)}
-.daynav-arrow:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
-.daynav-mid{flex:1;min-width:0;text-align:center}
-.daynav-mid b{display:block;font-size:15px;font-weight:700}
-.daynav-mid span{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin-top:1px}
+.logday:first-child{margin-top:0}
+.logday b{font-size:14px;font-weight:700}
+.logday span{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+.logday.is-today b{color:var(--teal)}
 
 /* ───── tabs ───── */
 .tabs{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -465,16 +462,8 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <div id="sum-growth"></div>
 
     <div class="sect"><h2>The log</h2><hr></div>
-    <div class="daynav">
-      <button class="daynav-arrow" id="day-prev" aria-label="The day before">&larr;</button>
-      <div class="daynav-mid">
-        <b id="day-label">&mdash;</b>
-        <span id="day-sub"></span>
-      </div>
-      <button class="daynav-arrow" id="day-next" aria-label="The day after">&rarr;</button>
-    </div>
-    <button class="btn quiet" id="day-today" hidden style="width:100%;margin-bottom:9px">Back to today</button>
     <div id="sum-timeline"></div>
+    <div id="log-end"></div>
   </div>
 
   <!-- ═══════════ SETUP ═══════════ -->
@@ -1761,45 +1750,93 @@ function renderSummary() {
    day and steps back through them. A day with nothing held locally is fetched from the
    repo on arrival, which is what makes a phone set up last week able to show last week. */
 
-var logDay = null;          /* null means today */
-var dayTried = {};          /* days already fetched, so a genuinely empty day is not refetched */
+var LOG_DAYS_MAX = 120;     /* a hard floor, so nothing can walk back forever */
+var LOG_DRY_RUN  = 7;       /* stop extending after this many empty days in a row */
+
+var logDays   = 1;          /* days on screen, counting back from today */
+var dayTried  = {};         /* days already fetched, so a genuinely empty day is not refetched */
+var logHtml   = '';         /* what was last written, so an unchanged redraw is skipped */
+var logAtFloor = false;
+var logObs    = null;
 
 function shiftDay(day, by) { return daySG(msFromIso(day + 'T12:00:00+08:00') + by * 86400000); }
 
+/* One continuous list, newest first, with a sticky heading at each day boundary. Earlier
+   days load as you reach the bottom.
+
+   The redraw is guarded: render() runs on every poll, and rebuilding the list each time
+   would throw the scroll position away while someone is reading it. The HTML is compared
+   first and only written when it differs, and the scroll offset is carried across. */
 function renderTimeline() {
   var today = daySG(Date.now());
-  var day = logDay || today;
-  var isToday = day === today;
+  var html = '', dry = 0;
 
-  $('day-label').textContent = dayLabel(day) + (isToday ? ' · today' : '');
-  $('day-next').disabled = isToday;
-  $('day-today').hidden = isToday;
+  for (var i = 0; i < logDays; i++) {
+    var day = i === 0 ? today : shiftDay(today, -i);
+    var rows = entries.filter(function (r) { return daySG(r.ms) === day; });
+    var kept = rows.filter(function (r) { return r.type !== 'deleted'; });
 
-  var rows = entries.filter(function (r) { return daySG(r.ms) === day; });
-  var live_ = rows.filter(function (r) { return r.type !== 'deleted'; });
-  $('day-sub').textContent = rows.length
-    ? live_.length + (live_.length === 1 ? ' entry' : ' entries') +
-      (rows.length > live_.length ? ' · ' + (rows.length - live_.length) + ' undone' : '')
-    : '';
+    html += '<div class="logday' + (i === 0 ? ' is-today' : '') + '">' +
+            '<b>' + esc(dayLabel(day)) + (i === 0 ? ' · today' : '') + '</b>' +
+            '<span>' + (rows.length
+              ? kept.length + (kept.length === 1 ? ' entry' : ' entries') +
+                (rows.length > kept.length ? ' · ' + (rows.length - kept.length) + ' undone' : '')
+              : '—') + '</span></div>';
 
-  if (rows.length) {
-    $('sum-timeline').innerHTML =
-      rows.slice().reverse().map(function (r) { return rowHtml(r, false); }).join('');
-    return;
+    if (rows.length) {
+      dry = 0;
+      html += rows.slice().reverse().map(function (r) { return rowHtml(r, false); }).join('');
+    } else {
+      dry++;
+      /* Nothing held for this day. If we have not looked, go and look: the repo may have
+         it even though this phone does not. Once per day, whatever the answer. */
+      var looked = !!dayTried[day];
+      if (i > 0 && configured() && !looked) {
+        dayTried[day] = true;
+        backfillDay(day).then(function () {
+          saveEntries();
+          if (!$('pane-sum').hidden) renderTimeline();
+          renderDiag();
+        });
+      }
+      html += '<p class="empty">' + (looked || !configured() ? 'Nothing logged.' : 'Looking…') + '</p>';
+    }
   }
-  /* Nothing held for this day. If it is in the past and we have not looked, go and look:
-     the repo may well have it even though this phone does not. */
-  if (!isToday && configured() && !dayTried[day]) {
-    dayTried[day] = true;
-    $('sum-timeline').innerHTML = '<p class="info">Looking in the repo for this day…</p>';
-    backfillDay(day).then(function () {
-      saveEntries();
-      if (!$('pane-sum').hidden) renderTimeline();
-      renderDiag();
-    });
-    return;
+
+  logAtFloor = logDays >= LOG_DAYS_MAX || dry >= LOG_DRY_RUN;
+  html += logAtFloor
+    ? '<p class="info">That is as far back as the log goes on this phone. Everything ever ' +
+      'logged is in the repo either way.</p>'
+    : '<p class="info">Keep scrolling for earlier days…</p>';
+
+  if (html !== logHtml) {
+    var pane = $('pane-sum');
+    var keep = pane ? pane.scrollTop : 0;
+    $('sum-timeline').innerHTML = html;
+    logHtml = html;
+    if (pane) pane.scrollTop = keep;
   }
-  $('sum-timeline').innerHTML = '<p class="empty">Nothing logged on this day.</p>';
+}
+
+/* Load one more day when the bottom comes into view. An observer rather than a scroll
+   handler, so nothing runs while you are simply reading. */
+function startLogObserver() {
+  if (logObs || typeof IntersectionObserver === 'undefined') return;
+  var end = $('log-end'), pane = $('pane-sum');
+  if (!end || !pane) return;
+  logObs = new IntersectionObserver(function (es) {
+    if (!es.some(function (e) { return e.isIntersecting; })) return;
+    if (logAtFloor || $('pane-sum').hidden || logDays >= LOG_DAYS_MAX) return;
+    logDays++;
+    renderTimeline();
+    /* An observer reports changes in state, not states. Loading a day leaves the sentinel
+       exactly where it was - still in view - so no second callback ever arrives and the
+       list stops growing after one day. Re-observing forces a fresh look, which either
+       loads the next day or settles. */
+    logObs.unobserve(end);
+    logObs.observe(end);
+  }, { root: pane, rootMargin: '300px' });
+  logObs.observe(end);
 }
 
 function render() {
@@ -2095,6 +2132,7 @@ function show(tab) {
   $('pane-set').hidden  = tab !== 'set';
   if (tab === 'sum') renderSummary();
   if (tab === 'set') { renderFirstRun(); renderDiag(); }
+  if (tab === 'sum') startLogObserver();
 }
 
 function goCat(name) {
@@ -2258,18 +2296,6 @@ $('cat-recent').addEventListener('click', function (e) {
   var f = e.target.closest('[data-fix]');
   if (f) openFix(f.dataset.fix);
 });
-$('day-prev').addEventListener('click', function () {
-  logDay = shiftDay(logDay || daySG(Date.now()), -1);
-  renderTimeline();
-});
-$('day-next').addEventListener('click', function () {
-  var today = daySG(Date.now());
-  var next = shiftDay(logDay || today, 1);
-  logDay = (next >= today) ? null : next;
-  renderTimeline();
-});
-$('day-today').addEventListener('click', function () { logDay = null; renderTimeline(); });
-
 $('sum-timeline').addEventListener('click', function (e) {
   var x = e.target.closest('[data-del]');
   if (x) { undo(x.dataset.del); renderSummary(); return; }   /* keeps logDay, so the view stays put */

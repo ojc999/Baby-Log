@@ -1,4 +1,7 @@
-// Paging back through the log: a day held locally, a day only in the repo, and the edges.
+// Scrolling back through the log: it opens on today, loads earlier days as you reach the
+// bottom, fetches a day that exists only in the repo on the way past, stops after a run of
+// empty days rather than scrolling back forever, and - the one that would make it
+// unusable - does not throw away your scroll position when the ten-second poll redraws.
 const { chromium } = require('playwright');
 const http=require('http'),fs=require('fs'),path=require('path'),url=require('url');
 const ROOT=path.resolve(__dirname,'..','..');
@@ -60,45 +63,61 @@ const t=(n,got,want)=>{const ok=String(got)===String(want);if(!ok)fail++;
   await page.waitForTimeout(500);
   await page.click('#tab-sum'); await page.waitForTimeout(400);
 
-  const label = async () => (await page.textContent('#day-label')).trim();
-  const sub   = async () => (await page.textContent('#day-sub')).trim();
   const body  = async () => ((await page.textContent('#sum-timeline'))||'').replace(/\s+/g,' ').trim();
+  const heads = async () => page.evaluate(()=>[...document.querySelectorAll('.logday b')].map(e=>e.textContent.trim()));
+  const pane  = () => page.locator('#pane-sum');
 
-  console.log('--- opens on today ---');
-  t('labelled today', /today/.test(await label()), true);
-  t('and counts today only', await sub(), '2 entries');
-  t('forward is disabled on today', await page.isDisabled('#day-next'), true);
-  t('no "back to today" button while on today', await page.isHidden('#day-today'), true);
+  console.log('--- it opens on today ---');
+  let h = await heads();
+  t('one day heading to start with', h.length, 1);
+  t('and it is today', /12 Oct 2026 · today/.test(h[0]), true);
+  t("today's entries are there", /Tummy time 10 min/.test(await body()), true);
+  t('and it invites you to keep going', /Keep scrolling/.test(await body()), true);
 
-  console.log('\n--- one step back ---');
-  await page.click('#day-prev'); await page.waitForTimeout(300);
-  t('shows the day before', /11 Oct 2026/.test(await label()), true);
-  t('not marked today', /today/.test(await label()), false);
-  t('counts that day', await sub(), '2 entries');
-  t('forward is enabled again', await page.isDisabled('#day-next'), false);
-  t('and a way back appears', await page.isVisible('#day-today'), true);
+  console.log('--- scrolling down loads earlier days ---');
+  for (let i=0;i<6;i++){
+    await page.evaluate(()=>{const p=document.getElementById('pane-sum');p.scrollTop=p.scrollHeight;});
+    await page.waitForTimeout(700);
+  }
+  h = await heads();
+  console.log('   day headings now:', JSON.stringify(h));
+  t('more days have loaded', h.length > 1, true);
+  t('yesterday appears, with its entries', /11 Oct 2026/.test(h.join('|')), true);
+  t("yesterday's rows are shown", /Bottle 70 ml/.test(await body()), true);
+  t('days are in order, newest first', h[0].indexOf('12 Oct') > -1 && h[1].indexOf('11 Oct') > -1, true);
 
-  console.log('\n--- a day with nothing on it ---');
-  await page.click('#day-prev'); await page.waitForTimeout(900);
-  t('says so plainly', /Nothing logged on this day/.test(await body()), true);
-
-  console.log('\n--- a day that exists only in the repo ---');
-  for (let i=0;i<3;i++){ await page.click('#day-prev'); await page.waitForTimeout(1200); }
-  t('we reached it', /7 Oct 2026/.test(await label()), true);
-  t('it was fetched and shown', /Breastfeed 25 min/.test(await body()), true);
+  console.log('--- a day that exists only in the repo is fetched on the way past ---');
+  for (let i=0;i<8;i++){
+    await page.evaluate(()=>{const p=document.getElementById('pane-sum');p.scrollTop=p.scrollHeight;});
+    await page.waitForTimeout(800);
+  }
+  t('we reached it', /7 Oct 2026/.test((await heads()).join('|')), true);
+  t('and it was pulled from the repo', /Breastfeed 25 min/.test(await body()), true);
   t('with the other person named', /Des/.test(await body()), true);
 
-  console.log('\n--- back to today ---');
-  await page.click('#day-today'); await page.waitForTimeout(300);
-  t('returns to today', /today/.test(await label()), true);
-  t('with today\'s entries', /Tummy time 10 min/.test(await body()), true);
+  console.log('--- it stops rather than scrolling back forever ---');
+  for (let i=0;i<12;i++){
+    await page.evaluate(()=>{const p=document.getElementById('pane-sum');p.scrollTop=p.scrollHeight;});
+    await page.waitForTimeout(400);
+  }
+  const atFloor = await page.evaluate(()=>({days:logDays, floor:logAtFloor}));
+  console.log('   days loaded:', atFloor.days, ' hit the floor:', atFloor.floor);
+  t('it stopped after a run of empty days', atFloor.floor, true);
+  t('well short of the hard cap', atFloor.days < 120, true);
+  t('and says so', /as far back as the log goes/.test(await body()), true);
 
-  console.log('\n--- forward never runs past today ---');
-  await page.click('#day-prev'); await page.waitForTimeout(200);
-  await page.click('#day-next'); await page.waitForTimeout(200);
-  await page.evaluate(()=>{ document.getElementById('day-next').disabled = false; });
-  await page.click('#day-next'); await page.waitForTimeout(200);
-  t('still today, never tomorrow', /today/.test(await label()), true);
+  console.log('--- a poll redraw must not throw away where you were reading ---');
+  await page.evaluate(()=>{const p=document.getElementById('pane-sum');p.scrollTop=400;});
+  await page.waitForTimeout(200);
+  const before = await page.evaluate(()=>document.getElementById('pane-sum').scrollTop);
+  await page.evaluate(()=>{ render(); render(); });        // what the 10s poll does
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(()=>document.getElementById('pane-sum').scrollTop);
+  t('an unchanged redraw leaves the scroll alone', after, before);
+  await page.evaluate(()=>{ add('nappy','wet','','','','wet'); render(); });
+  await page.waitForTimeout(300);
+  const after2 = await page.evaluate(()=>document.getElementById('pane-sum').scrollTop);
+  t('and a redraw that does change keeps it too', Math.abs(after2 - before) < 80, true);
 
   await page.screenshot({path:path.join(process.env.SHOTS||require('os').tmpdir(),'daynav.png')});
   await b.close(); srv.close();

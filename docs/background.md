@@ -320,19 +320,30 @@ rely on at 3am.
 Worth generalising: when two things that must differ are set by hand on two devices, one
 of them will eventually match, and the display has to survive it.
 
-## 7b15. The log is a day, not a feed of the last 120 entries
+## 7b15. The log scrolls; it does not paginate
 
-The log used to be the most recent 120 rows in one list, which answers "what just
-happened" and nothing else. A night is the unit a parent thinks in — how many feeds, how
-long asleep, who did which — so the log shows one day and steps between them.
+The log was the most recent 120 rows in one list, which answers "what just happened" and
+nothing else. It then grew arrows to step one day at a time, which answered the rest but
+made reading back through a week into fourteen taps. It is now one continuous list with a
+sticky heading at each day boundary, and earlier days load as you reach the bottom. The
+arrows are gone: once you can scroll, they are a second way to do the same thing.
 
-Stepping to a day this phone does not hold fetches it from the repo on arrival, once per
-day visited. That is what makes the history reachable from a phone set up last week, and
-it is the same `backfillDay` the setup path uses, so there is one code path for "go and
-get a day" rather than two.
+A day this phone does not hold is fetched on the way past, once per day visited. Same
+`backfillDay` the setup path uses, so there is one way to go and get a day rather than
+two. It stops after `LOG_DRY_RUN` empty days, so the list settles instead of walking back
+to the beginning of time, with a hard cap behind that.
 
-It will not step past today. There is no such thing as tomorrow's log, and an arrow that
-goes nowhere is a bug report waiting to happen.
+Two things this cost, both found by testing rather than reasoning:
+
+- **`IntersectionObserver` reports changes in state, not states.** Loading a day leaves
+  the sentinel exactly where it was, still in view, so no second callback arrives and the
+  list stops growing after one day. The observer is re-observed after each load, which
+  forces a fresh look.
+- **`render()` runs on every poll**, and rebuilding the list each time threw away the
+  scroll position while someone was reading it — once every ten seconds. The HTML is
+  compared first and only written when it differs, and the scroll offset is carried
+  across when it does. There is a test for exactly this, because it is the kind of fault
+  that makes a feature unusable without ever looking like a bug in the code.
 
 ## 7b2. Where a button sits is whether it exists
 
