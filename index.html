@@ -907,6 +907,12 @@ var lastPullMs = 0;        /* throttles the read-back of the other phone */
 var absorbed = 0;          /* rows recovered from our own remote file, see absorbOwn */
 var sharedName = false;    /* true once we see another person writing our own device file */
 var seenShas = {};         /* { path: sha } of foreign files already merged, so a poll skips them */
+/* Which build this phone is running, and which one the server has. Taken from the page's
+   own Last-Modified rather than a version constant, so it cannot drift from reality or be
+   forgotten on a deploy. Answers the one question a stale phone cannot otherwise answer:
+   did my reload actually do anything? */
+var bootBuild = '';
+var liveBuild = '';
 var liveT = null;          /* the on-screen poll timer */
 var backfilling = false;
 
@@ -1886,6 +1892,38 @@ function paintSync() {
   el.hidden = true;
 }
 
+/* A HEAD on our own page, with the browser cache bypassed, tells us what the server is
+   serving right now. Cheap, and only done at boot and when Setup is opened. */
+function checkBuild(first) {
+  try {
+    return fetch(location.pathname + '?v=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+      .then(function (r) {
+        /* Last-Modified is what GitHub Pages sends; ETag is the fallback for anywhere
+           that does not, so this never goes quietly blank. */
+        var lm = r.headers.get('last-modified') || r.headers.get('etag') || '';
+        if (first && !bootBuild) bootBuild = lm;
+        liveBuild = lm;
+        renderDiag();
+      })
+      .catch(function () {});
+  } catch (e) { return Promise.resolve(); }
+}
+
+function buildLine() {
+  if (!bootBuild && !liveBuild) return [];
+  var stale = bootBuild && liveBuild && bootBuild !== liveBuild;
+  var L = ['', 'app build     ' + (bootBuild || 'unknown')];
+  if (stale) {
+    L.push('');
+    L.push('A NEWER VERSION IS ON THE SERVER');
+    L.push('served        ' + liveBuild);
+    L.push('This phone is still running the older one. Close the app completely');
+    L.push('and open it again. On iPhone: swipe up from the bottom, swipe the app');
+    L.push('away, then tap the icon. A pull-to-refresh is not enough.');
+  }
+  return L;
+}
+
 function renderFirstRun() {
   var el = $('firstrun');
   if (configured()) { el.hidden = true; return; }
@@ -1946,6 +1984,8 @@ function renderDiag() {
     L.push('each one skips the file named after itself. Give this phone a different');
     L.push('name on this tab, then tap Save and test.');
   }
+  L.push('');
+  buildLine().forEach(function (x) { L.push(x); });
   L.push('');
   L.push(lastErr ? 'LAST ERROR\n' + lastErr : 'last error    none');
   $('diag').textContent = L.join('\n');
@@ -2131,7 +2171,7 @@ function show(tab) {
   $('pane-sum').hidden  = tab !== 'sum';
   $('pane-set').hidden  = tab !== 'set';
   if (tab === 'sum') renderSummary();
-  if (tab === 'set') { renderFirstRun(); renderDiag(); }
+  if (tab === 'set') { renderFirstRun(); renderDiag(); checkBuild(false); }
   if (tab === 'sum') startLogObserver();
 }
 
@@ -2562,6 +2602,7 @@ document.addEventListener('visibilitychange', function () {
   flush(); startLive();
 });
 if (configured()) { flush(); if (!document.hidden) startLive(); }
+checkBuild(true);
 
 if (linked) {
   if (linked === 'kept') {
@@ -2577,6 +2618,12 @@ if (linked) {
 if ('serviceWorker' in navigator) {
   try {
     var reg = navigator.serviceWorker.register('sw.js');
+    if (reg && reg.then) {
+      reg.then(function (r) {
+        try { r.update(); } catch (e) {}               /* look for a new worker on each open */
+        if (r.waiting) try { r.waiting.postMessage('skip-waiting'); } catch (e) {}
+      });
+    }
     if (reg && reg.catch) reg.catch(function () {});   // blocked in previews; the app is fine without it
   } catch (e) {}
 }

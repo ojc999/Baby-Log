@@ -403,6 +403,33 @@ The colour is a sixth pair, `--play`, checked against WCAG AA in both themes by
 its button says and nothing else: the picker's own title still goes into `raw`, which has
 to stay the words actually used.
 
+## 7d. "Network first" was not reaching the network
+
+Reported as reloading not picking up a new version. The deploy was fine — the live page
+was byte-identical to `main`. The service worker was the problem, and had been since it
+was written.
+
+`sw.js` fetched with a plain `fetch(req)`, which goes through the browser's own HTTP
+cache. GitHub Pages serves these files with `cache-control: max-age=600`, so for ten
+minutes after any load the "network first" branch returned the browser's cached copy
+without a single request leaving the phone. It was network-first in intent only.
+
+It now fetches with `cache: 'no-cache'`, which still uses the cache but revalidates every
+time: an unchanged file costs a 304, a changed one actually arrives. Offline still falls
+back to the cache, unchanged.
+
+**Two things about proving it, both worth keeping.** The first version of the test used
+`page.reload()` and passed against the broken worker — Chromium's reload forces
+revalidation and hides the HTTP cache entirely. Only a plain navigation, which is what
+reopening a home-screen app actually is, reproduces it. And the fix was confirmed by
+reverting it and watching the test fail, rather than by watching it pass. A test written
+after a fix proves nothing until it has been seen to fail.
+
+Diagnostics now shows `app build`, taken from the page's own `Last-Modified` rather than a
+version constant that could drift or be forgotten on a deploy, and says plainly when the
+server has a newer one. The question "is this phone actually running your change" was
+previously unanswerable from the phone, which is why it took a round trip to find out.
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.

@@ -52,6 +52,10 @@ what it is, and lists decisions that look arbitrary and are not.
 - **The token may appear in a setup link, and nowhere else.** It belongs after the `#`,
   which browsers never send to a server, and the app strips it from the address bar as
   soon as it has read it. Never put it in a query string, a path, a log or a commit.
+- **See a new test fail before trusting it.** The service worker's cache bug was first
+  "proved fixed" by a test that passed against the broken worker too, because
+  `page.reload()` forces revalidation and hid the fault. Revert the fix, watch the test
+  fail, put it back.
 - **Keep a stub as strict as the real API.** The GitHub stub once accepted a PUT to an
   existing file with no `sha`, which the real API refuses with 422. The overwrite
   protection was never exercised on the path that triggers it. A lenient stub hides the
