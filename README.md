@@ -51,6 +51,11 @@ Breastfeeds show **which side comes next** — on the Last feed card, and on the
 screen itself, where the side opposite the last one is already selected. It is a chip,
 so a guess is never forced into the record.
 
+To log something from **yesterday**, pick the time and tap the **yesterday** chip next to
+it. The row turns amber and says `yesterday 08:00`, so it is obvious the entry is not for
+now. A time later than the current clock already means yesterday without the chip — so
+logging last night's 23:40 feed at 00:30 needs no extra tap.
+
 Every category screen also has a **when** row — `now`, `−5`, `−15`, `−30`, `−60`, or a
 time picker — and a **free-text box** for anything the buttons miss. The box shows what
 it understood *before* saving, so a wrong reading is caught before it is in the record.
@@ -277,7 +282,8 @@ verbatim.
 | Diagnostics says `recovered N row(s)` | The file held entries this phone had not seen, and they were kept rather than overwritten. Once, after clearing the browser, is expected. Every sync means **both phones are using the same device name** — change one of them on the Setup tab. |
 | The app is only showing today | The app reads today automatically. For older days, **Setup → Load 90 days of history**. A phone set up from a link pulls the last seven days by itself. |
 | The other phone's entries look like your own | Both phones have the same **Your name**. The name is per phone and the setup link does **not** carry it, so it has to be typed on each. Until it is, the app labels the other phone's rows with its device name instead, and Diagnostics says so. Rows from the other phone also have no **Fix** or `×` buttons — that is always the reliable tell. |
-| An entry logged after midnight for the night before | Works correctly — pick the time and it lands on the previous day, not today. It reaches the other phone within about a minute. You cannot reach further back than 24 hours, though: for anything older, log it at the nearest time you can and put the real time in a note. |
+| Logging something from yesterday | Pick the time, then tap **yesterday**. The row says `yesterday 08:00` before you save. A time later than the current clock means yesterday anyway, so the 23:40 feed logged at 00:30 needs no chip. |
+| Logging something from further back than yesterday | Not possible from the app. Log it at the nearest time you can reach and put the real time in a note — `raw` keeps your words forever, and it stays visible as something to check rather than being quietly wrong. |
 | The other phone's entries are not showing | Four things to check, in order. **1.** Both phones must have **different device names** — if they share one, each skips the file named after itself and neither sees the other. Diagnostics says `SAME DEVICE NAME ON BOTH PHONES` when it can tell. **2.** Both must have the same **repo** and **branch**. **3.** Today and yesterday are read back automatically; for anything older, step back to that day in the log, which fetches it. **4.** They arrive on open and when you return to the app, at most once a minute — not instantly. |
 | Offline | Everything queues. The strip shows how many are waiting. They go up on the next sync. |
 

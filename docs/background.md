@@ -295,11 +295,24 @@ tick, because a directory listing is the one part of a poll that cannot be skipp
 sha, and yesterday rarely changes. Measured: twelve listings of today to one of
 yesterday.
 
-A known limit, left as it is: **nothing can be backdated further than 24 hours.** The
-picker is a wall clock with no date, so the furthest back it reaches is yesterday's
-23:59. Giving it a date field would widen what a mis-tap can do at 3am, for something
-needed rarely; the honest fallback is to log at the nearest reachable time and put the
-real one in a note, where `raw` keeps it forever.
+**That rollback was also doing less than it looked.** It only fired when the chosen time
+appeared to be in the future, so at 10:00 picking 08:00 stayed on today, and most of
+yesterday could not be reached at all — not 24 hours back, only the hours between now and
+midnight. Worse, it failed silently: the entry saved onto today and nothing said so.
+
+A **yesterday** chip now sits beside the time picker and places the chosen time on the
+previous day. The automatic rollback stays, so the common case — last night's feed keyed
+in after midnight — still needs no extra tap. Arming the chip with no time yet seeds the
+box with the current clock, visible and editable, rather than guessing silently. The
+whole row turns amber and reads `yesterday 08:00`, because the failure being fixed was
+one of not knowing which day an entry was about to land on.
+
+The row wraps instead of scrolling sideways now. The chip is last, and in a scrolling row
+it sat off the right edge — §7b2's lesson, arriving a second time within a fortnight.
+
+Still not possible: **anything before yesterday.** The picker is a wall clock with no
+date. The fallback is to log at the nearest reachable time and put the real one in a
+note, where `raw` keeps it forever and it stays visible as something to check.
 
 ## 7b1. Arriving and being seen are different things
 

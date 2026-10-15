@@ -180,7 +180,10 @@ body{
 .when{
   display:flex;align-items:center;gap:6px;margin:10px 0 2px;padding:7px 8px;
   border:1px solid var(--line);border-radius:11px;background:var(--surface);
-  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  /* Wraps rather than scrolls sideways. The yesterday chip is last, and in a scrolling
+     row it sat off the right edge where nobody would find it - the same way the vomit
+     button went unnoticed for a week. A second line costs 40px and hides nothing. */
+  flex-wrap:wrap;
 }
 .when.armed{background:var(--amber-bg);border-color:var(--amber-line)}
 .when-lbl{flex:none;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);padding-left:3px}
@@ -416,7 +419,8 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <button class="chip" data-off="15">&minus;15</button>
       <button class="chip" data-off="30">&minus;30</button>
       <button class="chip" data-off="60">&minus;60</button>
-      <input class="timein" id="when-time" type="time" aria-label="Or pick a time earlier today">
+      <input class="timein" id="when-time" type="time" aria-label="Or pick a time">
+      <button class="chip" id="when-yest" data-day="1" aria-pressed="false">yesterday</button>
     </div>
 
     <div id="cat-body"></div>
@@ -920,6 +924,7 @@ var screen = 'home';         // home | cat
 var curCat = null;
 var offsetMin = 0;
 var absTime = '';            // 'HH:MM' from the time picker, wins over offsetMin
+var dayBack = 0;             // 0 = the time picked is today's, 1 = yesterday's
 var sheetKind = null, sheetVal = 0, sheetSide = '';
 
 function lsGet(k, dflt) {
@@ -984,12 +989,16 @@ function ago(ms) { return dur(Date.now() - ms); }
 function stamp() {
   if (absTime) {
     var hm = absTime.split(':');
-    var p = sgParts(Date.now());
-    // build the chosen wall-clock time in Singapore, then step back a day if it is ahead
+    /* Build the chosen wall clock on the chosen day. `dayBack` is what makes yesterday
+       morning reachable at all: rolling back only when the time looks like the future
+       meant that at 10:00, picking 08:00 silently landed on today, and there was no way
+       to say otherwise. Times after the current clock still roll back on their own, so
+       the common case after midnight needs no extra tap. */
+    var p = sgParts(Date.now() - dayBack * 86400000);
     var t = Date.parse(p.year + '-' + p.month + '-' + p.day + 'T' +
                        ('0' + hm[0]).slice(-2) + ':' + ('0' + hm[1]).slice(-2) + ':00+08:00');
     if (isNaN(t)) return Date.now();
-    if (t > Date.now() + 60000) t -= 86400000;
+    if (t > Date.now() + 60000) t -= 86400000;      /* nothing can have happened yet */
     return t;
   }
   return Date.now() - offsetMin * 60000;
@@ -2028,7 +2037,7 @@ function buzz() { try { if (navigator.vibrate) navigator.vibrate(18); } catch (e
    written, if there is one - it gets a toast with an Undo, so a mis-tap is one tap to
    put right rather than a hunt for a small x in a list. */
 function afterWrite(e) {
-  offsetMin = 0; absTime = ''; $('when-time').value = '';
+  offsetMin = 0; absTime = ''; dayBack = 0; $('when-time').value = '';
   paintWhen(); render(); paintSync(); renderDiag(); buzz();
   if (e && e.msg_id && e.type !== 'deleted') {
     toast('<b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms), e.msg_id);
@@ -2207,16 +2216,31 @@ $('cat-back').addEventListener('click', goHome);
 
 function paintWhen() {
   document.querySelectorAll('#when .chip').forEach(function (b) {
+    if (b.dataset.day) { b.setAttribute('aria-pressed', dayBack ? 'true' : 'false'); return; }
     b.setAttribute('aria-pressed', (!absTime && Number(b.dataset.off) === offsetMin) ? 'true' : 'false');
   });
-  $('when').className = 'when' + ((offsetMin || absTime) ? ' armed' : '');
-  $('when-lbl').textContent = absTime ? 'at ' + absTime : (offsetMin ? offsetMin + ' min ago' : 'When');
+  $('when').className = 'when' + ((offsetMin || absTime || dayBack) ? ' armed' : '');
+  $('when-lbl').textContent = absTime
+    ? (dayBack ? 'yesterday ' + absTime : 'at ' + absTime)
+    : (offsetMin ? offsetMin + ' min ago' : 'When');
 }
 $('when').addEventListener('click', function (e) {
   var b = e.target.closest('.chip');
   if (!b) return;
+  if (b.dataset.day) {
+    dayBack = dayBack ? 0 : 1;
+    offsetMin = 0;
+    /* Arming yesterday with no time yet would leave nothing to put on it, so seed the
+       box with the current clock. It is on screen and editable - never a hidden guess. */
+    if (dayBack && !absTime) {
+      absTime = hhmm(Date.now());
+      $('when-time').value = absTime;
+    }
+    paintWhen();
+    return;
+  }
   offsetMin = Number(b.dataset.off);
-  absTime = ''; $('when-time').value = '';
+  absTime = ''; dayBack = 0; $('when-time').value = '';
   paintWhen();
 });
 $('when-time').addEventListener('change', function () {

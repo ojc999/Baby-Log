@@ -20,6 +20,7 @@ Run them when you change the layout, the stylesheet, or anything that talks to G
 | `daynav.test.js` | Scrolling back through the log: it opens on today, loads earlier days as you reach the bottom, fetches a day that exists only in the repo on the way past, stops after a run of empty days, and keeps your scroll position when the ten-second poll redraws. |
 | `midnight.test.js` | Logging last night's feed after midnight, with the clock pinned to 00:30. Checks the entry lands on yesterday rather than today, that the backdate chips agree, how far back the picker can reach at all, and that the other phone picks the entry up from the poll rather than only on a fresh setup. |
 | `update.test.js` | Whether a deploy actually reaches a phone. Serves the app with the headers GitHub Pages really sends, changes the file, navigates back, and checks the new build is what runs — and that it still opens offline. Must be a navigation, not a reload: Chromium's reload forces revalidation and hides the bug. |
+| `yesterday.test.js` | Reaching yesterday from the middle of today. Shows which times the picker reaches on its own, that the yesterday chip reaches the rest, that it never produces a future time, and that the row disarms after a save. Verified to fail before the fix. |
 | `contrast.test.js` | Measures every text node against its own background in both light and dark, and reports anything under WCAG AA. |
 
 Each writes screenshots to the system temp directory, or to `$SHOTS` if you set it.
