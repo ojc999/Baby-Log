@@ -150,6 +150,12 @@ const VIEWPORTS = [
         return who && /wife/i.test(who.textContent) && r.querySelector('.row-x'); }).length; });
     if (foreignX) note(name, `${foreignX} row(s) from the other phone show an undo button that cannot work`);
 
+    // Book tab
+    await page.click('#tab-book'); await page.waitForTimeout(400);
+    await page.screenshot({ path: `${SHOTS}/${name}-book.png`, fullPage: true });
+    const m4 = await page.evaluate(() => ({ scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth }));
+    if (m4.scrollW > m4.clientW + 1) note(name, `horizontal overflow on Book: ${m4.scrollW} > ${m4.clientW}`);
+
     // Setup tab
     await page.click('#tab-set'); await page.waitForTimeout(250);
     await page.screenshot({ path: `${SHOTS}/${name}-setup.png`, fullPage: true });

@@ -356,8 +356,25 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 .logday span{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
 .logday.is-today b{color:var(--teal)}
 
+/* ───── the book: a day index ───── */
+.bookday{
+  display:flex;align-items:baseline;gap:9px;width:100%;
+  appearance:none;background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;color:var(--ink);text-align:left;
+  padding:11px 12px;margin-bottom:6px;min-height:48px;cursor:pointer;font-family:var(--sans);
+}
+.bookday[aria-pressed="true"]{border-color:var(--teal);background:var(--teal-bg)}
+.bookday b{font-size:14px;font-weight:700}
+.bookday span{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+.bookday em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+  text-transform:uppercase;letter-spacing:.06em}
+.fixrow select{
+  flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;padding:10px 12px;min-height:48px;
+}
+
 /* ───── tabs ───── */
-.tabs{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tab{
   appearance:none;border:0;background:var(--surface);color:var(--ink-dim);font-family:var(--sans);
   font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
@@ -570,9 +587,58 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <button class="toast-act" id="toast-act" hidden></button>
   </div>
 
+  <!-- ═══════════ BOOK ═══════════
+       Checking the app against the paper book, and filling in what is missing. Kept off
+       the Log tab on purpose: a date field is the wrong thing to have under your thumb at
+       3am, and the right thing to have when you are sitting down with a notebook. -->
+  <div class="pane" id="pane-book" hidden>
+    <div class="sect"><h2>Every day on record</h2><hr></div>
+    <p class="info" id="book-note">Every day the repo has ever held, newest first. Tap one
+    to see it beside the book.</p>
+    <p class="info">A day with <b>nothing</b> logged at all will not be listed — there is
+    no folder for it. Put its date straight into the box below and it will appear once the
+    first record is added.</p>
+    <div id="book-days"></div>
+
+    <div class="sect"><h2 id="book-day-head">Nothing opened</h2><hr></div>
+    <div id="book-rows"></div>
+
+    <div class="sect"><h2>Add a missing record</h2><hr></div>
+    <div class="fixrow">
+      <label for="bk-date">Date</label>
+      <input id="bk-date" type="date">
+    </div>
+    <div class="fixrow">
+      <label for="bk-time">Time</label>
+      <input id="bk-time" type="time">
+    </div>
+    <div class="fixrow">
+      <label for="bk-kind">What</label>
+      <select id="bk-kind"></select>
+    </div>
+    <div class="fixrow" id="bk-amt-row" hidden>
+      <label for="bk-amt">Amount</label>
+      <input id="bk-amt" type="number" inputmode="decimal" step="any">
+      <span class="unit" id="bk-unit"></span>
+    </div>
+    <div class="fixrow" id="bk-side-row" hidden>
+      <label>Side</label>
+      <div class="sheet-row" id="bk-side"></div>
+    </div>
+    <div class="fixrow">
+      <label for="bk-note" id="bk-note-lbl">Note</label>
+      <input id="bk-note" type="text" autocomplete="off" placeholder="optional">
+    </div>
+    <button class="btn solid" id="bk-add" style="width:100%">Add this record</button>
+    <p class="info">It is saved as an ordinary entry at the date and time you give, and
+    pushed to the repo like any other. Nothing is overwritten — if the day already has
+    entries, this joins them.</p>
+  </div>
+
   <nav class="tabs" role="tablist">
     <button class="tab" id="tab-log" role="tab" aria-selected="true">Log</button>
     <button class="tab" id="tab-sum" role="tab" aria-selected="false">Summary</button>
+    <button class="tab" id="tab-book" role="tab" aria-selected="false">Book</button>
     <button class="tab" id="tab-set" role="tab" aria-selected="false">Setup</button>
   </nav>
 
@@ -1765,6 +1831,137 @@ function renderSummary() {
    day and steps back through them. A day with nothing held locally is fetched from the
    repo on arrival, which is what makes a phone set up last week able to show last week. */
 
+/* ───── the book ─────
+   Reconciling the app against the paper book. Three things the daily screens cannot do:
+   show every day that has ever been written, open any one of them, and add a record at
+   a date and time of your choosing.
+
+   The day index is one request: data/events/ holds a folder per day, so listing it gives
+   the complete history without reading a single entry. Days this phone holds but has not
+   pushed are folded in, so an unsynced day is not invisible here. */
+
+var bookDay   = null;       /* the day being looked at */
+var repoDays  = null;       /* day folders in the repo, or null until fetched */
+var bookBusy  = false;
+var bkSide    = '';
+
+function loadRepoDays() {
+  if (!configured() || bookBusy) return Promise.resolve();
+  bookBusy = true;
+  return gh('GET', '/contents/data/events?ref=' + encodeURIComponent(cfg.branch || 'main'))
+    .then(function (r) {
+      repoDays = (r.ok && Array.isArray(r.json))
+        ? r.json.filter(function (f) { return f.type === 'dir' && /^\d{4}-\d{2}-\d{2}$/.test(f.name); })
+                .map(function (f) { return f.name; })
+        : [];
+      bookBusy = false;
+      renderBook();
+    })
+    .catch(function () { bookBusy = false; repoDays = repoDays || []; renderBook(); });
+}
+
+/* Every day worth offering: in the repo, or held here and not yet pushed. */
+function allDays() {
+  var seen = {};
+  (repoDays || []).forEach(function (d) { seen[d] = true; });
+  entries.forEach(function (r) { seen[daySG(r.ms)] = true; });
+  return Object.keys(seen).sort().reverse();
+}
+
+/* The things that can be logged, built from the same catalogue the buttons use so the two
+   can never drift apart. A kind with a unit takes an amount; the rest do not. */
+function bookKinds() {
+  var out = [], seen = {};
+  function push(t, sub_, unit, label, sides) {
+    var key = t + '/' + (sub_ || '');
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push({ key: key, t: t, s: sub_ || '', unit: unit || '',
+               label: LABELS[key] || label || key, sides: !!sides });
+  }
+  for (var k in SHEETS) { var c = SHEETS[k]; push(c.t, c.s, c.unit, c.title, c.sides); }
+  for (var cat in CATS) {
+    CATS[cat].groups.forEach(function (g) {
+      g.items.forEach(function (it) {
+        if (it.t) push(it.t, it.s, '', it.label);
+      });
+    });
+  }
+  ['note', 'med', 'vax', 'milestone'].forEach(function (t) { push(t, '', '', LABELS[t + '/']); });
+  out.sort(function (a, b) { return a.label < b.label ? -1 : 1; });
+  return out;
+}
+
+function paintBookKind() {
+  var kinds = bookKinds();
+  var k = kinds.filter(function (x) { return x.key === $('bk-kind').value; })[0] || kinds[0];
+  $('bk-amt-row').hidden = !k.unit;
+  $('bk-unit').textContent = k.unit === 'C' ? '°C' : k.unit;
+  $('bk-side-row').hidden = !k.sides;
+  $('bk-side').innerHTML = k.sides
+    ? '<button class="chip" data-bkside="left">left</button><button class="chip" data-bkside="right">right</button>'
+    : '';
+  $('bk-side').querySelectorAll('[data-bkside]').forEach(function (b) {
+    b.setAttribute('aria-pressed', b.dataset.bkside === bkSide ? 'true' : 'false');
+  });
+  var textOnly = ['note/', 'med/', 'vax/', 'milestone/'].indexOf(k.key) > -1;
+  $('bk-note-lbl').textContent = textOnly ? 'Words' : 'Note';
+  $('bk-note').placeholder = textOnly ? 'what happened, in your words' : 'optional';
+  return k;
+}
+
+function renderBook() {
+  if (!$('bk-kind').options.length) {
+    $('bk-kind').innerHTML = bookKinds().map(function (k) {
+      return '<option value="' + esc(k.key) + '">' + esc(k.label) + '</option>';
+    }).join('');
+    /* Alphabetical order puts Bath first, which is not what anyone is here to add. */
+    $('bk-kind').value = 'feed/bottle';
+  }
+  if (!$('bk-date').value) $('bk-date').value = daySG(Date.now());
+
+  var days = allDays();
+  $('book-note').textContent = configured()
+    ? (repoDays === null ? 'Looking up every day on record…'
+       : days.length + (days.length === 1 ? ' day' : ' days') +
+         ' on record. Tap one to see it beside the book.')
+    : 'Not connected, so only what this phone holds is listed. Set it up to see everything.';
+
+  $('book-days').innerHTML = days.length
+    ? days.map(function (d) {
+        var rows = entries.filter(function (r) { return daySG(r.ms) === d; });
+        var kept = rows.filter(function (r) { return r.type !== 'deleted'; });
+        var inRepo = (repoDays || []).indexOf(d) > -1;
+        return '<button class="bookday" data-bookday="' + d + '"' +
+               ' aria-pressed="' + (d === bookDay ? 'true' : 'false') + '">' +
+               '<b>' + esc(dayLabel(d)) + '</b>' +
+               (inRepo ? '' : '<em>not pushed</em>') +
+               '<span>' + (rows.length ? kept.length + ' here' : 'not loaded') + '</span></button>';
+      }).join('')
+    : '<p class="empty">No days on record yet.</p>';
+
+  if (!bookDay) {
+    $('book-day-head').textContent = 'Nothing opened';
+    $('book-rows').innerHTML = '<p class="empty">Tap a day above.</p>';
+    return;
+  }
+  $('book-day-head').textContent = dayLabel(bookDay);
+  var rows = entries.filter(function (r) { return daySG(r.ms) === bookDay; });
+  $('book-rows').innerHTML = rows.length
+    ? rows.slice().reverse().map(function (r) { return rowHtml(r, false); }).join('')
+    : '<p class="empty">' + (dayTried[bookDay] ? 'Nothing on this day.' : 'Looking…') + '</p>';
+}
+
+function openBookDay(day) {
+  bookDay = day;
+  $('bk-date').value = day;
+  renderBook();
+  if (!dayTried[day] && configured()) {
+    dayTried[day] = true;
+    backfillDay(day).then(function () { saveEntries(); renderBook(); renderDiag(); });
+  }
+}
+
 var LOG_DAYS_MAX = 120;     /* a hard floor, so nothing can walk back forever */
 var LOG_DRY_RUN  = 7;       /* stop extending after this many empty days in a row */
 
@@ -2171,17 +2368,23 @@ var curTab = 'log';
 
 function show(tab) {
   curTab = tab;
-  ['log', 'sum', 'set'].forEach(function (n) {
+  ['log', 'sum', 'book', 'set'].forEach(function (n) {
     $('tab-' + n).setAttribute('aria-selected', n === tab ? 'true' : 'false');
   });
   // every pane set explicitly, so two can never be visible at once
   $('pane-home').hidden = !(tab === 'log' && screen === 'home');
   $('pane-cat').hidden  = !(tab === 'log' && screen === 'cat');
   $('pane-sum').hidden  = tab !== 'sum';
+  $('pane-book').hidden = tab !== 'book';
   $('pane-set').hidden  = tab !== 'set';
   if (tab === 'sum') renderSummary();
   if (tab === 'set') { renderFirstRun(); renderDiag(); checkBuild(false); }
   if (tab === 'sum') startLogObserver();
+  if (tab === 'book') {
+    renderBook();
+    paintBookKind();
+    if (repoDays === null) loadRepoDays();
+  }
 }
 
 function goCat(name) {
@@ -2205,7 +2408,7 @@ $('pane-home').addEventListener('click', function (e) {
   if (f) openFix(f.dataset.fix);
 });
 $('cat-back').addEventListener('click', goHome);
-['log', 'sum', 'set'].forEach(function (n) {
+['log', 'sum', 'book', 'set'].forEach(function (n) {
   $('tab-' + n).addEventListener('click', function () {
     if (n === 'log' && screen === 'cat') { goHome(); return; }
     show(n);
@@ -2360,6 +2563,66 @@ $('cat-recent').addEventListener('click', function (e) {
   var f = e.target.closest('[data-fix]');
   if (f) openFix(f.dataset.fix);
 });
+$('book-days').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-bookday]');
+  if (b) openBookDay(b.dataset.bookday);
+});
+
+$('book-rows').addEventListener('click', function (e) {
+  var x = e.target.closest('[data-del]');
+  if (x) { undo(x.dataset.del); renderBook(); return; }
+  var f = e.target.closest('[data-fix]');
+  if (f) openFix(f.dataset.fix);
+});
+
+$('bk-kind').addEventListener('change', function () { bkSide = ''; paintBookKind(); });
+$('bk-side').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-bkside]');
+  if (!b) return;
+  bkSide = bkSide === b.dataset.bkside ? '' : b.dataset.bkside;
+  paintBookKind();
+});
+
+/* A record at any date and time. The only thing it refuses is the future: everything else
+   is the owner's to assert, because the paper book is the source of truth and the app is
+   the copy being corrected. */
+$('bk-add').addEventListener('click', function () {
+  var k = paintBookKind();
+  var date = $('bk-date').value, time = $('bk-time').value;
+  if (!date) { toast('Give the record a date.'); return; }
+  if (!time) { toast('Give the record a time.'); return; }
+  var ms = Date.parse(date + 'T' + time + ':00+08:00');
+  if (isNaN(ms)) { toast('That date and time did not make sense.'); return; }
+  if (ms > Date.now() + 60000) { toast('That is in the future, so it cannot have happened yet.'); return; }
+
+  var textOnly = ['note/', 'med/', 'vax/', 'milestone/'].indexOf(k.key) > -1;
+  var words = $('bk-note').value.trim();
+  if (textOnly && !words) { toast('Write what happened first.'); return; }
+
+  var value = null;
+  if (k.unit) {
+    var typed = $('bk-amt').value.trim();
+    if (typed !== '') {
+      var n = Number(typed);
+      if (isNaN(n)) { toast('That amount did not make sense.'); return; }
+      value = n;
+    }
+  }
+  var note = k.sides ? bkSide : (textOnly ? '' : words);
+  var raw  = textOnly ? words
+           : (k.label.toLowerCase() + (value !== null ? ' ' + value + ' ' + k.unit : '') +
+              (k.sides && bkSide ? ' ' + bkSide : ''));
+
+  var e = add(k.t, k.s, value, k.unit, textOnly ? words : note, raw, ms);
+  $('bk-amt').value = ''; $('bk-note').value = ''; bkSide = '';
+  paintBookKind();
+  bookDay = daySG(ms);
+  dayTried[bookDay] = true;          /* we are writing it, so there is no need to go and look */
+  renderBook(); render(); paintSync(); renderDiag(); buzz();
+  toast('<b>' + esc(describe(e)) + '</b> added to ' + esc(dayLabel(bookDay)));
+  flush();
+});
+
 $('sum-timeline').addEventListener('click', function (e) {
   var x = e.target.closest('[data-del]');
   if (x) { undo(x.dataset.del); renderSummary(); return; }   /* keeps logDay, so the view stays put */

@@ -64,6 +64,10 @@ what it is, and lists decisions that look arbitrary and are not.
   the message, one file per phone. `list_commits` and a directory listing say in two
   requests which phones have ever written — which is usually a different question from
   the one the symptoms suggest.
+- **Anchor an edit on text that exists once.** Two JS blocks have been inserted into the
+  stylesheet by matching a section comment that exists in both the CSS and the script.
+  Check which half of the file an anchor lives in, and check afterwards that the new code
+  is inside `<script>`.
 - **Render with data before judging a screen.** An empty app hides its own timeline rows,
   undo buttons and sheets. A whole round of UI bugs survived the first browser pass
   because every screenshot was of an empty app.

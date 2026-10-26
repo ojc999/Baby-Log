@@ -60,6 +60,29 @@ Every category screen also has a **when** row — `now`, `−5`, `−15`, `−30
 time picker — and a **free-text box** for anything the buttons miss. The box shows what
 it understood *before* saving, so a wrong reading is caught before it is in the record.
 
+## The Book tab
+
+For checking the app against a paper record, and filling in what is missing. It is a
+separate tab on purpose: a date field is the wrong thing to have under your thumb at 3am
+and the right thing to have when you are sitting down with a notebook.
+
+**Every day on record.** One list of every day the repo has ever held, newest first, each
+showing how many entries this phone has for it. Tap one to load it and read it beside the
+book. A day with nothing logged at all is not listed — there is no folder for it — so put
+its date straight into the form below.
+
+**Add a missing record.** Date, time, what, and an amount where the kind takes one. It
+saves as an ordinary entry at the date and time you give and pushes to that day's file
+like any other. Nothing is overwritten: if the day already has entries, this joins them,
+and the other phone's file for that day is never touched.
+
+The only thing it refuses is a time in the future. Everything else is yours to assert —
+the book is the source of truth and the app is the copy being corrected.
+
+A record added this way is indistinguishable from a live one in the data, except that its
+`msg_id` encodes when it was keyed in, so a transcribed entry can always be told from one
+logged at the time.
+
 The **Summary** tab gives time since the last feed, poop, wet nappy and bath, then
 today's totals, the last seven days, latest measurements, and **the log**.
 

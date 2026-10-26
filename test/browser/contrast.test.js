@@ -94,6 +94,23 @@ const parse=s=>{const m=s.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);retur
     await page.screenshot({path:`${SH}/${scheme}-tummy.png`});
     await page.click('#cat-back').catch(()=>{});
 
+    // the Book tab, which has its own day-index styling
+    await page.click('#tab-book'); await page.waitForTimeout(500);
+    const lowB = await page.evaluate(()=>{
+      const out=[];
+      const bgOf=el=>{let n=el;while(n){const c=getComputedStyle(n).backgroundColor;
+        if(c&&!/rgba\(0, 0, 0, 0\)|transparent/.test(c))return c;n=n.parentElement}return 'rgb(255,255,255)'};
+      for(const el of document.querySelectorAll('#pane-book button,#pane-book h2,#pane-book b,#pane-book span,#pane-book em,#pane-book p,#pane-book label')){
+        const txt=(el.textContent||'').trim(); if(!txt||el.children.length)continue;
+        const r=el.getBoundingClientRect(); if(r.width<2||r.height<2)continue;
+        const cs=getComputedStyle(el);
+        out.push({txt:txt.slice(0,20),fg:cs.color,bg:bgOf(el),size:parseFloat(cs.fontSize),weight:cs.fontWeight});
+      }
+      return out;
+    });
+    low.push(...lowB);
+    await page.click('#tab-sum'); await page.waitForTimeout(300);
+
     // the correction box
     await page.click('#tab-sum'); await page.waitForTimeout(300);
     await page.evaluate(()=>{ const b=document.querySelector('#sum-timeline [data-fix]'); b&&b.click(); });

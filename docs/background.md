@@ -443,6 +443,34 @@ version constant that could drift or be forgotten on a deploy, and says plainly 
 server has a newer one. The question "is this phone actually running your change" was
 previously unanswerable from the phone, which is why it took a round trip to find out.
 
+## 7e. The Book tab
+
+A paper book is the source of truth; the app is a copy that needs reconciling against it.
+That is a different activity from logging, and it gets its own tab rather than more
+buttons on the Log screen.
+
+**The day index is one request.** `data/events/` holds a folder per day, so listing it
+gives every day ever written without reading a single entry. Days this phone holds but
+has not pushed are folded in, so an unsynced day is not invisible here. A day with nothing
+logged at all has no folder and cannot appear — the form below it is the way in, and the
+screen says so rather than leaving it to be worked out.
+
+**Any date and time, and only the future refused.** §7a1 argued against a date field on
+the daily backdate row, because it widens what a mis-tap can do at 3am for something
+needed rarely. That reasoning holds and is why this lives here instead: sitting down with
+a notebook is exactly when a date field is right. Beyond "it cannot have happened yet",
+nothing is second-guessed — the owner is reading from the record, and the app is not in a
+position to know better.
+
+**No new field for provenance.** A transcribed entry is an ordinary entry. It needs no
+marker because `msg_id` already carries one: `uid()` encodes the moment it was keyed in,
+so a row timestamped three weeks ago with an id from today is visibly a transcription.
+Adding a field would have meant touching the contract, `compact.py` and the charts for
+something the data already said.
+
+**The kinds offered are generated from `CATS` and `SHEETS`**, not listed again, so the
+form cannot drift from the buttons. Adding a category adds it here for free.
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.
