@@ -5,3 +5,7 @@ node_modules/
 # Never commit baby data into this repo. It belongs in the private data repo.
 data/
 *.jsonl
+
+# Python bytecode from running the compact tests
+__pycache__/
+*.pyc
