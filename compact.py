@@ -37,7 +37,14 @@ import json
 import sys
 from pathlib import Path
 
+# The original nine, in the original order, then the three added for the pump tab:
+# `dur_min` (minutes spent expressing), `ml_l` and `ml_r` (the per-side split). They are
+# appended rather than inserted so that anything already reading these files by position
+# keeps working, and they are written onto every row - null where they do not apply - so
+# that data/raw/ has one shape throughout rather than two.
 FIELDS = ["ts", "sender", "type", "subtype", "value", "unit", "note", "raw", "msg_id"]
+NUMERIC_FIELDS = ["value", "dur_min", "ml_l", "ml_r"]
+FIELDS = FIELDS + ["dur_min", "ml_l", "ml_r"]
 
 # Set by main() once --repo is known. Defaults to the repo this script sits in, which
 # is right when it lives at apps/baby-log-web/ inside the data repo, and overridable
@@ -100,9 +107,10 @@ def merge(rows: list[dict]) -> list[dict]:
         by_id[key] = r
     out = []
     for r in by_id.values():
-        row = {k: r.get(k, "" if k != "value" else None) for k in FIELDS}
-        if row["value"] == "":
-            row["value"] = None
+        row = {k: r.get(k, None if k in NUMERIC_FIELDS else "") for k in FIELDS}
+        for k in NUMERIC_FIELDS:
+            if row[k] == "":
+                row[k] = None
         out.append(row)
     out.sort(key=lambda r: (str(r["ts"]), str(r["msg_id"])))
     return out

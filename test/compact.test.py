@@ -65,5 +65,24 @@ out = compact.merge([row()])
 check("field order", list(out[0].keys()), compact.FIELDS)
 check('an absent value is null, never ""', compact.merge([row(value="")])[0]["value"], None)
 
+print("\n--- the three fields added for the pump tab ---")
+check("the original nine still come first, in order",
+      list(out[0].keys())[:9],
+      ["ts", "sender", "type", "subtype", "value", "unit", "note", "raw", "msg_id"])
+check("and the added ones come after, in order",
+      list(out[0].keys())[9:], ["dur_min", "ml_l", "ml_r"])
+check("a row written before they existed gets them as null",
+      [out[0]["dur_min"], out[0]["ml_l"], out[0]["ml_r"]], [None, None, None])
+pumped = compact.merge([row(type="pump", subtype="", value=65, unit="ml", raw="pump 65",
+                            dur_min=20, ml_l=30, ml_r=35)])[0]
+check("a pump session keeps all three", [pumped["dur_min"], pumped["ml_l"], pumped["ml_r"]],
+      [20, 30, 35])
+check("zero minutes is kept as zero, not turned into null",
+      compact.merge([row(dur_min=0)])[0]["dur_min"], 0)
+check('an empty string in a number field becomes null',
+      compact.merge([row(dur_min="", ml_l="")])[0]["dur_min"], None)
+check("a note is still an empty string, not null",
+      compact.merge([row(note="")])[0]["note"], "")
+
 print("\n======== " + (str(fails) + " FAILURES" if fails else "ALL PASS") + " ========")
 sys.exit(1 if fails else 0)

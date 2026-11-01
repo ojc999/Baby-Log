@@ -30,6 +30,10 @@ const parse=s=>{const m=s.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);retur
         mk(90,'Simon',true,'feed','breast',18,'min','right','bf 18 right'),
         mk(45,'Simon',true,'nappy','both',null,'','','both'),
         mk(20,'Simon',true,'deleted','',null,'','','mis-tap'),
+        /* Two pump sessions, one of them untimed, so the Pump tab is measured with its
+           chart, its starred table and its warning on screen rather than empty. */
+        Object.assign(mk(300,'Wife',false,'pump','',60,'ml','','pump 60'),{dur_min:20,ml_l:25,ml_r:35}),
+        Object.assign(mk(60,'Simon',true,'pump','power',30,'ml','','power pump 30'),{dur_min:null}),
       ]));
       localStorage.setItem('babylog.cfg.v2',JSON.stringify({who:'Simon',device:'simon-phone',repo:'me/d',branch:'main',token:''}));
     });
@@ -93,6 +97,29 @@ const parse=s=>{const m=s.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);retur
     low.push(...lowT);
     await page.screenshot({path:`${SH}/${scheme}-tummy.png`});
     await page.click('#cat-back').catch(()=>{});
+
+    // the Pump tab: the chart numbers and the import preview are coloured, not plain ink
+    await page.click('#tab-pump'); await page.waitForTimeout(500);
+    await page.evaluate(()=>{
+      const b=document.querySelector('#pm-imp');
+      b.value='12 Oct: 11mL hand expression\n13 Oct: 22mL pump (power pump after latch)';
+      document.querySelector('#pm-imp-read').click();
+    });
+    await page.waitForTimeout(400);
+    const lowP = await page.evaluate(()=>{
+      const out=[];
+      const bgOf=el=>{let n=el;while(n){const c=getComputedStyle(n).backgroundColor;
+        if(c&&!/rgba\(0, 0, 0, 0\)|transparent/.test(c))return c;n=n.parentElement}return 'rgb(255,255,255)'};
+      for(const el of document.querySelectorAll('#pane-pump button,#pane-pump h2,#pane-pump b,#pane-pump span,#pane-pump em,#pane-pump i,#pane-pump u,#pane-pump p,#pane-pump label,#pane-pump td,#pane-pump th,#pane-pump dt,#pane-pump dd,#pane-pump small,#pane-pump code')){
+        const txt=(el.textContent||'').trim(); if(!txt||el.children.length)continue;
+        const r=el.getBoundingClientRect(); if(r.width<2||r.height<2)continue;
+        const cs=getComputedStyle(el);
+        out.push({txt:txt.slice(0,20),fg:cs.color,bg:bgOf(el),size:parseFloat(cs.fontSize),weight:cs.fontWeight});
+      }
+      return out;
+    });
+    low.push(...lowP);
+    await page.screenshot({path:`${SH}/${scheme}-pump.png`,fullPage:true});
 
     // the Book tab, which has its own day-index styling
     await page.click('#tab-book'); await page.waitForTimeout(500);

@@ -158,6 +158,48 @@ const VIEWPORTS = [
       return bad; });
     if (odd) note(name, `${odd} row(s) with a mismatched set of controls`);
 
+    // Two ids the same means getElementById silently hands every caller the first one,
+    // and a whole panel can end up rendered inside a button with every test still green.
+    const dupIds = await page.evaluate(() => {
+      const seen = {}, dup = [];
+      document.querySelectorAll('[id]').forEach(el => {
+        if (seen[el.id]) dup.push(el.id); else seen[el.id] = 1; });
+      return [...new Set(dup)]; });
+    for (const d of dupIds) note(name, `duplicate id #${d} — getElementById returns only the first`);
+
+    // Pump tab: the chart and the notes box are the widest things in the app
+    await page.click('#tab-pump'); await page.waitForTimeout(400);
+    await page.screenshot({ path: `${SHOTS}/${name}-pump.png`, fullPage: true });
+    // Fill the notes box and read it, so the preview is on screen when the pane is measured.
+    await page.evaluate(() => {
+      document.querySelector('#pm-imp').value =
+        '12 Oct: 11mL hand expression\n' +
+        '13 Oct: 22mL pump (no overnight latch), 33mL (power pump after a long latch)\n' +
+        '14 Oct: 23/41mL (2h after latch, 11/30mL)';
+      document.querySelector('#pm-imp-read').click(); });
+    await page.waitForTimeout(400);
+    // The panes are the scrollers, not the document, so documentElement.scrollWidth stays
+    // at the viewport width however far a child spills. Measure the pane itself.
+    const m5 = await page.evaluate(() => {
+      const p = document.querySelector('#pane-pump');
+      return { scrollW: p.scrollWidth, clientW: p.clientWidth,
+               docW: document.documentElement.scrollWidth }; });
+    if (m5.scrollW > m5.clientW + 1) note(name, `horizontal overflow inside Pump pane: ${m5.scrollW} > ${m5.clientW}`);
+    if (m5.docW > 375 && name === 'iphone-se') note(name, `page itself overflows on Pump: ${m5.docW}`);
+    const pumpSmall = await page.evaluate(() => {
+      const out = [];
+      for (const el of document.querySelectorAll('#pane-pump button')) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        if (r.width < 44 || r.height < 44) out.push(`${Math.round(r.width)}x${Math.round(r.height)}px : ${(el.textContent||el.id).trim().slice(0,24)}`);
+      }
+      return out; });
+    for (const sm of pumpSmall) note(name, `tap target ${sm} (<44) on Pump`);
+    // a bar whose fill is wider than its track means a day is being drawn off the edge
+    const overfull = await page.evaluate(() => [...document.querySelectorAll('#pump-bars .bfill')]
+      .filter(f => f.getBoundingClientRect().width > f.parentElement.getBoundingClientRect().width + 1).length);
+    if (overfull) note(name, `${overfull} bar fill(s) wider than their track`);
+
     // Book tab
     await page.click('#tab-book'); await page.waitForTimeout(400);
     await page.screenshot({ path: `${SHOTS}/${name}-book.png`, fullPage: true });

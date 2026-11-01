@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -110,9 +110,17 @@ t('undo marks it deleted', A.entries().find(r=>r.msg_id===e3.msg_id).type, 'dele
 // Keep in step with docs/background.md §6.
 const real = JSON.parse('{"ts":"2026-01-02T03:14:00+08:00","sender":"EXAMPLE","type":"sleep",' +
   '"subtype":"start","value":null,"unit":"","note":"","raw":"asleep now","msg_id":"web-example-0001"}');
+// The three fields the pump tab added, appended after msg_id and written onto every row.
+const ADDED = ['dur_min','ml_l','ml_r'];
 const out = A.jsonlFor('2026-10-01').trim().split('\n').map(JSON.parse);
 t('export has all three incl deleted', out.length, 3);
-t('field names and order match archive', JSON.stringify(Object.keys(out[0])), JSON.stringify(Object.keys(real)));
+t('the original nine come first, in the original order',
+  JSON.stringify(Object.keys(out[0]).slice(0, 9)), JSON.stringify(Object.keys(real)));
+t('and the added ones come after, in order',
+  JSON.stringify(Object.keys(out[0]).slice(9)), JSON.stringify(ADDED));
+t('nothing else crept in', Object.keys(out[0]).length, 12);
+t('they are null on a row that has no use for them',
+  ADDED.every(k => out[0][k] === null), true);
 t('ts carries +08:00', /\+08:00$/.test(out[0].ts), true);
 t('ts is SG wall clock', out[0].ts, '2026-10-01T19:30:00+08:00');
 t('absent value is null', out[1].value, null);
@@ -158,6 +166,130 @@ for (const s of ['bath','wipe','nails','hair','cord','cream'])
 t('describe adds units', A.describe({type:'feed',subtype:'bottle',value:60,unit:'ml',note:''}), 'Bottle 60 ml');
 t('describe adds side', A.describe({type:'feed',subtype:'breast',value:20,unit:'min',note:'left'}), 'Breastfeed 20 min, left');
 t('describe temp degree', A.describe({type:'measure',subtype:'temp',value:37.8,unit:'C',note:''}), 'Temperature 37.8°C');
+
+console.log('\n--- the pump tab: a session carries two numbers, not one ---');
+A.setEntries([]);
+const pbase = Date.UTC(2026, 9, 31, 1, 0);          // 09:00 SG, 31 Oct
+const ps = A.add('pump', '', 65, 'ml', '', 'pump 65 ml 20 min', pbase, {dur_min: 20, ml_l: 30, ml_r: 35});
+t('the volume is the value', ps.value, 65);
+t('the minutes are their own field', ps.dur_min, 20);
+t('so is each side', ps.ml_l + '/' + ps.ml_r, '30/35');
+t('an empty box is null, not zero', A.add('pump','',40,'ml','','pump 40',pbase+60000,{}).dur_min, null);
+t('they survive the export',
+  JSON.parse(A.jsonlFor('2026-10-31').trim().split('\n')[0]).dur_min, 20);
+t('describe says both numbers',
+  A.describe({type:'pump',subtype:'',value:65,unit:'ml',note:'',dur_min:20,ml_l:30,ml_r:35}),
+  'Mum expressed 65 ml in 20 min (L 30 / R 35)');
+t('and leaves out what was not recorded',
+  A.describe({type:'pump',subtype:'',value:65,unit:'ml',note:''}), 'Mum expressed 65 ml');
+t('hand expression has its own label', A.label({type:'pump',subtype:'hand'}), 'Hand expressed');
+t('so does a power pump', A.label({type:'pump',subtype:'power'}), 'Power pumped');
+t('an old row with no subtype still reads', A.label({type:'pump',subtype:''}), 'Mum expressed');
+
+console.log('\n--- a day\u2019s pump figures ---');
+A.setEntries([]);
+A.add('pump', '',      60, 'ml', '', 'p', pbase,            {dur_min: 20});
+A.add('pump', 'power', 30, 'ml', '', 'p', pbase + 3600000,  {dur_min: 10});
+A.add('pump', 'hand',  10, 'ml', '', 'p', pbase + 7200000,  {});          // not timed
+A.add('feed', 'breast', 25, 'min', 'left', 'bf', pbase + 1800000);
+A.add('feed', 'expressed', 80, 'ml', '', 'ebm 80', pbase + 5400000);
+const st = A.pumpStats('2026-10-31');
+t('three sessions', st.n, 3);
+t('volumes summed', st.ml, 100);
+t('expressed milk he drank is not counted as production', st.ml === 100, true);
+t('minutes summed from the sessions that have them', st.mins, 30);
+t('an untimed session is counted and flagged, not dropped', st.untimed, 1);
+t('time at the breast comes from the feed entries', st.latchMin, 25);
+t('lactation time is both', st.lactMin, 55);
+t('ml per pumping hour', st.perHour, 200);
+t('a day with nothing is empty, not an error', A.pumpStats('2026-10-30').n, 0);
+
+console.log('\n--- reading up a page of notes ---');
+// Synthetic lines in the shape the notebook is written in. Not real records.
+const NOW = Date.parse('2026-10-31T18:00:00+08:00');
+A.setEntries([]);
+const r1 = A.parsePumpNotes('3 Oct: 12mL hand expression', NOW);
+t('one day read', r1.days.length, 1);
+t('the year is this one', r1.days[0].day, '2026-10-03');
+t('hand expression is read as such', r1.days[0].sessions[0].how, 'hand');
+t('and its volume', r1.days[0].sessions[0].ml, 12);
+
+const r2 = A.parsePumpNotes('4 Oct: 11mL x2 pump', NOW);
+t('"x2" is two pumps in the sitting', r2.days[0].sessions[0].pumps, 2);
+t('and twice the volume', r2.days[0].sessions[0].ml, 22);
+
+const r3 = A.parsePumpNotes('5 Oct: 22mL pump (no overnight latch), 33mL (power pump after latching)', NOW);
+t('a comma outside brackets splits sessions', r3.days[0].sessions.length, 2);
+t('the day total adds up', r3.days[0].ml, 55);
+t('power pump is read from inside the bracket', r3.days[0].sessions[1].how, 'power');
+
+const r4 = A.parsePumpNotes('6 Oct: 44mL (2h after feed, 7mL from hand expression)', NOW);
+t('a comma inside brackets does not', r4.days[0].sessions.length, 1);
+t('a volume inside the bracket is not added to the session', r4.days[0].sessions[0].ml, 44);
+t('and does not make it a hand expression', r4.days[0].sessions[0].how, '');
+t('the bracket is kept as the note', /7mL from hand expression/.test(r4.days[0].sessions[0].note), true);
+t('and the whole line is kept as raw',
+  r4.days[0].sessions[0].raw, '44mL (2h after feed, 7mL from hand expression)');
+
+const r5 = A.parsePumpNotes('7 Oct: 21mL + 13mL + 6mL (2h after latching, 11/10mL, 6/7mL, 3/3mL)', NOW);
+t('several volumes in one sitting are one session', r5.days[0].sessions.length, 1);
+t('summed', r5.days[0].sessions[0].ml, 40);
+t('and counted', r5.days[0].sessions[0].pumps, 3);
+t('the split is NOT guessed into the side fields', r5.days[0].sessions[0].ml_l, undefined);
+
+const r6 = A.parsePumpNotes('8 Oct: 23/41mL (2h after latch, 11/30mL)', NOW);
+t('an ambiguous reading before the bracket is left unread', r6.days[0].sessions.length, 0);
+t('and reported as unread rather than dropped', r6.days[0].unread.length, 1);
+
+const r7 = A.parsePumpNotes('9 Oct: 51mL (3h after pump at 4am), 27mL (power pump)', NOW);
+t('a stated time with am/pm is used', A.hhmm(r7.days[0].sessions[0].ms), '04:00');
+t('and is not marked as placed', !!r7.days[0].sessions[0].guessed, false);
+t('one with no time is placed and says so', !!r7.days[0].sessions[1].guessed, true);
+t('sessions come out in time order', r7.days[0].sessions[0].ms < r7.days[0].sessions[1].ms, true);
+
+const r8 = A.parsePumpNotes('10 Oct: 19mL pump (after 6+h from last feed, 19mm flanges)', NOW);
+t('a number that is not a time is not read as one', !!r8.days[0].sessions[0].guessed, true);
+
+const r9 = A.parsePumpNotes('Breastfeeding\n11 Oct: 31mL pump,\n17mL pump (power pump after latch)', NOW);
+t('a wrapped line belongs to the day above it', r9.days[0].sessions.length, 2);
+t('a heading is reported as not a day', r9.unread.length, 1);
+t('and does not become an entry', r9.days.length, 1);
+
+const r10 = A.parsePumpNotes('32 Foo: 10mL pump', NOW);
+t('a line with no readable date is unread', r10.unread.length, 1);
+t('and makes no day', r10.days.length, 0);
+
+const r11 = A.parsePumpNotes('25 Dec: 10mL pump', NOW);
+t('a date later in this year belongs to last year', r11.days[0].day, '2025-12-25');
+
+const r12 = A.parsePumpNotes('31 Oct: 15mL pump, 15mL pump, 15mL pump, 15mL pump', NOW);
+t('placed times never land in the future',
+  r12.days[0].sessions.every(s => s.ms <= NOW), true);
+
+const r14 = A.parsePumpNotes('12 Oct: 18mL pump | midnight latch without top up', NOW);
+t('words after the volume are kept when there is no bracket',
+  r14.days[0].sessions[0].note, 'midnight latch without top up');
+t('and the method word is not repeated in them', /pump/.test(r14.days[0].sessions[0].note), false);
+
+const r15 = A.parsePumpNotes('13 Oct: 29mL (at 11.30pm) | 2 daytime latches', NOW);
+t('text after the bracket closes is kept too',
+  r15.days[0].sessions[0].note, 'at 11.30pm · 2 daytime latches');
+t('and no stray bracket comes with it', /\)/.test(r15.days[0].sessions[0].note), false);
+t('the time in it is still read', A.hhmm(r15.days[0].sessions[0].ms), '23:30');
+
+const r16 = A.parsePumpNotes('14 Oct: 33mL (2h after latch, 18/15mL. 44mL after power pumping)', NOW);
+t('a volume left in the note is flagged for checking', r16.days[0].sessions[0].stray, '44 ml');
+t('but the session that was read is still saved', r16.days[0].sessions[0].ml, 33);
+const r17 = A.parsePumpNotes('15 Oct: 36mL (2h after feed, 7mL from hand expression)', NOW);
+t('a few ml of hand expression inside a pump is not flagged', r17.days[0].sessions[0].stray, '');
+const r18 = A.parsePumpNotes('16 Oct: 41mL (2h after latch, 19/22mL)', NOW);
+t('neither is half of a left/right split', r18.days[0].sessions[0].stray, '');
+
+A.setEntries([]);
+A.add('pump', '', 50, 'ml', '', 'p', Date.parse('2026-10-20T10:00:00+08:00'), {});
+const r13 = A.parsePumpNotes('20 Oct: 60mL pump\n21 Oct: 70mL pump', NOW);
+t('a day that already has sessions is marked as such', r13.days[0].had, 1);
+t('and one that does not, is not', r13.days[1].had, 0);
 
 console.log(fail ? '\n======== ' + fail + ' FAILURES ========' : '\n======== ALL PASS ========');
 process.exit(fail ? 1 : 0);

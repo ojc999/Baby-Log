@@ -35,6 +35,18 @@ what it is, and lists decisions that look arbitrary and are not.
   whose undo survived depended on what the devices were called.
 - **Never silently repair data.** An unpaired sleep entry is a missed message and must
   stay visible as a gap, named on the screen, not quietly paired with the next event.
+  A pump session logged without its minutes is the same thing: it counts towards the day's
+  volume, it is marked with a `*`, and the screen says the day's time is an undercount.
+  Guessing a duration would make wrong the one figure that tab exists to show.
+- **Never invent a number the notebook does not have.** The notes reader fills in nothing.
+  It places a session in the day when no time was written, and then says `time not
+  recorded` on the entry, because a timestamp has to exist for the row to be filed at all.
+  Everything else it cannot read with confidence — an ambiguous `23/41mL`, a left/right
+  split, a duration — it leaves empty and names on the screen as unread. A wrong side is
+  worse than no side.
+- **Never add expressing to a feed.** `pump` is what came out of her; `feed/expressed` is
+  what he drank. Summing them counts the same milk twice. The Pump tab's figures and the
+  Log tab's figures are drawn from the two separately, and must stay that way.
 - **Never delete an entry.** Undo marks `type: "deleted"` and keeps the row. A correction
   is the same thing twice over: mark the original `deleted`, write a new entry. Never
   edit a row in place, however much easier it looks. Undoing the *other* phone's entry
@@ -51,8 +63,8 @@ what it is, and lists decisions that look arbitrary and are not.
 
 ## Always
 
-- Run `node test/logic.test.js` before claiming a change works, and add a case for
-  anything you fix.
+- Run `node test/logic.test.js` and `python3 test/compact.test.py` before claiming a
+  change works, and add a case for anything you fix.
 - Run `test/browser/*.test.js` too for anything touching layout, colour or the GitHub
   calls. They need Playwright; the app still has no dependencies. Logic tests cannot see
   a viewport, a tap target, a colour or a request, and every bug in those four classes
@@ -99,12 +111,20 @@ what it is, and lists decisions that look arbitrary and are not.
 One JSON object per line. Field names and order must not drift.
 
 `ts` (ISO 8601, `+08:00`) · `sender` · `type` · `subtype` · `value` · `unit` · `note` ·
-`raw` · `msg_id`
+`raw` · `msg_id` · `dur_min` · `ml_l` · `ml_r`
+
+The last three were **appended** for the pump tab, never inserted: the original nine keep
+their names and their order, so anything reading these files by position still works. They
+are written onto every row, null where they do not apply, so `data/raw/` has one shape
+throughout rather than two. `dur_min` exists because a pump session is the only entry with
+two numbers that both matter — how much, and over how long — and `value` holds one.
 
 `type` is one of `sleep` `feed` `pump` `nappy` `hygiene` `measure` `vomit` `cry` `tummy`
 `med` `vax` `milestone` `note` `deleted`.
 
-`raw` is kept forever. `value` is `null`, never `""`, when absent. `msg_id` must be
+`raw` is kept forever. `value` is `null`, never `""`, when absent, and so are `dur_min`,
+`ml_l` and `ml_r`; on a pump session `value` is the total and is authoritative, with the
+side split as detail beside it. `msg_id` must be
 unique for all time — rows in the data repo's `data/derived/` point back at it. One id can
 appear in **two** event files, once live and once struck, when one phone undoes the other's
 entry; `compact.py` resolves that to a single row, so `data/raw/` still holds one row per

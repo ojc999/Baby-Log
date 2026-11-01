@@ -41,6 +41,8 @@ just a static file, and an entry is in the repo within a second of the tap.
 | **Tummy time** | How long was it (minutes) · Just log it, when you did not time it |
 | **More** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream · Weight · Length · Head · Temperature · Unsettled · Medicine · Vaccination · Milestone · Note |
 
+Mum's own expressing has a tab of its own — see **The Pump tab** below.
+
 Four tiles for the things that happen many times a day, and **More** for everything else.
 The split is frequency, not importance: anything in More is two taps rather than one, which
 is the right trade for something done once a day or once a week. **Last bath** stays on the
@@ -59,6 +61,69 @@ logging last night's 23:40 feed at 00:30 needs no extra tap.
 Every category screen also has a **when** row — `now`, `−5`, `−15`, `−30`, `−60`, or a
 time picker — and a **free-text box** for anything the buttons miss. The box shows what
 it understood *before* saving, so a wrong reading is caught before it is in the record.
+
+## The Pump tab
+
+What Mum expresses, counted on its own. Expressing and feeding are never added together:
+this tab counts what comes out of her, the Log tab counts what goes into him. Expressing
+80 ml and him drinking 80 ml are two events, and adding them would count the same milk
+twice.
+
+**Today so far.** Four figures: how much was expressed and over how many sessions, how
+many minutes at the pump, how many at the breast, and the two added — with millilitres per
+hour of pumping beside it. Time at the breast is taken from the breastfeeds already logged
+on the Log tab, so it needs entering only once.
+
+**Logging a session.** Pick how (pump, by hand, power pump), tap a preset or type the
+total, and add how long it took. Left and right are optional: fill both and it checks they
+add up to the total, and says so plainly if they do not rather than quietly changing one.
+Date and time open on now, so a session logged straight after it happened is three taps.
+
+**How long matters.** 60 ml in 15 minutes and 60 ml in 40 minutes are not the same
+morning, and the ratio is the figure worth watching. A session saved without its minutes
+is still counted in the volume, but the day is marked with a `*` and the screen says the
+time is an undercount — tap **Fix** on the session to add the minutes later.
+
+**Daily production.** Three weeks, oldest at the top. Two bars to a day: millilitres above,
+total lactation time below. They are scaled separately — there is no honest shared scale
+for a millilitre and a minute — so the chart answers *which days were out of step*. A short
+milk bar under a long time bar is a day that took a lot of work for a little. The table
+underneath gives the exact figures, day by day.
+
+**Typing up a page of notes.** For catching up from the notebook. Paste it in, one day to
+a line, in the shape you already write them:
+
+```
+14 Oct: 50mL pump, 50mL pump
+15 Oct: 80mL pump (no overnight latch), 30mL (power pump after latching)
+```
+
+Tap **Read these notes** and it shows you, line by line, exactly what it understood —
+nothing is saved until you tap the button under the preview. What it does *not* do is the
+important part:
+
+- Volumes come only from the part **before** the bracket. `40mL (2h after feed, 10mL from
+  hand expression)` is one 40 ml session, not 50.
+- A comma inside a bracket is not a session break. `65mL + 25mL + 15mL` is one sitting,
+  totalled — and the whole line is kept word for word on the entry, so nothing is lost.
+- A left/right split in the bracket is **not** filed as left and right. `30/35mL` is
+  probably left then right, and probably is not good enough to put in the record. It is
+  kept as the note instead.
+- `23/41mL` before a bracket could be two readings or one split, so that session is listed
+  as **not read** for you to key in by hand, rather than guessed at.
+- A volume left in the bracket that is not part of a left/right split and not called hand
+  expression — `30/20mL. 60mL after power pumping x2` — is usually a second session
+  written inside the first one's note. The one it read is kept, and the leftover is
+  flagged in amber for you to add by hand if it was.
+- Times are hardly ever in the notes. One written with am or pm is used; otherwise the
+  day's sessions are spread through it and each one says `time not recorded`, so a
+  placed time can never be mistaken for a recorded one.
+- A day that already has sessions is **skipped**, not added to, so pasting the same page
+  twice cannot double a month. Undo the sessions on that day first if you want to key it
+  again.
+
+Each day becomes one commit, so a long paste takes a minute to finish syncing. Watch the
+strip at the top of the screen; it says when everything is saved.
 
 ## The Book tab
 
@@ -266,9 +331,16 @@ With no `--repo` it assumes it is sitting at `apps/baby-log-web/` inside the dat
 which is where it also lives there.
 
 It reports and writes nothing until `--write`, deletes nothing without `--prune`, keeps
-`type:"deleted"` rows, de-duplicates on `msg_id` (last wins), and is safe to re-run. A
-line it cannot parse is reported and skipped but **left in the event file**, so nothing
-is lost. Look at any such line before pruning.
+`type:"deleted"` rows, de-duplicates on `msg_id`, and is safe to re-run. Where one id
+appears twice — which happens when one phone strikes out the other's entry — **a struck
+row always beats a live one**, whichever file was read first. A line it cannot parse is
+reported and skipped but **left in the event file**, so nothing is lost. Look at any such
+line before pruning.
+
+**If you keep a copy of `compact.py` in the data repo**, replace it whenever this one
+changes. It gained three fields with the Pump tab (`dur_min`, `ml_l`, `ml_r`); an old copy
+would write nine-field rows while the app writes twelve, leaving `data/raw/` with two
+shapes in it. Running this repo's copy with `--repo` avoids the question entirely.
 
 ## Keeping one repo instead of two
 
@@ -321,7 +393,15 @@ node test/logic.test.js
 Needs nothing installed. Reads the script straight out of `index.html` under a stubbed
 DOM. Checks the parser against its original 21 cases, the export schema against the
 archive format, Singapore time and the day boundary, both forms of backdating, sleep
-pairing with a deliberate gap, undo, and the two-phone merge. Run it after any edit.
+pairing with a deliberate gap, undo, the two-phone merge, a day's pump figures, and every
+case the notes reader is meant to refuse. Run it after any edit.
+
+```
+python3 test/compact.test.py
+```
+
+Also needs nothing installed. Checks `compact.py`'s merge rule — that a struck-out row
+beats a live one whichever file was read first, and that the field order has not drifted.
 
 ```
 npm install playwright && npx playwright install chromium

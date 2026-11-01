@@ -155,11 +155,26 @@ Unchanged from the bot, and checked by the test suite against the committed
 | `ts` | ISO 8601, `+08:00`. Derived from the `Asia/Singapore` zone, not the device's, so an entry made abroad still lands on the right day. Singapore has no daylight saving, so the offset is constant. |
 | `sender` | Who logged it. |
 | `type` | `sleep` · `feed` · `pump` · `nappy` · **`hygiene`** · `measure` · `vomit` · `cry` · `tummy` · `med` · `vax` · `milestone` · `note` · `deleted` |
-| `subtype` | `start`/`end` · `bottle`/`breast`/`formula`/`expressed` · `wet`/`dirty`/`both` · **`bath`/`wipe`/`nails`/`hair`/`cord`/`cream`** · `weight`/`length`/`head`/`temp` |
+| `subtype` | `start`/`end` · `bottle`/`breast`/`formula`/`expressed` · `wet`/`dirty`/`both` · **`bath`/`wipe`/`nails`/`hair`/`cord`/`cream`** · `weight`/`length`/`head`/`temp` · **`hand`/`power`** on a `pump` |
 | `value`, `unit` | Number and `ml`/`min`/`kg`/`cm`/`C`. `null`, not `""`, when absent. |
 | `note` | Leftover text, or `left`/`right` for a breastfeed side. |
 | `raw` | What was entered — the button's own words, or the typed text. |
 | `msg_id` | **Now a generated id** (`web-<base36>-<random>`), not a Telegram message id. Still the key `data/derived/` rows point at via `from_raw`, so it must stay unique forever. |
+| `dur_min` | **Added for the Pump tab.** Minutes spent expressing. `null` on every other kind of entry, and on a pump session whose minutes were not recorded. |
+| `ml_l`, `ml_r` | **Added for the Pump tab.** The per-side split of a pump session. `null` unless it was actually measured. `value` stays the total and is the authoritative figure; these are detail. |
+
+**Why `dur_min` could not be folded into `value`.** A pump session is the only entry with
+two numbers that both matter: how much came out, and how long it took. 60 ml in 15 minutes
+and 60 ml in 40 minutes are different mornings, and the ratio is the figure worth watching.
+`value` holds one number, so the second needs a field. The three were **appended after
+`msg_id`**, not inserted, so anything reading these files by position keeps working, and
+they are written onto **every** row — null where they do not apply — so `data/raw/` has one
+shape throughout instead of two. Rows written before they existed get them as null in
+`compact.py`.
+
+The side split could have gone into `note` as text. It did not, because a number kept as
+prose is a number nobody can total later: a month of `30/35mL` in a free-text field is a
+month of regular expressions, and the two fields cost three nulls a row now.
 
 **Two additions, both safe.** `type: "hygiene"` is new. The bot's `type: "bath"` is still
 read wherever it appears, but new baths are logged as `hygiene/bath`. Nothing in
@@ -503,6 +518,77 @@ is either our own undo or a marker — so there is no second list to keep in ste
 original survives in her file permanently, with the strike recorded separately and
 attributed to whoever made it. The audit trail across two devices is stronger than the
 single-device one, not weaker.
+
+## 7g. The Pump tab
+
+What comes out of Mum, counted on its own. Her question is not his: she wants to know
+whether today's production is holding up, and what it cost in time.
+
+**It is not a new kind of entry.** The data has kept expressing and feeding apart from the
+start — `type: "pump"` against `type: "feed", subtype: "expressed"` — because expressing
+80 ml and him drinking 80 ml are two events and adding them double-counts the same milk.
+What the tab adds is a view of something already separate, plus the second number that
+makes a day comparable.
+
+**Why a tab and not a section of the Log tab.** The person using it is not the person being
+woken, and the things it needs under a thumb — a date field, a minutes field, a page of
+notes to type up — are exactly the things that should not be near a 3am nappy button. The
+same argument that put the Book tab where it is.
+
+**Lactation time includes the latch.** The volume on its own does not say whether a session
+went well. Time at the pump comes from `dur_min`; time at the breast comes from the
+breastfeed entries on the Log tab, which already carry minutes. Both are shown, separately
+and added, because a short milk figure under a long time figure is the day worth asking
+about — and that is the comparison the chart is drawn for.
+
+**An untimed session is flagged, not filled in.** A session logged without its minutes
+makes the day's time an undercount and flatters its ml-per-hour. It is counted in the
+volume, marked with a `*` in the table, and named on the screen, the same way an unpaired
+sleep entry is left visible on the summary. Guessing a duration would make the one figure
+the tab exists for quietly wrong.
+
+**The chart's two bars are scaled separately.** Millilitres and minutes share no axis, so
+there is no honest single scale for both. Each bar is a share of its own three-week
+maximum, which makes the chart answer *which days were out of step* rather than inviting a
+reading of ml per minute off the page. It is drawn with divs: a percentage width needs no
+axis to be read, and there is no build step to put a chart library into.
+
+### Reading up a page of handwritten notes
+
+The notebook is the source of truth and it is written in prose, one day to a line. Keying a
+month of it into a form on a phone is an hour of tapping nobody will do, so the tab takes a
+paste of it. The whole value of this is in what it **refuses** to do, because the
+alternative to being strict is a month of wrong numbers nobody notices.
+
+- Volumes are read only from the part **before** the bracket. `40mL (2h after feed, 10mL
+  from hand expression)` is one 40 ml session, not 50 and not two.
+- A comma inside a bracket is not a session break.
+- `5mL x2` is two pumps of 5 ml in that sitting, so 10 ml.
+- Several volumes in one session — `65mL + 25mL + 15mL` — are one sitting, summed. Nothing
+  is lost: the line goes into `raw` verbatim, and `raw` is kept forever.
+- A left/right split in the bracket is **not** read into `ml_l`/`ml_r`. `30/35mL` is
+  probably left then right, and probably is not good enough — a wrong side is worse than no
+  side, and the text is kept either way.
+- `23/41mL` before the bracket could be two readings or one split, so that session is left
+  **unread and named on screen** rather than resolved by guesswork.
+- A millilitre figure left in the bracket that is neither half of a left/right split nor
+  called hand expression — `30/20mL. 60mL after power pumping x2` — is usually a second
+  session written inside the first one's bracket. The session that was read is kept and
+  the leftover is **named on the preview** for her to decide about. Over the first month
+  of real notes this flagged exactly one line, and refused exactly one other.
+- Times are hardly ever written down. One stated with am or pm is used; otherwise the day's
+  sessions are spread evenly through it and each entry carries `time not recorded` in its
+  note. An invented timestamp must never pass for a recorded one.
+- A day that already has sessions is **skipped, not added to**. Pasting the same page twice
+  is the easiest way to double a month of figures, and it is one tap away.
+- Nothing is written until the preview has been shown and the button under it tapped.
+
+Only the structured form sets `ml_l`/`ml_r` and `dur_min`, and the shared free-text parser
+in `docs/parser-source.gs` was left alone: it is the source of truth for the Telegram bot
+too, and a pump session's two numbers are not something you want to be typing in prose at
+the end of a feed.
+
+---
 
 ## 8. Privacy
 

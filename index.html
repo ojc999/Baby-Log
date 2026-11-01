@@ -374,14 +374,61 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 }
 
 /* ───── tabs ───── */
-.tabs{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tab{
   appearance:none;border:0;background:var(--surface);color:var(--ink-dim);font-family:var(--sans);
-  font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
-  padding:14px 4px 13px;cursor:pointer;min-height:54px;
+  font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  padding:14px 2px 13px;cursor:pointer;min-height:54px;
 }
 .tab[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 var(--teal)}
 .tab:focus-visible{outline:2px solid var(--teal);outline-offset:-3px}
+
+/* ───── pump tab: the daily production chart ─────
+   Two bars to a day, one above the other: millilitres on top, minutes spent below.
+   Drawn with divs rather than a chart library, because there is no build step to put one
+   in, and because a bar whose width is a percentage needs no axis to be read. The two are
+   scaled to their own maxima, so the question the chart answers is "which days were out
+   of step", not "how many ml is a minute worth". */
+.bars{margin:8px 0 2px}
+.brow{display:grid;grid-template-columns:44px 1fr 60px;align-items:center;gap:8px;padding:3px 0}
+.brow+.brow{border-top:1px solid var(--line)}
+.brow .bd{font-family:var(--mono);font-size:11px;color:var(--ink-faint);white-space:nowrap}
+.brow .bt{display:grid;gap:3px;min-width:0}
+.btrack{height:9px;background:var(--surface-2);border-radius:5px;overflow:hidden}
+/* display:block is load-bearing. A <span> is inline, and an inline box ignores both
+   width and height - the fills rendered as nothing at all while the percentages were
+   sitting correctly in the style attribute, so a test reading style.width passed against
+   an invisible chart. */
+.bfill{display:block;height:100%;border-radius:5px;background:var(--mum);min-width:2px}
+.bfill.mins{background:var(--teal)}
+.brow .bn{font-family:var(--mono);font-size:10.5px;font-variant-numeric:tabular-nums;text-align:right;line-height:1.35}
+.brow .bn i{display:block;font-style:normal;color:var(--mum)}
+.brow .bn u{display:block;text-decoration:none;color:var(--teal)}
+.brow.today .bd{color:var(--ink);font-weight:700}
+.brow.empty .bn{color:var(--ink-faint)}
+.key{display:flex;gap:12px;align-items:center;font-size:11px;color:var(--ink-dim);margin:6px 0 0}
+.key span{display:flex;gap:5px;align-items:center}
+.key i{width:11px;height:11px;border-radius:3px;background:var(--mum);display:inline-block}
+.key i.mins{background:var(--teal)}
+
+/* ───── pump tab: reading up a page of handwritten notes ───── */
+/* 16px, not smaller: iOS Safari zooms the whole page when you focus a box under 16px,
+   and this is the one box on the app you type a lot into. */
+.imp{width:100%;min-height:120px;font-family:var(--mono);font-size:16px;line-height:1.5;
+  padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);
+  color:var(--ink);resize:vertical}
+.imp:focus{outline:2px solid var(--teal);outline-offset:-1px}
+.pv{margin:10px 0 0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pvd{display:flex;align-items:baseline;gap:8px;padding:7px 11px;background:var(--surface-2);
+  border-top:1px solid var(--line);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-dim)}
+.pvd:first-child{border-top:0}
+.pvd em{margin-left:auto;font-style:normal;font-family:var(--mono);font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink)}
+.pvd.skip em{color:var(--amber)}
+.pvs{display:grid;grid-template-columns:48px 1fr;gap:8px;padding:7px 11px;background:var(--surface);
+  border-top:1px solid var(--line);font-size:12px}
+.pvs b{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--ink-faint)}
+.pvs span{min-width:0;word-break:break-word}
+.pvs span em{display:block;font-style:normal;font-size:11px;color:var(--ink-faint);margin-top:1px}
 </style>
 
 <div class="app">
@@ -587,6 +634,104 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <button class="toast-act" id="toast-act" hidden></button>
   </div>
 
+  <!-- ═══════════ PUMP ═══════════
+       Mum's own tab. Expressing and feeding are different events and are never added
+       together: this tab counts what comes out of her, the Log tab counts what goes into
+       him. They can differ by a lot in both directions. It is a tab of its own rather
+       than a section of the Log tab because the person using it is not the person being
+       woken, and because a date field and a page of notes are the wrong things to have
+       under a thumb at 3am. -->
+  <div class="pane" id="pane-pump" hidden>
+    <div class="sect"><h2>Today so far</h2><hr></div>
+    <dl class="lastgrid" id="pump-today"></dl>
+    <p class="info" id="pump-hint"></p>
+
+    <div class="sect"><h2>Log a session</h2><hr></div>
+    <div class="fixrow">
+      <label>How</label>
+      <div class="sheet-row" id="pm-how"></div>
+    </div>
+    <div class="fixrow">
+      <label for="pm-ml">Total</label>
+      <input id="pm-ml" type="number" inputmode="decimal" step="any" min="0" placeholder="ml">
+      <span class="unit">ml</span>
+    </div>
+    <div class="sheet-row" id="pm-presets"></div>
+    <div class="fixrow" style="margin-top:11px">
+      <label for="pm-min">How long</label>
+      <input id="pm-min" type="number" inputmode="numeric" step="1" min="0" placeholder="minutes">
+      <span class="unit">min</span>
+    </div>
+    <div class="fixrow">
+      <label for="pm-l">Left</label>
+      <input id="pm-l" type="number" inputmode="decimal" step="any" min="0" placeholder="optional">
+      <span class="unit">ml</span>
+    </div>
+    <div class="fixrow">
+      <label for="pm-r">Right</label>
+      <input id="pm-r" type="number" inputmode="decimal" step="any" min="0" placeholder="optional">
+      <span class="unit">ml</span>
+    </div>
+    <p class="sidehint" id="pm-sum" hidden></p>
+    <div class="fixrow">
+      <label for="pm-date">Date</label>
+      <input id="pm-date" type="date">
+    </div>
+    <div class="fixrow">
+      <label for="pm-time">Time</label>
+      <input id="pm-time" type="time">
+    </div>
+    <div class="fixrow">
+      <label for="pm-note">Note</label>
+      <input id="pm-note" type="text" autocomplete="off" placeholder="optional">
+    </div>
+    <button class="btn solid" id="pm-add" style="width:100%">Save this session</button>
+    <p class="info"><b>Total</b> is the figure the trend counts, so it is the one worth
+    being right. Left and right are optional; if you fill both and they do not add up to
+    the total, it will say so rather than quietly changing one of them. <b>How long</b> is
+    what makes the day comparable &mdash; 60 ml in 15 minutes and 60 ml in 40 minutes are
+    not the same morning.</p>
+
+    <div class="sect"><h2>Daily production</h2><hr></div>
+    <div class="key">
+      <span><i></i>millilitres</span><span><i class="mins"></i>minutes expressing</span>
+    </div>
+    <div id="pump-bars"></div>
+    <p class="info" id="pump-barnote"></p>
+
+    <div class="sect"><h2>Day by day</h2><hr></div>
+    <div class="wrap"><table class="week" id="pump-week"></table></div>
+    <p class="info" id="pump-weeknote"></p>
+
+    <div class="sect"><h2>Sessions on <span id="pump-rowday">today</span></h2><hr></div>
+    <div class="when" style="margin-bottom:4px">
+      <button class="chip" id="pm-prev">&larr; earlier</button>
+      <button class="chip" id="pm-next">later &rarr;</button>
+      <button class="chip" id="pm-today">today</button>
+    </div>
+    <div id="pump-rows"></div>
+
+    <div class="sect"><h2>Type up a page of notes</h2><hr></div>
+    <p class="info">For catching up from the notebook. One day to a line, in the shape you
+    already write them &mdash; <code>14 Oct: 50mL pump, 50mL pump</code>. It reads them,
+    shows you exactly what it understood, and saves nothing until you tap the button
+    underneath.</p>
+    <label class="sr" for="pm-imp">Your notes, one day to a line</label>
+    <textarea class="imp" id="pm-imp" rows="6" placeholder="14 Oct: 50mL pump, 50mL pump
+15 Oct: 80mL pump (no overnight latch), 30mL (power pump after latching)"></textarea>
+    <div class="grid g2" style="margin-top:8px">
+      <button class="btn quiet" id="pm-imp-clear">Clear</button>
+      <button class="btn quiet" id="pm-imp-read" style="font-weight:700">Read these notes</button>
+    </div>
+    <div id="pm-preview"></div>
+    <div id="pm-imp-act" hidden>
+      <button class="btn solid" id="pm-imp-save" style="width:100%;margin-top:10px">Save these sessions</button>
+      <p class="info">Each day becomes one commit, so a long paste takes a minute to
+      finish syncing. A day that already has sessions in it is left alone rather than
+      doubled &mdash; undo the ones there first if you want to key it again.</p>
+    </div>
+  </div>
+
   <!-- ═══════════ BOOK ═══════════
        Checking the app against the paper book, and filling in what is missing. Kept off
        the Log tab on purpose: a date field is the wrong thing to have under your thumb at
@@ -638,6 +783,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
   <nav class="tabs" role="tablist">
     <button class="tab" id="tab-log" role="tab" aria-selected="true">Log</button>
     <button class="tab" id="tab-sum" role="tab" aria-selected="false">Summary</button>
+    <button class="tab" id="tab-pump" role="tab" aria-selected="false">Pump</button>
     <button class="tab" id="tab-book" role="tab" aria-selected="false">Book</button>
     <button class="tab" id="tab-set" role="tab" aria-selected="false">Setup</button>
   </nav>
@@ -654,6 +800,16 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <label for="fix-amt">Amount</label>
       <input id="fix-amt" type="number" inputmode="decimal" step="any">
       <span class="unit" id="fix-unit"></span>
+    </div>
+    <div class="fixrow" id="fix-min-row" hidden>
+      <label for="fix-min">How long</label>
+      <input id="fix-min" type="number" inputmode="numeric" step="1" min="0" placeholder="minutes">
+      <span class="unit">min</span>
+    </div>
+    <div class="fixrow" id="fix-lr-row" hidden>
+      <label for="fix-l">Left &amp; right</label>
+      <input id="fix-l" type="number" inputmode="decimal" step="any" min="0" placeholder="L ml">
+      <input id="fix-r" type="number" inputmode="decimal" step="any" min="0" placeholder="R ml">
     </div>
     <div class="fixrow" id="fix-side-row" hidden>
       <label>Side</label>
@@ -939,7 +1095,8 @@ var LABELS = {
   'feed/expressed': 'Expressed milk', 'feed/': 'Feed',
   'measure/weight': 'Weight', 'measure/length': 'Length', 'measure/head': 'Head',
   'measure/temp': 'Temperature',
-  'pump/': 'Mum expressed', 'cry/': 'Unsettled', 'tummy/': 'Tummy time', 'vomit/': 'Vomit',
+  'pump/': 'Mum expressed', 'pump/hand': 'Hand expressed', 'pump/power': 'Power pumped',
+  'cry/': 'Unsettled', 'tummy/': 'Tummy time', 'vomit/': 'Vomit',
   'med/': 'Medicine', 'vax/': 'Vaccination', 'milestone/': 'Milestone', 'note/': 'Note',
   'bath/': 'Bath'
 };
@@ -1076,12 +1233,27 @@ function uid() {
   return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
 
-function add(type, subtype, value, unit, note, raw, ms) {
+/* An empty box is `null`, never 0 and never "". Used for every number on a row, so that
+   "she did not write it down" and "it was zero" stay different things. */
+function numOrNull(v) {
+  if (v === '' || v === undefined || v === null) return null;
+  var n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+/* `extra` carries the fields added for the pump tab - `dur_min`, `ml_l`, `ml_r`. They are
+   appended to the contract rather than folded into `value` or `note`, because a pump
+   session has two numbers that matter (how much, and over how long) and `value` can only
+   hold one. Every other kind of entry writes them as null, which keeps one shape for
+   every row in the archive. */
+function add(type, subtype, value, unit, note, raw, ms, extra) {
   var when = (ms === undefined || ms === null) ? stamp() : ms;
+  var x = extra || {};
   var e = {
     ms: when, ts: isoSG(when), sender: cfg.who || 'me', type: type, subtype: subtype || '',
     value: (value === '' || value === undefined || value === null) ? null : value,
     unit: unit || '', note: note || '', raw: raw || '', msg_id: uid(),
+    dur_min: numOrNull(x.dur_min), ml_l: numOrNull(x.ml_l), ml_r: numOrNull(x.ml_r),
     own: true, device: cfg.device || 'this-device'
   };
   entries.push(e);
@@ -1160,7 +1332,16 @@ function describe(r) {
     base += ' ' + r.value + u;
   }
   if (r.note === 'left' || r.note === 'right') base += ', ' + r.note;
+  /* A pump session carries two numbers and sometimes a split. Both are shown, because
+     the volume on its own does not say whether it was a good session. */
+  if (r.dur_min !== null && r.dur_min !== undefined && r.dur_min !== '') base += ' in ' + r.dur_min + ' min';
+  if (hasSides(r)) base += ' (L ' + (r.ml_l || 0) + ' / R ' + (r.ml_r || 0) + ')';
   return base;
+}
+
+function hasSides(r) {
+  return (r.ml_l !== null && r.ml_l !== undefined && r.ml_l !== '') ||
+         (r.ml_r !== null && r.ml_r !== undefined && r.ml_r !== '');
 }
 
 function esc(s) {
@@ -1239,9 +1420,13 @@ function jsonlFor(day) {
     .filter(function (r) { return r.own && daySG(r.ms) === day; })
     .sort(function (a, b) { return a.ms - b.ms; })
     .map(function (r) {
+      /* The original nine, in the original order, then the three added for the pump
+         tab. Appending rather than inserting is what lets `data/derived/` keep reading
+         files written before they existed. */
       return JSON.stringify({
         ts: r.ts, sender: r.sender, type: r.type, subtype: r.subtype,
-        value: r.value, unit: r.unit, note: r.note, raw: r.raw, msg_id: r.msg_id
+        value: r.value, unit: r.unit, note: r.note, raw: r.raw, msg_id: r.msg_id,
+        dur_min: numOrNull(r.dur_min), ml_l: numOrNull(r.ml_l), ml_r: numOrNull(r.ml_r)
       });
     }).join('\n') + '\n';
 }
@@ -1890,6 +2075,454 @@ function renderSummary() {
    day and steps back through them. A day with nothing held locally is fetched from the
    repo on arrival, which is what makes a phone set up last week able to show last week. */
 
+/* ═══════════════════════ the pump tab ═══════════════════════
+   What comes out of Mum, counted on its own. It is deliberately not part of the feed
+   figures: expressing 80 ml and him drinking 80 ml are two events, and adding them would
+   double-count the same milk. The data has always kept them apart - `type: "pump"` versus
+   `type: "feed", subtype: "expressed"` - so this tab is a view of something that was
+   already separate, not a new kind of entry.
+
+   Two numbers make a day comparable: how much, and how long. `dur_min` carries the
+   second, because `value` can only hold one number and the milk-per-minute question is
+   the whole point of logging the time. Time at the breast is counted alongside it, from
+   the breastfeed entries on the Log tab: it is not pumping, but it is lactation time, and
+   it is the first thing to look at on a day when the volume is down. */
+
+var pumpDay   = null;       /* the day the session list is showing; null means today */
+var pmHow     = '';         /* '' ordinary pump · 'hand' · 'power' */
+var impResult = null;       /* what the last "Read these notes" understood, before saving */
+var PUMP_BARS = 21;         /* days in the chart */
+var PUMP_TABLE = 14;        /* rows in the table */
+var PM_PRESETS = [20, 30, 40, 50, 60, 80, 100];
+var PM_HOW = [['', 'Pump'], ['hand', 'By hand'], ['power', 'Power pump']];
+
+function pumpOf(day) {
+  return live().filter(function (r) { return r.type === 'pump' && daySG(r.ms) === day; })
+               .sort(function (a, b) { return a.ms - b.ms; });
+}
+
+/* One day's figures. `untimed` is not a rounding detail: a session logged without its
+   minutes makes the day's minutes an undercount, and that is shown rather than filled in,
+   the same way an unpaired sleep is left visible on the summary. */
+function pumpStats(day) {
+  var ps = pumpOf(day);
+  var ml = 0, mins = 0, timed = 0;
+  ps.forEach(function (r) {
+    ml += (r.value || 0);
+    if (r.dur_min) { mins += r.dur_min; timed++; }
+  });
+  var latch = live().filter(function (r) {
+    return r.type === 'feed' && r.subtype === 'breast' && r.unit === 'min' &&
+           daySG(r.ms) === day;
+  });
+  var latchMin = latch.reduce(function (a, r) { return a + (r.value || 0); }, 0);
+  ml = Math.round(ml * 10) / 10;
+  return {
+    day: day, rows: ps, n: ps.length, ml: ml, mins: mins,
+    timed: timed, untimed: ps.length - timed,
+    latches: latch.length, latchMin: latchMin, lactMin: mins + latchMin,
+    perHour: mins ? Math.round(ml / (mins / 60)) : null
+  };
+}
+
+function pumpDays(n) {
+  var out = [];
+  for (var i = n - 1; i >= 0; i--) out.push(daySG(Date.now() - i * 86400000));
+  return out;                                   /* oldest first, so a trend reads down */
+}
+
+function renderPump() {
+  var today = daySG(Date.now());
+  var s = pumpStats(today);
+
+  $('pump-today').innerHTML =
+    lcard('Expressed', s.ml || '—', s.n + (s.n === 1 ? ' session' : ' sessions'), false) +
+    lcard('Pumping', s.mins ? s.mins + ' min' : '—',
+          s.untimed ? s.untimed + ' not timed' : (s.mins ? 'all timed' : 'nothing yet'),
+          !!s.untimed) +
+    lcard('At the breast', s.latchMin ? s.latchMin + ' min' : '—',
+          s.latches + (s.latches === 1 ? ' latch' : ' latches'), false) +
+    lcard('Lactation time', s.lactMin ? s.lactMin + ' min' : '—',
+          s.perHour !== null ? s.perHour + ' ml per pumping hour' : 'pumping not timed',
+          false);
+
+  $('pump-hint').innerHTML = s.untimed
+    ? '<b>' + s.untimed + ' of today’s ' + s.n + ' session' + (s.n === 1 ? '' : 's') +
+      ' carr' + (s.untimed === 1 ? 'ies' : 'y') + ' no minutes</b>, so today’s pumping ' +
+      'time and the ml-per-hour figure are both undercounts. Tap <b>Fix</b> on the ' +
+      'session below to add them.'
+    : 'Expressing is counted here and nowhere else. What he actually drinks, expressed ' +
+      'milk included, stays on the <b>Log</b> tab — the two are never added together.';
+
+  /* ── the chart ── */
+  var st = pumpDays(PUMP_BARS).map(pumpStats);
+  var maxMl  = st.reduce(function (a, x) { return Math.max(a, x.ml); }, 0);
+  var maxMin = st.reduce(function (a, x) { return Math.max(a, x.lactMin); }, 0);
+  var anyMl  = st.some(function (x) { return x.ml > 0; });
+  $('pump-bars').innerHTML = anyMl
+    ? '<div class="bars">' + st.map(function (x) {
+        var w1 = maxMl  ? Math.max(x.ml  ? 2 : 0, Math.round(x.ml  / maxMl  * 100)) : 0;
+        var w2 = maxMin ? Math.max(x.lactMin ? 2 : 0, Math.round(x.lactMin / maxMin * 100)) : 0;
+        return '<div class="brow' + (x.day === today ? ' today' : '') +
+                 (x.ml ? '' : ' empty') + '">' +
+          '<span class="bd">' + dayShort(x.day) + '</span>' +
+          '<span class="bt">' +
+            '<span class="btrack">' + (w1 ? '<span class="bfill" style="width:' + w1 + '%"></span>' : '') + '</span>' +
+            '<span class="btrack">' + (w2 ? '<span class="bfill mins" style="width:' + w2 + '%"></span>' : '') + '</span>' +
+          '</span>' +
+          '<span class="bn">' + (x.ml
+            ? '<i>' + x.ml + ' ml</i><u>' + (x.lactMin || 0) + ' min' + (x.untimed ? '*' : '') + '</u>'
+            : '<i>—</i>') + '</span>' +
+        '</div>';
+      }).join('') + '</div>'
+    : '<p class="info">Nothing expressed in the last three weeks. Log a session above, ' +
+      'or type up a page of the notebook at the bottom of this tab.</p>';
+  $('pump-barnote').innerHTML = anyMl
+    ? 'Three weeks, oldest at the top. The two bars are scaled separately, so the ' +
+      'chart answers <b>which days were out of step</b> — a short milk bar under a long ' +
+      'time bar is a day that took a lot of work for a little. A <b>*</b> marks a day ' +
+      'with a session logged without its minutes, so that day’s time bar is short of ' +
+      'the truth.'
+    : '';
+
+  /* ── the table ── */
+  var head = '<tr><th>Day</th><th>ml</th><th>Sess</th><th>Pump</th><th>Latch</th><th>ml/h</th></tr>';
+  var body = pumpDays(PUMP_TABLE).slice().reverse().map(function (d) {
+    var x = pumpStats(d);
+    if (!x.n && !x.latchMin) {
+      return '<tr' + (d === today ? ' class="today"' : '') + '><td>' + dayShort(d) +
+             '</td><td colspan="5" style="text-align:right;color:var(--ink-faint)">nothing logged</td></tr>';
+    }
+    return '<tr' + (d === today ? ' class="today"' : '') + '>' +
+      '<td>' + dayShort(d) + '</td>' +
+      '<td>' + (x.ml || '—') + '</td>' +
+      '<td>' + (x.n || '—') + '</td>' +
+      '<td>' + (x.mins ? x.mins + (x.untimed ? '*' : '') : '—') + '</td>' +
+      '<td>' + (x.latchMin || '—') + '</td>' +
+      '<td>' + (x.perHour !== null ? x.perHour : '—') + '</td></tr>';
+  }).join('');
+  $('pump-week').innerHTML = head + body;
+  $('pump-weeknote').innerHTML =
+    '<b>Pump</b> is minutes at the pump, <b>Latch</b> minutes at the breast, ' +
+    '<b>ml/h</b> millilitres per hour of pumping. A <b>*</b> means a session that day ' +
+    'was logged without its minutes, so the figure is an undercount and ml/h is flattered. ' +
+    'Only what this app holds is counted — this phone, plus whatever the other one had ' +
+    'pushed when it was last read.';
+
+  /* ── the sessions on one day ── */
+  var d = pumpDay || today;
+  var x = pumpStats(d);
+  $('pump-rowday').textContent = d === today ? 'today' : dayLabel(d);
+  $('pm-next').disabled = d >= today;
+  $('pm-today').hidden = d === today;
+  $('pump-rows').innerHTML = x.rows.length
+    ? x.rows.slice().reverse().map(function (r) { return rowHtml(r, false); }).join('') +
+      '<p class="info">' + x.n + (x.n === 1 ? ' session' : ' sessions') + ', ' + x.ml +
+      ' ml' + (x.mins ? ' over ' + x.mins + ' min' : '') + '.</p>'
+    : '<p class="info">No sessions logged on ' + esc(dayLabel(d)) + '.</p>';
+
+  paintPmHow();
+  paintPmSum();
+}
+
+function paintPmHow() {
+  $('pm-how').innerHTML = PM_HOW.map(function (h) {
+    return '<button class="chip" data-how="' + h[0] + '" aria-pressed="' +
+           (h[0] === pmHow ? 'true' : 'false') + '">' + h[1] + '</button>';
+  }).join('');
+  $('pm-presets').innerHTML = PM_PRESETS.map(function (v) {
+    return '<button class="chip" data-pmset="' + v + '">' + v + '</button>';
+  }).join('');
+}
+
+/* Left plus right against the total. It never rewrites the total - a typed figure is
+   what she measured, and quietly replacing it with a sum that disagrees is exactly the
+   kind of silent repair that makes a record untrustworthy. It fills the total in only
+   when the box is empty, and otherwise says plainly that the two do not agree. */
+function paintPmSum() {
+  var l = numOrNull($('pm-l').value), r = numOrNull($('pm-r').value);
+  var tot = numOrNull($('pm-ml').value);
+  var hint = $('pm-sum');
+  if (l === null && r === null) { hint.hidden = true; return; }
+  var sum = Math.round(((l || 0) + (r || 0)) * 10) / 10;
+  hint.hidden = false;
+  if (tot === null) {
+    hint.innerHTML = 'Left and right add up to <b>' + sum + ' ml</b>. Leave the total ' +
+                     'blank and that is what is saved.';
+  } else if (Math.abs(tot - sum) > 0.05) {
+    hint.innerHTML = 'Left and right add up to <b>' + sum + ' ml</b>, not the <b>' + tot +
+                     ' ml</b> in the total. Fix one of them before saving.';
+  } else {
+    hint.innerHTML = 'Left and right add up to the total.';
+  }
+}
+
+function shiftPumpDay(by) {
+  var d = shiftDay(pumpDay || daySG(Date.now()), by);
+  if (d > daySG(Date.now())) return;
+  pumpDay = d === daySG(Date.now()) ? null : d;
+  renderPump();
+}
+
+/* ═══════════════════════ reading up a page of notes ═══════════════════════
+   The notebook is the source of truth and it is written in prose, one day to a line:
+
+     14 Oct: 50mL pump, 50mL pump
+     15 Oct: 80mL pump (no overnight latch), 30mL (power pump after latching)
+
+   What this reads, and what it refuses to guess at, matters more than how clever it is:
+   the alternative to being strict here is a month of wrong numbers nobody notices.
+
+     - Volumes come only from the part before the bracket. "40mL (2h after feed, 10mL from
+       hand expression)" is one 40 ml session, not 50 and not two.
+     - A comma inside a bracket is not a session break.
+     - "5mL x2" is two pumps of 5 ml in that sitting, so 10 ml.
+     - Several volumes in one session — "65mL + 25mL + 15mL" — are one sitting and are
+       summed. Nothing is lost: the line goes into `raw` verbatim, and `raw` is kept
+       forever.
+     - A left/right split in the bracket is NOT read into `ml_l`/`ml_r`. "30/35mL" is
+       probably left then right, and probably is not good enough: a wrong side is worse
+       than no side. The text is kept either way.
+     - "50/65mL" before the bracket could be two readings or one split, so the session is
+       left unread rather than resolved by guesswork.
+     - Times are hardly ever written down. One stated with am or pm is used; otherwise the
+       day's sessions are spread evenly through it and each entry carries
+       `time not recorded` in its note, so an invented timestamp can never pass for a
+       recorded one.
+     - A day that already has sessions is skipped, not added to. Pasting the same page
+       twice is the easiest way to double a month of figures. */
+
+var MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6,
+               aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+/* Split on commas that are not inside brackets. */
+function splitTop_(s) {
+  var out = [], buf = '', depth = 0;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charAt(i);
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    else if (c === ',' && depth === 0) { out.push(buf); buf = ''; continue; }
+    buf += c;
+  }
+  out.push(buf);
+  return out.map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+}
+
+/* "14 Oct" with no year is the most recent 14 October that is not in the future. */
+function dayFromDM_(d, mon, nowMs) {
+  var y = Number(sgParts(nowMs).year);
+  var limit = daySG(nowMs);
+  for (var k = 0; k < 2; k++) {
+    var iso = y + '-' + ('0' + (mon + 1)).slice(-2) + '-' + ('0' + d).slice(-2);
+    if (isNaN(Date.parse(iso + 'T12:00:00+08:00'))) return '';
+    if (iso <= limit) return iso;
+    y--;
+  }
+  return '';
+}
+
+/* Everything after the session's own bracket closes still belongs to it - the notebook
+   ends lines with things like "| midnight latch without top up" - so it is kept rather
+   than dropped on the floor along with the stray bracket. */
+function noteOf_(chunk, paren) {
+  if (paren === -1) return '';
+  var depth = 0, close = -1;
+  for (var j = paren; j < chunk.length; j++) {
+    if (chunk.charAt(j) === '(') depth++;
+    else if (chunk.charAt(j) === ')') { depth--; if (!depth) { close = j; break; } }
+  }
+  var inside = (close === -1 ? chunk.slice(paren + 1) : chunk.slice(paren + 1, close)).trim();
+  var after = close === -1 ? '' : chunk.slice(close + 1).replace(/^[\s|,.;:-]+/, '').trim();
+  return [inside, after].filter(function (x) { return !!x; }).join(' · ');
+}
+
+/* A millilitre figure left sitting in the note, which is neither one half of a left/right
+   split nor called hand expression, is usually a second session written inside the first
+   one's bracket. It is not resolved either way: the session that was read is kept, and the
+   leftover is named on the preview for her to decide about. */
+function strayMl_(note) {
+  var re = /(^|[^\d\/])(\d+(?:\.\d+)?)\s*ml\b/gi, m;
+  while ((m = re.exec(note))) {
+    var after = note.slice(m.index + m[0].length, m.index + m[0].length + 24);
+    if (/hand\s*express/i.test(after)) continue;
+    return m[2] + ' ml';
+  }
+  return '';
+}
+
+function readSession_(chunk) {
+  var paren = chunk.indexOf('(');
+  var head = (paren === -1 ? chunk : chunk.slice(0, paren)).trim();
+  var note = noteOf_(chunk, paren);
+  if (/\d\s*\/\s*\d/.test(head)) return null;        /* two readings, or one split? */
+  var re = /(\d+(?:\.\d+)?)\s*ml\b\s*(?:x\s*(\d+))?/gi, m, vols = [], tail = 0;
+  while ((m = re.exec(head))) {
+    var times = m[2] ? Math.max(1, Math.min(20, parseInt(m[2], 10))) : 1;
+    for (var i = 0; i < times; i++) vols.push(parseFloat(m[1]));
+    tail = m.index + m[0].length;
+  }
+  if (!vols.length) return null;
+  /* With no bracket, anything written after the last volume is the note. The method words
+     are dropped from it because they are already carried as the subtype. */
+  if (!note) {
+    note = head.slice(tail).replace(/^[\s+|,.;:-]+/, '')
+               .replace(/^(hand\s*expression|power\s*pump(ing)?|pump(ing|ed)?)\b[\s|,.;:-]*/i, '')
+               .trim();
+  }
+  var ml = vols.reduce(function (a, v) { return a + v; }, 0);
+  /* "hand expression" only counts as the method when it describes the session itself,
+     before the bracket. Inside it, it is usually a few ml of a larger pump. "power pump"
+     is nearly always written inside the bracket, so that one is read from the whole. */
+  var how = /hand\s*express/i.test(head) ? 'hand'
+          : (/power\s*pump/i.test(chunk) ? 'power' : '');
+  /* A time only counts with am or pm on it. Without that, "after 6+h" and "19mm" are
+     both numbers next to the word "at". */
+  var tm = note.match(/(?:^|[^\d])(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm)\b/i);
+  var hh = null, mm = 0;
+  if (tm) {
+    hh = parseInt(tm[1], 10) % 12;
+    if (tm[3].toLowerCase() === 'pm') hh += 12;
+    mm = tm[2] ? parseInt(tm[2], 10) : 0;
+  }
+  return {
+    ml: Math.round(ml * 10) / 10, pumps: vols.length, how: how,
+    note: note, raw: chunk.trim(), hh: hh, mm: mm, stray: strayMl_(note)
+  };
+}
+
+function parsePumpNotes(text, nowMs) {
+  nowMs = nowMs || Date.now();
+  var out = { days: [], unread: [] };
+  /* A wrapped line belongs to the day above it. Her notebook wraps mid-day constantly. */
+  var lines = [];
+  String(text || '').split('\n').forEach(function (ln) {
+    var t = ln.trim();
+    if (!t) return;
+    if (/^\d{1,2}\s*[A-Za-z]{3,}\s*:/.test(t)) lines.push(t);
+    else if (lines.length) lines[lines.length - 1] += ' ' + t;
+    else out.unread.push(t);
+  });
+
+  lines.forEach(function (ln) {
+    var m = ln.match(/^(\d{1,2})\s*([A-Za-z]{3,})\s*:\s*(.*)$/);
+    var mon = MONTHS[m[2].slice(0, 3).toLowerCase()];
+    var day = mon === undefined ? '' : dayFromDM_(Number(m[1]), mon, nowMs);
+    if (!day) { out.unread.push(ln); return; }
+
+    var sessions = [], unread = [];
+    splitTop_(m[3]).forEach(function (c) {
+      var ses = readSession_(c);
+      if (ses) sessions.push(ses); else unread.push(c);
+    });
+    if (!sessions.length && !unread.length) return;
+
+    /* Give the ones with no stated time a slot, evenly through the day from 04:00, and
+       say so on the entry. Clamped to now, so importing today cannot date a session into
+       the future. */
+    sessions.forEach(function (ses, i) {
+      if (ses.hh === null) {
+        ses.hh = Math.min(23, 4 + Math.round((i + 0.5) * 19 / sessions.length));
+        ses.mm = 0;
+        ses.guessed = true;
+      }
+      var ms = Date.parse(day + 'T' + ('0' + ses.hh).slice(-2) + ':' +
+                          ('0' + ses.mm).slice(-2) + ':00+08:00');
+      if (isNaN(ms)) ms = Date.parse(day + 'T12:00:00+08:00');
+      if (ms > nowMs) { ms = nowMs; ses.guessed = true; }
+      ses.ms = ms;
+    });
+    sessions.sort(function (a, b) { return a.ms - b.ms; });
+
+    out.days.push({
+      day: day, sessions: sessions, unread: unread,
+      ml: Math.round(sessions.reduce(function (a, x) { return a + x.ml; }, 0) * 10) / 10,
+      had: pumpOf(day).length
+    });
+  });
+  out.days.sort(function (a, b) { return a.day < b.day ? -1 : 1; });
+  return out;
+}
+
+function renderImportPreview() {
+  var box = $('pm-preview'), act = $('pm-imp-act');
+  if (!impResult) { box.innerHTML = ''; act.hidden = true; return; }
+  var r = impResult;
+  var willAdd = 0, willDays = 0;
+  r.days.forEach(function (d) {
+    if (d.had || !d.sessions.length) return;
+    willAdd += d.sessions.length; willDays++;
+  });
+
+  var html = '';
+  r.days.forEach(function (d) {
+    var skip = !!d.had;
+    html += '<div class="pvd' + (skip ? ' skip' : '') + '">' + esc(dayLabel(d.day)) +
+            '<em>' + (skip
+              ? 'skipped — already has ' + d.had + (d.had === 1 ? ' session' : ' sessions')
+              : !d.sessions.length
+                ? 'nothing read'
+                : d.ml + ' ml in ' + d.sessions.length +
+                  (d.sessions.length === 1 ? ' session' : ' sessions')) + '</em></div>';
+    if (skip) return;
+    d.sessions.forEach(function (s) {
+      var how = LABELS['pump/' + s.how] || LABELS['pump/'];
+      html += '<div class="pvs"><b>' + hhmm(s.ms) + (s.guessed ? '?' : '') + '</b>' +
+              '<span>' + esc(how) + ' ' + s.ml + ' ml' +
+              (s.pumps > 1 ? ' <span style="color:var(--ink-faint)">(' + s.pumps +
+                             ' pumps in the sitting)</span>' : '') +
+              (s.note ? '<em>' + esc(s.note) + '</em>' : '') +
+              (s.guessed ? '<em>time not recorded — placed here</em>' : '') +
+              (s.stray ? '<em style="color:var(--amber)">the note also mentions ' +
+                         esc(s.stray) + ' — check whether that was a session of its own ' +
+                         'and add it by hand</em>' : '') +
+              '</span></div>';
+    });
+    d.unread.forEach(function (u) {
+      html += '<div class="pvs"><b>?</b><span style="color:var(--amber)">not read: ' +
+              esc(u) + '<em>two readings or one split — key this one in by hand</em>' +
+              '</span></div>';
+    });
+  });
+  r.unread.forEach(function (u) {
+    html += '<div class="pvd skip">Not a day<em>' + esc(u.slice(0, 40)) + '</em></div>';
+  });
+
+  box.innerHTML = html
+    ? '<div class="pv">' + html + '</div>' +
+      '<p class="info">' + (willAdd
+        ? '<b>' + willAdd + (willAdd === 1 ? ' session' : ' sessions') + ' across ' +
+          willDays + (willDays === 1 ? ' day' : ' days') + '</b> will be saved. A time ' +
+          'marked <b>?</b> was not in your notes — the sessions are spread through the ' +
+          'day in the order you wrote them, and each one says so in its note. Nothing ' +
+          'has been saved yet.'
+        : 'Nothing new to save.') + '</p>'
+    : '<p class="info">Nothing in there looked like a day of notes. A line has to start ' +
+      'with a date and a colon, like <code>14 Oct:</code>.</p>';
+  act.hidden = !willAdd;
+}
+
+function savePumpImport() {
+  if (!impResult) return;
+  var added = 0, days = 0;
+  impResult.days.forEach(function (d) {
+    if (d.had) return;
+    d.sessions.forEach(function (s) {
+      var note = [s.note, s.guessed ? 'time not recorded' : ''].filter(function (x) { return !!x; }).join(' · ');
+      add('pump', s.how, s.ml, 'ml', note, s.raw, s.ms, {});
+      added++;
+    });
+    days++;
+  });
+  impResult = null;
+  $('pm-imp').value = '';
+  renderImportPreview();
+  render(); renderPump(); paintSync(); renderDiag(); buzz();
+  toast('<b>' + added + (added === 1 ? ' session' : ' sessions') + '</b> added across ' +
+        days + (days === 1 ? ' day' : ' days') + '. Syncing them now.');
+  flush();
+}
+
 /* ───── the book ─────
    Reconciling the app against the paper book. Three things the daily screens cannot do:
    show every day that has ever been written, open any one of them, and add a record at
@@ -2114,6 +2747,10 @@ function render() {
   renderState(); renderLast(); renderTiles(); renderHomeRecent();
   if (screen === 'cat') renderCat();
   if (!$('pane-sum').hidden) renderSummary();
+  /* The poll calls this every ten seconds, so the pump tab picks up the other phone's
+     sessions without being left and re-entered. Only when it is the tab on screen -
+     rebuilding a chart nobody is looking at is work for nothing. */
+  if (!$('pane-pump').hidden) renderPump();
 }
 
 /* ═══════════════════════ sync status & diagnostics ═══════════════════════ */
@@ -2301,6 +2938,85 @@ function afterWrite(e) {
   flush();
 }
 
+/* ═══════════════════════ pump tab wiring ═══════════════════════ */
+
+$('pm-how').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-how]');
+  if (!b) return;
+  pmHow = b.dataset.how;
+  paintPmHow();
+});
+
+$('pm-presets').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-pmset]');
+  if (!b) return;
+  $('pm-ml').value = b.dataset.pmset;
+  paintPmSum();
+});
+
+['pm-ml', 'pm-l', 'pm-r'].forEach(function (id) {
+  $(id).addEventListener('input', paintPmSum);
+});
+
+$('pm-add').addEventListener('click', function () {
+  var date = $('pm-date').value, time = $('pm-time').value;
+  if (!date) { toast('Give the session a date.'); return; }
+  if (!time) { toast('Give the session a time.'); return; }
+  var ms = Date.parse(date + 'T' + time + ':00+08:00');
+  if (isNaN(ms)) { toast('That date and time did not make sense.'); return; }
+  if (ms > Date.now() + 60000) { toast('That is in the future, so it cannot have happened yet.'); return; }
+
+  var l = numOrNull($('pm-l').value), r = numOrNull($('pm-r').value);
+  var tot = numOrNull($('pm-ml').value);
+  var sum = Math.round(((l || 0) + (r || 0)) * 10) / 10;
+  /* An empty total with a split filled in is the one case where the sum is used: there
+     is no typed figure for it to overrule. Where both exist and disagree, neither is
+     silently preferred - she is told, and nothing is saved. */
+  if (tot === null && (l !== null || r !== null)) tot = sum;
+  if (tot === null) { toast('How much came out? The total is the figure the trend counts.'); return; }
+  if (tot < 0) { toast('A volume cannot be negative.'); return; }
+  if ((l !== null || r !== null) && Math.abs(tot - sum) > 0.05) {
+    toast('Left and right add up to ' + sum + ' ml, not ' + tot + ' ml. Fix one of them first.');
+    return;
+  }
+  var mins = numOrNull($('pm-min').value);
+  if (mins !== null && (mins < 0 || mins > 720)) { toast('That many minutes does not look right.'); return; }
+
+  var words = $('pm-note').value.trim();
+  var how = LABELS['pump/' + pmHow] || LABELS['pump/'];
+  var raw = how.toLowerCase() + ' ' + tot + ' ml' + (mins !== null ? ' ' + mins + ' min' : '') +
+            (l !== null || r !== null ? ' l' + (l || 0) + ' r' + (r || 0) : '') +
+            (words ? ' ' + words : '');
+  var e = add('pump', pmHow, tot, 'ml', words, raw, ms, { dur_min: mins, ml_l: l, ml_r: r });
+
+  ['pm-ml', 'pm-min', 'pm-l', 'pm-r', 'pm-note'].forEach(function (id) { $(id).value = ''; });
+  $('pm-time').value = hhmm(Date.now());
+  pumpDay = daySG(ms) === daySG(Date.now()) ? null : daySG(ms);
+  render(); renderPump(); paintSync(); renderDiag(); buzz();
+  toast('<b>' + esc(describe(e)) + '</b> saved', e.msg_id);
+  flush();
+});
+
+$('pm-prev').addEventListener('click', function () { shiftPumpDay(-1); });
+$('pm-next').addEventListener('click', function () { shiftPumpDay(1); });
+$('pm-today').addEventListener('click', function () { pumpDay = null; renderPump(); });
+
+$('pump-rows').addEventListener('click', function (e) {
+  var x = e.target.closest('[data-del]');
+  if (x) { undo(x.dataset.del); renderPump(); return; }
+  var f = e.target.closest('[data-fix]');
+  if (f) openFix(f.dataset.fix);
+});
+
+$('pm-imp-read').addEventListener('click', function () {
+  impResult = parsePumpNotes($('pm-imp').value, Date.now());
+  renderImportPreview();
+});
+$('pm-imp-clear').addEventListener('click', function () {
+  $('pm-imp').value = ''; impResult = null; renderImportPreview();
+});
+$('pm-imp-save').addEventListener('click', savePumpImport);
+
 /* ═══════════════════════ correcting an entry ═══════════════════════
 
    Across every baby tracker in common use, the most asked-for thing is being able to fix
@@ -2330,6 +3046,16 @@ function openFix(id) {
   $('fix-amt-row').hidden = !hasAmt;
   $('fix-amt').value = hasAmt ? r.value : '';
   $('fix-unit').textContent = r.unit === 'C' ? '°C' : (r.unit || '');
+
+  /* A pump session is the one entry with more than one number on it, so it is the one
+     that needs more than the amount box to be corrected. The hint on the Pump tab points
+     at this button to fill in minutes that were missed at the time. */
+  var isPump = r.type === 'pump';
+  $('fix-min-row').hidden = !isPump;
+  $('fix-lr-row').hidden  = !isPump;
+  $('fix-min').value = isPump && r.dur_min !== null && r.dur_min !== undefined ? r.dur_min : '';
+  $('fix-l').value   = isPump && r.ml_l !== null && r.ml_l !== undefined ? r.ml_l : '';
+  $('fix-r').value   = isPump && r.ml_r !== null && r.ml_r !== undefined ? r.ml_r : '';
 
   var sides = r.type === 'feed' && r.subtype === 'breast';
   $('fix-side-row').hidden = !sides;
@@ -2397,6 +3123,25 @@ function saveFix() {
   }
   var note = $('fix-side-row').hidden ? oldNote : fixSide;
 
+  /* The three fields only a pump session carries. Unchanged for every other kind, so a
+     correction never drops them - the row is rebuilt from scratch, and anything left out
+     here would be silently lost. */
+  var mins = numOrNull(old.dur_min), ml_l = numOrNull(old.ml_l), ml_r = numOrNull(old.ml_r);
+  if (!$('fix-min-row').hidden) {
+    mins = numOrNull($('fix-min').value);
+    if (mins !== null && (mins < 0 || mins > 720)) {
+      toast('That many minutes does not look right, so nothing was changed.'); return;
+    }
+    ml_l = numOrNull($('fix-l').value);
+    ml_r = numOrNull($('fix-r').value);
+    var sum = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;
+    if ((ml_l !== null || ml_r !== null) && value !== null && Math.abs(value - sum) > 0.05) {
+      toast('Left and right add up to ' + sum + ' ml, not ' + value +
+            ' ml, so nothing was changed.');
+      return;
+    }
+  }
+
   /* Nothing has been written yet, so a bad input above leaves the entry untouched.
      From here on both halves happen together. */
   if (old.own) {
@@ -2412,6 +3157,7 @@ function saveFix() {
     type: oldType, subtype: oldSub,
     value: (value === '' || value === undefined) ? null : value,
     unit: oldUnit, note: note, raw: oldRaw, msg_id: uid(),
+    dur_min: mins, ml_l: ml_l, ml_r: ml_r,
     own: true, device: cfg.device || 'this-device'
   };
   entries.push(e);
@@ -2421,6 +3167,7 @@ function saveFix() {
 
   closeFix();
   afterWrite();
+  if (!$('pane-pump').hidden) renderPump();
   toast('Corrected to <b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms));
 }
 
@@ -2430,15 +3177,23 @@ var curTab = 'log';
 
 function show(tab) {
   curTab = tab;
-  ['log', 'sum', 'book', 'set'].forEach(function (n) {
+  ['log', 'sum', 'pump', 'book', 'set'].forEach(function (n) {
     $('tab-' + n).setAttribute('aria-selected', n === tab ? 'true' : 'false');
   });
   // every pane set explicitly, so two can never be visible at once
   $('pane-home').hidden = !(tab === 'log' && screen === 'home');
   $('pane-cat').hidden  = !(tab === 'log' && screen === 'cat');
   $('pane-sum').hidden  = tab !== 'sum';
+  $('pane-pump').hidden = tab !== 'pump';
   $('pane-book').hidden = tab !== 'book';
   $('pane-set').hidden  = tab !== 'set';
+  if (tab === 'pump') {
+    /* Open on today at the current time. A session is nearly always logged just after it
+       happened, and the one time it is not, the two boxes are right there. */
+    if (!$('pm-date').value) $('pm-date').value = daySG(Date.now());
+    if (!$('pm-time').value) $('pm-time').value = hhmm(Date.now());
+    renderPump();
+  }
   if (tab === 'sum') renderSummary();
   if (tab === 'set') { renderFirstRun(); renderDiag(); checkBuild(false); }
   if (tab === 'sum') startLogObserver();
@@ -2470,7 +3225,7 @@ $('pane-home').addEventListener('click', function (e) {
   if (f) openFix(f.dataset.fix);
 });
 $('cat-back').addEventListener('click', goHome);
-['log', 'sum', 'book', 'set'].forEach(function (n) {
+['log', 'sum', 'pump', 'book', 'set'].forEach(function (n) {
   $('tab-' + n).addEventListener('click', function () {
     if (n === 'log' && screen === 'cat') { goHome(); return; }
     show(n);
