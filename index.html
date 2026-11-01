@@ -1094,16 +1094,52 @@ function add(type, subtype, value, unit, note, raw, ms) {
 function live() { return entries.filter(function (r) { return r.type !== 'deleted'; }); }
 
 /* Undo marks the entry deleted and keeps it. It never removes it. */
+/* Which ids this phone has struck out. Derived, not stored: an own row marked `deleted`
+   is either our own undo or a marker superseding the other phone's row, and both mean the
+   same thing - that id is struck out. Deriving it means there is no second list to keep
+   in step, and it survives a reload for free. */
+function struckIds() {
+  var out = {};
+  entries.forEach(function (r) { if (r.own && r.type === 'deleted') out[r.msg_id] = true; });
+  return out;
+}
+
+/* Undo or correct an entry logged on the OTHER phone, without ever writing to its file.
+   A row carrying the same msg_id, marked deleted, goes into our own file instead. The
+   original is left untouched - the audit trail the whole design rests on - and compaction
+   resolves the pair, because a deleted row always wins there whatever order the files are
+   read in.
+
+   This is the only way to do it that keeps one writer per file. Writing her file from our
+   copy would overwrite any row of hers we have not seen, which is the one thing that must
+   never happen. */
+function supersede(r) {
+  var marker = {
+    ms: r.ms, ts: r.ts, sender: cfg.who || 'me', type: 'deleted', subtype: '',
+    value: null, unit: '', note: '', raw: r.raw || '', msg_id: r.msg_id,
+    own: true, device: cfg.device || 'this-device'
+  };
+  /* Drop the original from this phone's copy and keep the marker in its place, so the
+     screen shows one struck-out row rather than two. The next pull will not bring it back:
+     mergeForeign skips anything already struck out. */
+  entries = entries.filter(function (x) { return x !== r; });
+  entries.push(marker);
+  entries.sort(function (a, b) { return a.ms - b.ms; });
+  dirty[daySG(marker.ms)] = true;
+  return marker;
+}
+
 function undo(id) {
   for (var i = entries.length - 1; i >= 0; i--) {
     if (entries[i].msg_id === id && entries[i].type !== 'deleted') {
-      if (!entries[i].own) {
-        toast('That one was logged on the other phone. It can only be undone there.');
-        return;
+      var r = entries[i];
+      if (r.own) {
+        r.type = 'deleted';
+        r.subtype = '';
+        dirty[daySG(r.ms)] = true;
+      } else {
+        supersede(r);
       }
-      entries[i].type = 'deleted';
-      entries[i].subtype = '';
-      dirty[daySG(entries[i].ms)] = true;
       saveEntries(); saveDirty();
       afterWrite();
       hideToast();
@@ -1577,6 +1613,29 @@ function mergeForeign(text, device, day) {
       incoming.push(r);
     } catch (e) { /* a half-written line: skip it, the next pull will have it whole */ }
   });
+  /* Reconcile strikes in both directions, so one row shows for each entry whichever
+     phone struck it out.
+
+       - A row we have already struck stays struck. Without this the next poll would read
+         her file, find the original still live in it - which it correctly is, since we
+         never write her file - and put it back on screen.
+       - A strike of hers lands on a row of ours. Her marker carries our msg_id, so it
+         marks our copy deleted rather than arriving as a second row. No push is forced:
+         the day is left clean and our file catches up the next time anything writes it,
+         which is enough, because compaction resolves the pair regardless. */
+  var struck = struckIds();
+  var live = {};
+  entries.forEach(function (r) { if (r.type !== 'deleted') live[r.msg_id] = r; });
+
+  incoming = incoming.filter(function (r) {
+    if (struck[r.msg_id]) return false;              /* we struck it; keep ours, drop theirs */
+    if (r.type === 'deleted' && live[r.msg_id]) {
+      live[r.msg_id].type = 'deleted';               /* they struck ours; show it struck */
+      live[r.msg_id].subtype = '';
+      return false;
+    }
+    return true;
+  });
   entries = entries.filter(function (r) {
     return r.own || r.device !== device || daySG(r.ms) !== day;
   }).concat(incoming);
@@ -1691,9 +1750,9 @@ function rowHtml(r, showDate) {
     '<span class="row-who">' +
       esc(!r.own && cfg.who && r.sender === cfg.who ? (r.device || r.sender) : r.sender) +
     '</span>' +
-    /* Only our own rows get controls. The other phone's file is not ours to write, so a
-       x there was a button that could only ever refuse. */
-    (del || !r.own ? '' :
+    /* Every live row gets controls, whichever phone logged it. Changing the other phone's
+       entry does not write its file - see supersede(). */
+    (del ? '' :
       '<button class="row-fix" data-fix="' + esc(r.msg_id) + '" aria-label="Correct this entry">Fix</button>' +
       '<button class="row-x" data-del="' + esc(r.msg_id) + '" aria-label="Undo this entry">&times;</button>') +
   '</div>';
@@ -2260,7 +2319,6 @@ function openFix(id) {
     if (entries[i].msg_id === id) { r = entries[i]; break; }
   }
   if (!r) return;
-  if (!r.own) { toast('That one was logged on the other phone. It can only be changed there.'); return; }
   if (r.type === 'deleted') return;
 
   fixing = id;
@@ -2307,7 +2365,7 @@ function saveFix() {
   for (var i = entries.length - 1; i >= 0; i--) {
     if (entries[i].msg_id === fixing) { old = entries[i]; break; }
   }
-  if (!old || !old.own || old.type === 'deleted') { closeFix(); return; }
+  if (!old || old.type === 'deleted') { closeFix(); return; }
 
   /* Read everything off the original before anything is changed. */
   var oldDay   = daySG(old.ms);
@@ -2341,9 +2399,13 @@ function saveFix() {
 
   /* Nothing has been written yet, so a bad input above leaves the entry untouched.
      From here on both halves happen together. */
-  old.type = 'deleted';
-  old.subtype = '';
-  dirty[oldDay] = true;
+  if (old.own) {
+    old.type = 'deleted';
+    old.subtype = '';
+    dirty[oldDay] = true;
+  } else {
+    supersede(old);          /* her row stays as it is; the strike goes in our file */
+  }
 
   var e = {
     ms: ms, ts: isoSG(ms), sender: cfg.who || oldSend || 'me',

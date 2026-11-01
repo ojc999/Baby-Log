@@ -144,11 +144,19 @@ const VIEWPORTS = [
       .map(el => { const r = el.getBoundingClientRect(); return {w:Math.round(r.width), h:Math.round(r.height)}; })
       .filter(b => b.w > 0 || b.h > 0));
     for (const b of rowBtns) if (b.w < 44 || b.h < 44) { note(name, `undo button on a log row is ${b.w}x${b.h}px (<44) - and it is destructive`); break; }
-    const foreignX = await page.evaluate(() => {
+    // Either phone may strike out the other's entries now, so a row from the other phone
+    // carrying controls is correct. What would be wrong is a struck-out row still
+    // offering them, or a live row offering only one of the pair.
+    const odd = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('.pane:not([hidden]) .row')];
-      return rows.filter(r => { const who = r.querySelector('.row-who');
-        return who && /wife/i.test(who.textContent) && r.querySelector('.row-x'); }).length; });
-    if (foreignX) note(name, `${foreignX} row(s) from the other phone show an undo button that cannot work`);
+      let bad = 0;
+      for (const r of rows) {
+        const del = !!r.querySelector('[data-del]'), fix = !!r.querySelector('[data-fix]');
+        if (r.classList.contains('del')) { if (del || fix) bad++; }
+        else if (del !== fix) bad++;
+      }
+      return bad; });
+    if (odd) note(name, `${odd} row(s) with a mismatched set of controls`);
 
     // Book tab
     await page.click('#tab-book'); await page.waitForTimeout(400);

@@ -471,6 +471,39 @@ something the data already said.
 **The kinds offered are generated from `CATS` and `SHEETS`**, not listed again, so the
 form cannot drift from the buttons. Adding a category adds it here for free.
 
+## 7f. Either phone can change the other's entries
+
+Each phone writes only its own file, which is what stops a push losing an entry (§2). The
+cost was that an entry could only be undone or corrected on the phone that made it — so
+sitting with the paper book, half the record was read-only.
+
+Both are now possible, and the rule is untouched: **neither phone ever writes the
+other's file.** Undoing her entry writes a row into *his* file carrying her `msg_id`,
+marked `deleted`. Her file is left exactly as it was. A correction is the same strike plus
+a new row with a fresh id, which is what a correction already was for his own entries.
+
+Two copies of one id therefore exist, in two files. `compact.py` settles them with **a
+deleted row always wins**, whatever order the files were read in. That rule is not a
+nicety: plain last-wins resolved by filename, so `des.jsonl` sorting before `simon.jsonl`
+decided whose undo survived. Undo is one-way in this app, so "deleted wins" is both
+order-independent and the only answer that matches what the person did.
+
+In the app the same thing is reconciled on the way in, in both directions:
+
+- A row this phone has struck is not resurrected by the next poll, which correctly still
+  finds the original live in her file.
+- A strike of hers lands on a row of ours and marks it struck, rather than appearing as a
+  second row. No push is forced; our file catches up whenever that day is next written,
+  which is enough, because compaction resolves the pair either way.
+
+The set of struck ids is derived from the entries themselves — an own row marked `deleted`
+is either our own undo or a marker — so there is no second list to keep in step.
+
+**What this does not weaken.** Nothing is edited in place, and nothing is removed. Her
+original survives in her file permanently, with the strike recorded separately and
+attributed to whoever made it. The audit trail across two devices is stronger than the
+single-device one, not weaker.
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.

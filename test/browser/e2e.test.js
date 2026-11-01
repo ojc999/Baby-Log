@@ -290,16 +290,22 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   t('and says why', /last feed was on the/i.test((await page.textContent('#sheet-hint'))||''), true);
   await page.click('#sheet-cancel');
 
-  console.log('\n--- the other phone\'s rows carry no controls we cannot honour ---');
+  console.log('\n--- every live row carries controls, whoever logged it ---');
   await page.click('#tab-sum'); await page.waitForTimeout(300);
-  // Check by ownership, not by the sender's name: a row absorbed from our own remote file
-  // can carry another person's name and still be ours to write.
-  const dead = await page.evaluate(()=>{
-    const foreign = new Set(entries.filter(r=>!r.own).map(r=>r.msg_id));
-    return [...document.querySelectorAll('.pane:not([hidden]) [data-del],.pane:not([hidden]) [data-fix]')]
-      .filter(b=>foreign.has(b.dataset.del || b.dataset.fix)).length;
+  // Either phone may now strike out the other's entries, so the other phone's rows get
+  // controls too. What makes that safe is in crossdevice.test.js: the strike is written
+  // into our own file, never hers.
+  const seen = await page.evaluate(()=>{
+    const shown = [...document.querySelectorAll('.pane:not([hidden]) .row')];
+    const struck = new Set([...document.querySelectorAll('.pane:not([hidden]) .row.del')]);
+    return {
+      live: shown.filter(r=>!struck.has(r)).length,
+      withControls: shown.filter(r=>!struck.has(r) && r.querySelector('[data-del]') && r.querySelector('[data-fix]')).length,
+      struckWithControls: [...struck].filter(r=>r.querySelector('[data-del]')).length
+    };
   });
-  t('no undo or fix button on the other phone\'s entries', dead, 0);
+  t('every live row on screen has Fix and x', seen.withControls, seen.live);
+  t('and a struck-out row has none', seen.struckWithControls, 0);
 
   console.log('\n--- setup survives without tapping Save and test ---');
   // The token is the last box on the page, so it never loses focus and `change` never

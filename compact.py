@@ -77,10 +77,27 @@ def read_day(day_dir: Path) -> tuple[list[dict], list[str]]:
 
 
 def merge(rows: list[dict]) -> list[dict]:
-    """De-duplicate on msg_id (last wins), order by timestamp, normalise fields."""
+    """De-duplicate on msg_id, order by timestamp, normalise fields.
+
+    Last wins, with one exception that is not optional: a row marked ``deleted`` always
+    beats a live row with the same id, whichever order the files happened to be read in.
+
+    That matters because the two phones can now strike out each other's entries. Neither
+    writes the other's file - the one-writer-per-file rule is what stops a push losing an
+    entry - so an undo of her row is a ``deleted`` row carrying the same msg_id, written
+    into his file. Both copies therefore reach this function, and plain last-wins would
+    resolve them by filename order: ``des.jsonl`` sorts before ``simon.jsonl``, so whose
+    undo survived would depend on who was called what. Undo is one-way in this app, so
+    "deleted wins" is both order-independent and the only answer that matches what the
+    person actually did.
+    """
     by_id: dict[str, dict] = {}
     for r in rows:
-        by_id[str(r["msg_id"])] = r
+        key = str(r["msg_id"])
+        prev = by_id.get(key)
+        if prev is not None and prev.get("type") == "deleted" and r.get("type") != "deleted":
+            continue
+        by_id[key] = r
     out = []
     for r in by_id.values():
         row = {k: r.get(k, "" if k != "value" else None) for k in FIELDS}

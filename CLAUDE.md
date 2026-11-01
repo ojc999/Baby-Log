@@ -23,11 +23,23 @@ what it is, and lists decisions that look arbitrary and are not.
 - **Never overwrite a row this device has not seen.** A push rewrites a day's file whole,
   which is only safe while our copy is a superset of the remote one. `absorbOwn` takes in
   anything unknown first. Removing that check loses the other parent's night feeds.
+- **Never write the other device's file.** One writer per file is the rule that makes a
+  whole-file push safe. Either phone may now strike out the other's entries, and that is
+  done by writing a `deleted` row carrying the other's `msg_id` into *our own* file —
+  `supersede()`. Her file is left exactly as it was. Rewriting it from our copy would
+  destroy any row of hers we had not pulled, which is the one failure this design exists
+  to prevent.
+- **Never resolve two copies of a `msg_id` by order.** The phones can now both hold a row
+  with the same id — hers live, his struck. `compact.py` settles it with "a deleted row
+  always wins", which is order-independent. Plain last-wins resolved it by filename, so
+  whose undo survived depended on what the devices were called.
 - **Never silently repair data.** An unpaired sleep entry is a missed message and must
   stay visible as a gap, named on the screen, not quietly paired with the next event.
 - **Never delete an entry.** Undo marks `type: "deleted"` and keeps the row. A correction
   is the same thing twice over: mark the original `deleted`, write a new entry. Never
-  edit a row in place, however much easier it looks.
+  edit a row in place, however much easier it looks. Undoing the *other* phone's entry
+  adds a row rather than changing one, so the original survives in her file untouched —
+  the audit trail is stronger across devices, not weaker.
   The one exception is **Setup → Clear this phone**, which empties the whole device on
   purpose. It exists so a scratch dataset does not become the first week of a child's
   record, it is two taps and named plainly, and it touches only this browser — never the
@@ -93,7 +105,10 @@ One JSON object per line. Field names and order must not drift.
 `med` `vax` `milestone` `note` `deleted`.
 
 `raw` is kept forever. `value` is `null`, never `""`, when absent. `msg_id` must be
-unique for all time — rows in the data repo's `data/derived/` point back at it.
+unique for all time — rows in the data repo's `data/derived/` point back at it. One id can
+appear in **two** event files, once live and once struck, when one phone undoes the other's
+entry; `compact.py` resolves that to a single row, so `data/raw/` still holds one row per
+id and `data/derived/` still resolves.
 
 ## Writing style
 

@@ -98,8 +98,10 @@ original, marked undone, and saves the correction as a new entry, so the record 
 shows what was first logged and when it changed. You can change the time within the
 entry's own day; to move one to a different day, undo it and log it again.
 
-Entries logged on the other phone have neither button. That file is not this phone's to
-write.
+This works on the other phone's entries too. Undoing or correcting one of hers does not
+touch her file — a strike carrying that entry's id is written into yours, and the two are
+resolved when the day is compacted. Her original is kept, as every original is. Her phone
+picks the change up on its next read.
 
 Right after you log something a strip appears at the bottom with **Undo** on it, for
 about five seconds. A mis-tap while holding the baby is the commonest way a wrong row
