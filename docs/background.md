@@ -590,6 +590,35 @@ the end of a feed.
 
 ---
 
+## 7h. Editing after the fact
+
+Three things a record could not do, all of which the paper book can:
+
+**Move to another day.** The correction box took a time and pinned it to the day the entry
+already belonged to. That default is right — correcting last night's 23:50 feed at
+breakfast must not drag it into today — but it was absolute, so a feed logged on the wrong
+day could only be undone and re-entered. The box now has a date, opening on the entry's own
+day so the default is unchanged. When it is changed, the strike stays in the old day's file
+and the correction goes to the new day's; both are marked dirty and both are pushed, so
+neither file loses a row and nothing is edited in place.
+
+**Gain a number it was logged without.** The amount box appeared only on rows that already
+carried a value, which is exactly backwards: the row that needs it is the one logged in a
+hurry. It now appears for any kind that takes an amount, and the entry picks up that kind's
+unit when a number is filled in — otherwise a tummy time given its minutes would have read
+`Tummy time 12` with nothing after it.
+
+**Be added in full from the Book tab.** Hand expression and power pumping are chips on the
+Pump tab, not tiles, so they were the one kind of entry that could be logged today but
+never recorded for a day gone by. The Book form now offers both, and carries the pump's
+minutes and side split, refusing a split that does not add up to the total exactly as the
+Pump tab does.
+
+None of this weakens the rule that nothing is edited in place. A correction is still a
+strike plus a new row, wherever the new row lands.
+
+---
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.

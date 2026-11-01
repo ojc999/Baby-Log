@@ -76,6 +76,11 @@ what it is, and lists decisions that look arbitrary and are not.
 - **The token may appear in a setup link, and nowhere else.** It belongs after the `#`,
   which browsers never send to a server, and the app strips it from the address bar as
   soon as it has read it. Never put it in a query string, a path, a log or a commit.
+- **Never hard-code a wall-clock time in a test.** `e2e` and `crossdevice` corrected an
+  entry to `04:30`, which the app correctly refuses between midnight and 04:30 because it
+  has not happened yet. Both failed every night and passed every morning. Derive the time
+  from the page's own clock — `earlier()` in those two files — or pin the clock with
+  `page.clock.install`, as the Book, Pump and edit tests do.
 - **See a new test fail before trusting it.** The service worker's cache bug was first
   "proved fixed" by a test that passed against the broken worker too, because
   `page.reload()` forces revalidation and hid the fault. Revert the fix, watch the test

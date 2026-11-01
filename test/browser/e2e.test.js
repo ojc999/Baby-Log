@@ -223,6 +223,16 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
      await page.evaluate(()=>entries.some(r=>r.type==='deleted')), true);
   t('the toast goes away', await page.isHidden('#toast'), true);
 
+  // 90 minutes before now, in Singapore, clamped to the start of the day. A hard-coded
+  // early-morning time made this fail every night between midnight and that time: the app
+  // correctly refuses a correction into the future, and 04:30 "today" is the future at
+  // 00:27. Derived from the page's own clock so it is always a time that has happened.
+  const earlier = async p => p.evaluate(() => {
+    const q = sgParts(Date.now());
+    const m = Math.max(0, Number(q.hour) * 60 + Number(q.minute) - 90);
+    return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+  });
+
   console.log('\n--- correcting an entry keeps the original ---');
   await page.evaluate(()=>{ const b=document.querySelector('#cat-back'); b && b.click(); });
   await page.click('[data-go="feed"]');
@@ -236,7 +246,8 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   await page.evaluate(id=>{ const b=document.querySelector(`#sum-timeline [data-fix="${id}"]`); b && b.click(); }, target.id);
   await page.waitForTimeout(300);
   t('the correction box opens', await page.isVisible('#fix'), true);
-  await page.fill('#fix-time','04:30');
+  const back = await earlier(page);
+  await page.fill('#fix-time', back);
   await page.fill('#fix-amt','125');
   await page.click('#fix-save');
   await page.waitForTimeout(900);
@@ -247,7 +258,8 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   t('the original is kept and marked deleted', fixed.original && fixed.original.type, 'deleted');
   t('the correction exists with the new amount', !!fixed.corrected, true);
   t('and it has its own msg_id', fixed.corrected && fixed.corrected.msg_id !== target.id, true);
-  t('and the corrected time was applied', fixed.corrected && /T04:30:/.test(fixed.corrected.ts), true);
+  t('and the corrected time was applied',
+     fixed.corrected && fixed.corrected.ts.slice(11,16), back);
   await page.waitForTimeout(600);
   const pushedRows = Buffer.from(JSON.parse(calls.filter(c=>c.method==='PUT').pop().body).content,'base64')
     .toString('utf8').trim().split('\n').map(JSON.parse);

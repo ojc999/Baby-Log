@@ -766,6 +766,16 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <input id="bk-amt" type="number" inputmode="decimal" step="any">
       <span class="unit" id="bk-unit"></span>
     </div>
+    <div class="fixrow" id="bk-min-row" hidden>
+      <label for="bk-min">How long</label>
+      <input id="bk-min" type="number" inputmode="numeric" step="1" min="0" placeholder="minutes">
+      <span class="unit">min</span>
+    </div>
+    <div class="fixrow" id="bk-lr-row" hidden>
+      <label for="bk-l">Left &amp; right</label>
+      <input id="bk-l" type="number" inputmode="decimal" step="any" min="0" placeholder="L ml">
+      <input id="bk-r" type="number" inputmode="decimal" step="any" min="0" placeholder="R ml">
+    </div>
     <div class="fixrow" id="bk-side-row" hidden>
       <label>Side</label>
       <div class="sheet-row" id="bk-side"></div>
@@ -792,6 +802,10 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
   <div class="modal-card">
     <h3 id="fix-h">Correct this entry</h3>
     <p class="was" id="fix-was"></p>
+    <div class="fixrow">
+      <label for="fix-date">Date</label>
+      <input id="fix-date" type="date">
+    </div>
     <div class="fixrow">
       <label for="fix-time">Time</label>
       <input id="fix-time" type="time">
@@ -2580,6 +2594,11 @@ function bookKinds() {
     });
   }
   ['note', 'med', 'vax', 'milestone'].forEach(function (t) { push(t, '', '', LABELS[t + '/']); });
+  /* Hand expression and power pumping have no tile of their own - they are chips on the
+     Pump tab - so they would otherwise be the one kind of entry that could be logged
+     today but never added after the fact. */
+  push('pump', 'hand', 'ml', LABELS['pump/hand']);
+  push('pump', 'power', 'ml', LABELS['pump/power']);
   out.sort(function (a, b) { return a.label < b.label ? -1 : 1; });
   return out;
 }
@@ -2589,6 +2608,11 @@ function paintBookKind() {
   var k = kinds.filter(function (x) { return x.key === $('bk-kind').value; })[0] || kinds[0];
   $('bk-amt-row').hidden = !k.unit;
   $('bk-unit').textContent = k.unit === 'C' ? '°C' : k.unit;
+  /* A pump session carries minutes and a side split as well as its total, and a record
+     added from the book should be able to say as much as one logged at the time. */
+  var isPump = k.t === 'pump';
+  $('bk-min-row').hidden = !isPump;
+  $('bk-lr-row').hidden  = !isPump;
   $('bk-side-row').hidden = !k.sides;
   $('bk-side').innerHTML = k.sides
     ? '<button class="chip" data-bkside="left">left</button><button class="chip" data-bkside="right">right</button>'
@@ -3029,6 +3053,18 @@ $('pm-imp-save').addEventListener('click', savePumpImport);
 var fixing = null;        /* msg_id of the entry being corrected */
 var fixSide = '';
 
+/* The unit a kind of entry takes, whether or not this particular row carries a number.
+   Without this the amount box only appeared on rows that already had one, so a tummy time
+   logged with "Just log it" could never be given its minutes afterwards - the one case
+   where you most want to. */
+function unitFor(r) {
+  if (r.unit) return r.unit;
+  for (var k in SHEETS) {
+    if (SHEETS[k].t === r.type && (SHEETS[k].s || '') === (r.subtype || '')) return SHEETS[k].unit || '';
+  }
+  return '';
+}
+
 function openFix(id) {
   var r = null;
   for (var i = entries.length - 1; i >= 0; i--) {
@@ -3039,13 +3075,18 @@ function openFix(id) {
 
   fixing = id;
   fixSide = (r.note === 'left' || r.note === 'right') ? r.note : '';
-  $('fix-was').textContent = 'Logged as ' + describe(r) + ' at ' + hhmm(r.ms) + '.';
+  $('fix-was').textContent = 'Logged as ' + describe(r) + ' on ' + dayLabel(daySG(r.ms)) +
+                             ' at ' + hhmm(r.ms) + '.';
+  $('fix-date').value = daySG(r.ms);
   $('fix-time').value = hhmm(r.ms);
 
+  /* Shown whenever the kind takes an amount, not only when this row happens to have one,
+     so an entry logged without its number can be given it later. */
+  var unit = unitFor(r);
   var hasAmt = r.value !== null && r.value !== undefined && r.value !== '';
-  $('fix-amt-row').hidden = !hasAmt;
+  $('fix-amt-row').hidden = !unit;
   $('fix-amt').value = hasAmt ? r.value : '';
-  $('fix-unit').textContent = r.unit === 'C' ? '°C' : (r.unit || '');
+  $('fix-unit').textContent = unit === 'C' ? '°C' : unit;
 
   /* A pump session is the one entry with more than one number on it, so it is the one
      that needs more than the amount box to be corrected. The hint on the Pump tab points
@@ -3075,12 +3116,15 @@ function paintFixSide() {
 
 function closeFix() { $('fix').hidden = true; fixing = null; }
 
-/* Build a timestamp from an HH:MM typed into the correction box, on the same day the
-   entry already belongs to - not today. Correcting a 23:50 feed the next morning must
-   not move it to tonight. */
+/* Build a timestamp from the date and time in the correction box. The date box opens on
+   the day the entry already belongs to, never today, so correcting a 23:50 feed the next
+   morning does not move it to tonight unless the date is deliberately changed. Moving an
+   entry to another day is allowed: the strike stays in the old day's file and the
+   corrected row goes into the new one, so both are pushed and neither loses a row. */
 function fixStamp(day, hhmmStr) {
   var hm = String(hhmmStr || '').split(':');
   if (hm.length !== 2) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ''))) return null;
   var t = Date.parse(day + 'T' + ('0' + hm[0]).slice(-2) + ':' + ('0' + hm[1]).slice(-2) + ':00+08:00');
   return isNaN(t) ? null : t;
 }
@@ -3102,8 +3146,8 @@ function saveFix() {
   var oldNote  = old.note || '';
   var oldSend  = old.sender;
 
-  var ms = fixStamp(oldDay, $('fix-time').value);
-  if (ms === null) { toast('That time did not make sense, so nothing was changed.'); return; }
+  var ms = fixStamp($('fix-date').value || oldDay, $('fix-time').value);
+  if (ms === null) { toast('That date and time did not make sense, so nothing was changed.'); return; }
   /* Nothing can have happened yet. Everywhere else that takes a time refuses the future
      too; a corrected entry in the future would read as a negative "time since". */
   if (ms > Date.now() + 60000) {
@@ -3112,6 +3156,7 @@ function saveFix() {
   }
 
   var value = old.value;
+  var unit = oldUnit;
   if (!$('fix-amt-row').hidden) {
     var typed = String($('fix-amt').value).trim();
     if (typed === '') { value = null; }
@@ -3119,6 +3164,10 @@ function saveFix() {
       var n = Number(typed);
       if (isNaN(n)) { toast('That amount did not make sense, so nothing was changed.'); return; }
       value = n;
+      /* A row logged without its number carries no unit either, so the kind's own unit
+         is taken when one is filled in. Without this a tummy time given its minutes
+         afterwards would read "Tummy time 10" with nothing after it. */
+      if (!unit) unit = unitFor(old);
     }
   }
   var note = $('fix-side-row').hidden ? oldNote : fixSide;
@@ -3156,7 +3205,7 @@ function saveFix() {
     ms: ms, ts: isoSG(ms), sender: cfg.who || oldSend || 'me',
     type: oldType, subtype: oldSub,
     value: (value === '' || value === undefined) ? null : value,
-    unit: oldUnit, note: note, raw: oldRaw, msg_id: uid(),
+    unit: unit, note: note, raw: oldRaw, msg_id: uid(),
     dur_min: mins, ml_l: ml_l, ml_r: ml_r,
     own: true, device: cfg.device || 'this-device'
   };
@@ -3168,7 +3217,10 @@ function saveFix() {
   closeFix();
   afterWrite();
   if (!$('pane-pump').hidden) renderPump();
-  toast('Corrected to <b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms));
+  if (!$('pane-book').hidden) renderBook();
+  var moved = daySG(ms) !== oldDay;
+  toast('Corrected to <b>' + esc(describe(e)) + '</b>' +
+        (moved ? ' on ' + esc(dayLabel(daySG(ms))) : '') + ' at ' + hhmm(e.ms));
 }
 
 /* ═══════════════════════ navigation ═══════════════════════ */
@@ -3425,17 +3477,38 @@ $('bk-add').addEventListener('click', function () {
       value = n;
     }
   }
+  /* The pump's own fields, read the same way and refused the same way as on the Pump tab:
+     a split that does not add up to the total is said out loud rather than one of the two
+     being quietly preferred. */
+  var mins = null, ml_l = null, ml_r = null;
+  if (!$('bk-min-row').hidden) {
+    mins = numOrNull($('bk-min').value);
+    if (mins !== null && (mins < 0 || mins > 720)) { toast('That many minutes does not look right.'); return; }
+    ml_l = numOrNull($('bk-l').value);
+    ml_r = numOrNull($('bk-r').value);
+    var sum = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;
+    if (value === null && (ml_l !== null || ml_r !== null)) value = sum;
+    if ((ml_l !== null || ml_r !== null) && value !== null && Math.abs(value - sum) > 0.05) {
+      toast('Left and right add up to ' + sum + ' ml, not ' + value + ' ml. Fix one of them first.');
+      return;
+    }
+  }
+
   var note = k.sides ? bkSide : (textOnly ? '' : words);
   var raw  = textOnly ? words
            : (k.label.toLowerCase() + (value !== null ? ' ' + value + ' ' + k.unit : '') +
+              (mins !== null ? ' ' + mins + ' min' : '') +
               (k.sides && bkSide ? ' ' + bkSide : ''));
 
-  var e = add(k.t, k.s, value, k.unit, textOnly ? words : note, raw, ms);
-  $('bk-amt').value = ''; $('bk-note').value = ''; bkSide = '';
+  var e = add(k.t, k.s, value, k.unit, textOnly ? words : note, raw, ms,
+              { dur_min: mins, ml_l: ml_l, ml_r: ml_r });
+  ['bk-amt', 'bk-note', 'bk-min', 'bk-l', 'bk-r'].forEach(function (id) { $(id).value = ''; });
+  bkSide = '';
   paintBookKind();
   bookDay = daySG(ms);
   dayTried[bookDay] = true;          /* we are writing it, so there is no need to go and look */
   renderBook(); render(); paintSync(); renderDiag(); buzz();
+  if (!$('pane-pump').hidden) renderPump();
   toast('<b>' + esc(describe(e)) + '</b> added to ' + esc(dayLabel(bookDay)));
   flush();
 });

@@ -136,9 +136,11 @@ showing how many entries this phone has for it. Tap one to load it and read it b
 book. A day with nothing logged at all is not listed — there is no folder for it — so put
 its date straight into the form below.
 
-**Add a missing record.** Date, time, what, and an amount where the kind takes one. It
-saves as an ordinary entry at the date and time you give and pushes to that day's file
-like any other. Nothing is overwritten: if the day already has entries, this joins them,
+**Add a missing record.** Date, time, what, and an amount where the kind takes one. A
+pump session also gets its minutes and its left/right split here, and **hand expression**
+and **power pump** can be chosen — those are chips on the Pump tab rather than tiles, so
+this is the only place a past one can be recorded. It saves as an ordinary entry at the
+date and time you give and pushes to that day's file like any other. Nothing is overwritten: if the day already has entries, this joins them,
 and the other phone's file for that day is never touched.
 
 The only thing it refuses is a time in the future. Everything else is yours to assert —
@@ -167,6 +169,17 @@ This works on the other phone's entries too. Undoing or correcting one of hers d
 touch her file — a strike carrying that entry's id is written into yours, and the two are
 resolved when the day is compacted. Her original is kept, as every original is. Her phone
 picks the change up on its next read.
+
+**Fix can change the date as well as the time**, so an entry logged on the wrong day can
+be moved to the right one. The box opens on the day the entry already belongs to, so
+correcting last night's 23:50 feed at breakfast does not drag it into today by accident.
+When a date is changed, the original stays struck out where it was and the correction goes
+to the new day; both days are pushed, so neither file loses a row.
+
+**Fix can also fill in a number that was never logged.** The amount box appears for any
+kind of entry that takes one, not only for entries that already have one — so a tummy time
+logged with *Just log it* can be given its minutes the next morning, and a pump session
+logged in a hurry can be given its duration.
 
 Right after you log something a strip appears at the bottom with **Undo** on it, for
 about five seconds. A mis-tap while holding the baby is the commonest way a wrong row

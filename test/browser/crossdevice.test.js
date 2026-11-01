@@ -103,6 +103,15 @@ const pull = async P => { await P.page.evaluate(()=>{lastPullMs=0;}); await P.pa
 
   console.log('--- he corrects another of her entries ---');
   await DES.page.evaluate(()=>{const b=document.querySelector('#cat-back');b&&b.click();});
+  // 90 minutes before now, in Singapore, clamped to the start of the day. A hard-coded
+  // early-morning time made this fail every night between midnight and that time: the app
+  // correctly refuses a correction into the future, and 04:30 "today" is the future at
+  // 00:27. Derived from the page's own clock so it is always a time that has happened.
+  const earlier = async p => p.evaluate(() => {
+    const q = sgParts(Date.now());
+    const m = Math.max(0, Number(q.hour) * 60 + Number(q.minute) - 90);
+    return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+  });
   await DES.page.click('[data-go="nappy"]');
   await DES.page.evaluate(()=>{const x=[...document.querySelectorAll('#cat-body button')].find(e=>/^wet/i.test(e.textContent.trim()));x&&x.click();});
   await DES.page.waitForTimeout(1200);
@@ -112,12 +121,13 @@ const pull = async P => { await P.page.evaluate(()=>{lastPullMs=0;}); await P.pa
   await SIM.page.evaluate(id=>openFix(id), herId2);
   await SIM.page.waitForTimeout(300);
   t('the correction box opens on her row', await SIM.page.isVisible('#fix'), true);
-  await SIM.page.fill('#fix-time','04:05');
+  const back = await earlier(SIM.page);
+  await SIM.page.fill('#fix-time', back);
   await SIM.page.click('#fix-save'); await SIM.page.waitForTimeout(1500);
   t('HER FILE IS STILL UNTOUCHED', JSON.stringify(rows(herFile)), herBefore2);
   const his2 = rows(hisFile);
   t('his file strikes her original', (his2.find(r=>r.msg_id===herId2)||{}).type, 'deleted');
-  const corrected = his2.find(r=>r.type==='nappy'&&r.ts.slice(11,16)==='04:05');
+  const corrected = his2.find(r=>r.type==='nappy'&&r.ts.slice(11,16)===back);
   t('and carries the correction as a new row', !!corrected, true);
   t('with its own msg_id', corrected && corrected.msg_id !== herId2, true);
   t('recorded as his', corrected && corrected.sender, 'Simon');
