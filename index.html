@@ -651,6 +651,10 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <label>How</label>
       <div class="sheet-row" id="pm-how"></div>
     </div>
+    <div class="fixrow" id="pm-kit-row">
+      <label>Which</label>
+      <div class="sheet-row" id="pm-kit"></div>
+    </div>
     <div class="fixrow">
       <label for="pm-ml">Total</label>
       <input id="pm-ml" type="number" inputmode="decimal" step="any" min="0" placeholder="ml">
@@ -658,11 +662,6 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     </div>
     <div class="sheet-row" id="pm-presets"></div>
     <div class="fixrow" style="margin-top:11px">
-      <label for="pm-min">How long</label>
-      <input id="pm-min" type="number" inputmode="numeric" step="1" min="0" placeholder="minutes">
-      <span class="unit">min</span>
-    </div>
-    <div class="fixrow">
       <label for="pm-l">Left</label>
       <input id="pm-l" type="number" inputmode="decimal" step="any" min="0" placeholder="optional">
       <span class="unit">ml</span>
@@ -688,13 +687,13 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <button class="btn solid" id="pm-add" style="width:100%">Save this session</button>
     <p class="info"><b>Total</b> is the figure the trend counts, so it is the one worth
     being right. Left and right are optional; if you fill both and they do not add up to
-    the total, it will say so rather than quietly changing one of them. <b>How long</b> is
-    what makes the day comparable &mdash; 60 ml in 15 minutes and 60 ml in 40 minutes are
-    not the same morning.</p>
+    the total, it will say so rather than quietly changing one of them. How long you spent
+    at the pump is not asked for &mdash; the number that sits beside the volume is how long
+    he was on the breast, and that comes from the breastfeeds on the <b>Log</b> tab.</p>
 
     <div class="sect"><h2>Daily production</h2><hr></div>
     <div class="key">
-      <span><i></i>millilitres</span><span><i class="mins"></i>minutes expressing</span>
+      <span><i></i>millilitres expressed</span><span><i class="mins"></i>minutes at the breast</span>
     </div>
     <div id="pump-bars"></div>
     <p class="info" id="pump-barnote"></p>
@@ -766,10 +765,9 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <input id="bk-amt" type="number" inputmode="decimal" step="any">
       <span class="unit" id="bk-unit"></span>
     </div>
-    <div class="fixrow" id="bk-min-row" hidden>
-      <label for="bk-min">How long</label>
-      <input id="bk-min" type="number" inputmode="numeric" step="1" min="0" placeholder="minutes">
-      <span class="unit">min</span>
+    <div class="fixrow" id="bk-kit-row" hidden>
+      <label>Which</label>
+      <div class="sheet-row" id="bk-kit"></div>
     </div>
     <div class="fixrow" id="bk-lr-row" hidden>
       <label for="bk-l">Left &amp; right</label>
@@ -815,10 +813,9 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
       <input id="fix-amt" type="number" inputmode="decimal" step="any">
       <span class="unit" id="fix-unit"></span>
     </div>
-    <div class="fixrow" id="fix-min-row" hidden>
-      <label for="fix-min">How long</label>
-      <input id="fix-min" type="number" inputmode="numeric" step="1" min="0" placeholder="minutes">
-      <span class="unit">min</span>
+    <div class="fixrow" id="fix-kit-row" hidden>
+      <label>Which</label>
+      <div class="sheet-row" id="fix-kit"></div>
     </div>
     <div class="fixrow" id="fix-lr-row" hidden>
       <label for="fix-l">Left &amp; right</label>
@@ -1268,6 +1265,7 @@ function add(type, subtype, value, unit, note, raw, ms, extra) {
     value: (value === '' || value === undefined || value === null) ? null : value,
     unit: unit || '', note: note || '', raw: raw || '', msg_id: uid(),
     dur_min: numOrNull(x.dur_min), ml_l: numOrNull(x.ml_l), ml_r: numOrNull(x.ml_r),
+    pump_dev: x.pump_dev || '',
     own: true, device: cfg.device || 'this-device'
   };
   entries.push(e);
@@ -1350,6 +1348,7 @@ function describe(r) {
      the volume on its own does not say whether it was a good session. */
   if (r.dur_min !== null && r.dur_min !== undefined && r.dur_min !== '') base += ' in ' + r.dur_min + ' min';
   if (hasSides(r)) base += ' (L ' + (r.ml_l || 0) + ' / R ' + (r.ml_r || 0) + ')';
+  if (r.pump_dev && KIT_LABEL[r.pump_dev]) base += ' · ' + KIT_LABEL[r.pump_dev];
   return base;
 }
 
@@ -1440,7 +1439,8 @@ function jsonlFor(day) {
       return JSON.stringify({
         ts: r.ts, sender: r.sender, type: r.type, subtype: r.subtype,
         value: r.value, unit: r.unit, note: r.note, raw: r.raw, msg_id: r.msg_id,
-        dur_min: numOrNull(r.dur_min), ml_l: numOrNull(r.ml_l), ml_r: numOrNull(r.ml_r)
+        dur_min: numOrNull(r.dur_min), ml_l: numOrNull(r.ml_l), ml_r: numOrNull(r.ml_r),
+        pump_dev: r.pump_dev || ''
       });
     }).join('\n') + '\n';
 }
@@ -2104,11 +2104,18 @@ function renderSummary() {
 
 var pumpDay   = null;       /* the day the session list is showing; null means today */
 var pmHow     = '';         /* '' ordinary pump · 'hand' · 'power' */
+var pmKit     = 'spectra';  /* which machine; the one she reaches for by default */
 var impResult = null;       /* what the last "Read these notes" understood, before saving */
 var PUMP_BARS = 21;         /* days in the chart */
 var PUMP_TABLE = 14;        /* rows in the table */
 var PM_PRESETS = [20, 30, 40, 50, 60, 80, 100];
 var PM_HOW = [['', 'Pump'], ['hand', 'By hand'], ['power', 'Power pump']];
+/* Which machine. A field of its own rather than more `subtype` values, because power
+   pumping is a technique and the Spectra is a thing - you can power pump on either
+   machine, and folding both into one field would lose that pairing. Empty for a hand
+   expression, which uses no machine at all. */
+var PM_KITS = [['spectra', 'Spectra'], ['imani', 'Imani']];
+var KIT_LABEL = { spectra: 'Spectra', imani: 'Imani' };
 
 function pumpOf(day) {
   return live().filter(function (r) { return r.type === 'pump' && daySG(r.ms) === day; })
@@ -2118,24 +2125,28 @@ function pumpOf(day) {
 /* One day's figures. `untimed` is not a rounding detail: a session logged without its
    minutes makes the day's minutes an undercount, and that is shown rather than filled in,
    the same way an unpaired sleep is left visible on the summary. */
+/* One day's figures. How long she spent at the pump is deliberately not among them: the
+   number she wants beside the volume is how long he was on the breast, because the more
+   he takes directly the less there is left to express. Time at the pump answers a
+   question she is not asking.
+
+   A breastfeed logged without its minutes makes the latch figure an undercount, so it is
+   counted as a feed, flagged, and named on the screen rather than treated as zero - the
+   same rule an unpaired sleep entry gets. */
 function pumpStats(day) {
   var ps = pumpOf(day);
-  var ml = 0, mins = 0, timed = 0;
-  ps.forEach(function (r) {
-    ml += (r.value || 0);
-    if (r.dur_min) { mins += r.dur_min; timed++; }
-  });
+  var ml = 0;
+  ps.forEach(function (r) { ml += (r.value || 0); });
   var latch = live().filter(function (r) {
-    return r.type === 'feed' && r.subtype === 'breast' && r.unit === 'min' &&
-           daySG(r.ms) === day;
+    return r.type === 'feed' && r.subtype === 'breast' && daySG(r.ms) === day;
   });
-  var latchMin = latch.reduce(function (a, r) { return a + (r.value || 0); }, 0);
-  ml = Math.round(ml * 10) / 10;
+  var latchMin = 0, timed = 0;
+  latch.forEach(function (r) {
+    if (r.unit === 'min' && r.value) { latchMin += r.value; timed++; }
+  });
   return {
-    day: day, rows: ps, n: ps.length, ml: ml, mins: mins,
-    timed: timed, untimed: ps.length - timed,
-    latches: latch.length, latchMin: latchMin, lactMin: mins + latchMin,
-    perHour: mins ? Math.round(ml / (mins / 60)) : null
+    day: day, rows: ps, n: ps.length, ml: Math.round(ml * 10) / 10,
+    latches: latch.length, latchMin: latchMin, untimedLatch: latch.length - timed
   };
 }
 
@@ -2149,34 +2160,45 @@ function renderPump() {
   var today = daySG(Date.now());
   var s = pumpStats(today);
 
+  /* Yesterday and the week sit beside today, because "is it holding up" is a comparison
+     and one number cannot answer it. The week is a total over the days that had anything
+     rather than an average over seven, so a run of days before she started does not
+     quietly halve the figure. */
+  var yd = pumpStats(daySG(Date.now() - 86400000));
+  var wk = pumpDays(7).map(pumpStats);
+  var wkMl = wk.reduce(function (a, x) { return a + x.ml; }, 0);
+  var wkDays = wk.filter(function (x) { return x.n > 0; }).length;
+
   $('pump-today').innerHTML =
     lcard('Expressed', s.ml || '—', s.n + (s.n === 1 ? ' session' : ' sessions'), false) +
-    lcard('Pumping', s.mins ? s.mins + ' min' : '—',
-          s.untimed ? s.untimed + ' not timed' : (s.mins ? 'all timed' : 'nothing yet'),
-          !!s.untimed) +
     lcard('At the breast', s.latchMin ? s.latchMin + ' min' : '—',
-          s.latches + (s.latches === 1 ? ' latch' : ' latches'), false) +
-    lcard('Lactation time', s.lactMin ? s.lactMin + ' min' : '—',
-          s.perHour !== null ? s.perHour + ' ml per pumping hour' : 'pumping not timed',
+          s.latches + (s.latches === 1 ? ' latch' : ' latches') +
+          (s.untimedLatch ? ', ' + s.untimedLatch + ' untimed' : ''), !!s.untimedLatch) +
+    lcard('Yesterday', yd.ml || '—', yd.n + (yd.n === 1 ? ' session' : ' sessions'), false) +
+    lcard('Last 7 days', Math.round(wkMl) || '—',
+          wkDays ? 'ml over ' + wkDays + (wkDays === 1 ? ' day' : ' days') : 'nothing yet',
           false);
 
-  $('pump-hint').innerHTML = s.untimed
-    ? '<b>' + s.untimed + ' of today’s ' + s.n + ' session' + (s.n === 1 ? '' : 's') +
-      ' carr' + (s.untimed === 1 ? 'ies' : 'y') + ' no minutes</b>, so today’s pumping ' +
-      'time and the ml-per-hour figure are both undercounts. Tap <b>Fix</b> on the ' +
-      'session below to add them.'
+  $('pump-hint').innerHTML = s.untimedLatch
+    ? '<b>' + s.untimedLatch + ' of today’s ' + s.latches + ' breastfeed' +
+      (s.latches === 1 ? '' : 's') + ' carr' + (s.untimedLatch === 1 ? 'ies' : 'y') +
+      ' no minutes</b>, so today’s time at the breast is an undercount — which matters ' +
+      'here, because it is the figure that explains a low pumping day. Tap <b>Fix</b> ' +
+      'on that feed in the <b>Log</b> tab to add them.'
     : 'Expressing is counted here and nowhere else. What he actually drinks, expressed ' +
-      'milk included, stays on the <b>Log</b> tab — the two are never added together.';
+      'milk included, stays on the <b>Log</b> tab — the two are never added together. ' +
+      'Minutes at the breast sit beside the volume because the more he takes directly, ' +
+      'the less there is left to express.';
 
   /* ── the chart ── */
   var st = pumpDays(PUMP_BARS).map(pumpStats);
   var maxMl  = st.reduce(function (a, x) { return Math.max(a, x.ml); }, 0);
-  var maxMin = st.reduce(function (a, x) { return Math.max(a, x.lactMin); }, 0);
+  var maxMin = st.reduce(function (a, x) { return Math.max(a, x.latchMin); }, 0);
   var anyMl  = st.some(function (x) { return x.ml > 0; });
   $('pump-bars').innerHTML = anyMl
     ? '<div class="bars">' + st.map(function (x) {
         var w1 = maxMl  ? Math.max(x.ml  ? 2 : 0, Math.round(x.ml  / maxMl  * 100)) : 0;
-        var w2 = maxMin ? Math.max(x.lactMin ? 2 : 0, Math.round(x.lactMin / maxMin * 100)) : 0;
+        var w2 = maxMin ? Math.max(x.latchMin ? 2 : 0, Math.round(x.latchMin / maxMin * 100)) : 0;
         return '<div class="brow' + (x.day === today ? ' today' : '') +
                  (x.ml ? '' : ' empty') + '">' +
           '<span class="bd">' + dayShort(x.day) + '</span>' +
@@ -2185,43 +2207,43 @@ function renderPump() {
             '<span class="btrack">' + (w2 ? '<span class="bfill mins" style="width:' + w2 + '%"></span>' : '') + '</span>' +
           '</span>' +
           '<span class="bn">' + (x.ml
-            ? '<i>' + x.ml + ' ml</i><u>' + (x.lactMin || 0) + ' min' + (x.untimed ? '*' : '') + '</u>'
+            ? '<i>' + x.ml + ' ml</i><u>' + (x.latchMin || 0) + ' min' + (x.untimedLatch ? '*' : '') + '</u>'
             : '<i>—</i>') + '</span>' +
         '</div>';
       }).join('') + '</div>'
     : '<p class="info">Nothing expressed in the last three weeks. Log a session above, ' +
       'or type up a page of the notebook at the bottom of this tab.</p>';
   $('pump-barnote').innerHTML = anyMl
-    ? 'Three weeks, oldest at the top. The two bars are scaled separately, so the ' +
-      'chart answers <b>which days were out of step</b> — a short milk bar under a long ' +
-      'time bar is a day that took a lot of work for a little. A <b>*</b> marks a day ' +
-      'with a session logged without its minutes, so that day’s time bar is short of ' +
+    ? 'Three weeks, oldest at the top. Millilitres above, minutes he spent at the ' +
+      'breast below. The two are scaled separately, so the chart answers <b>which days ' +
+      'were out of step</b> — a short milk bar under a long breast bar is usually a day ' +
+      'he took more directly, not a day the supply dropped. A <b>*</b> marks a day with ' +
+      'a breastfeed logged without its minutes, so that day’s lower bar is short of ' +
       'the truth.'
     : '';
 
   /* ── the table ── */
-  var head = '<tr><th>Day</th><th>ml</th><th>Sess</th><th>Pump</th><th>Latch</th><th>ml/h</th></tr>';
+  var head = '<tr><th>Day</th><th>ml</th><th>Sess</th><th>Latch</th><th>Feeds</th></tr>';
   var body = pumpDays(PUMP_TABLE).slice().reverse().map(function (d) {
     var x = pumpStats(d);
-    if (!x.n && !x.latchMin) {
+    if (!x.n && !x.latches) {
       return '<tr' + (d === today ? ' class="today"' : '') + '><td>' + dayShort(d) +
-             '</td><td colspan="5" style="text-align:right;color:var(--ink-faint)">nothing logged</td></tr>';
+             '</td><td colspan="4" style="text-align:right;color:var(--ink-faint)">nothing logged</td></tr>';
     }
     return '<tr' + (d === today ? ' class="today"' : '') + '>' +
       '<td>' + dayShort(d) + '</td>' +
       '<td>' + (x.ml || '—') + '</td>' +
       '<td>' + (x.n || '—') + '</td>' +
-      '<td>' + (x.mins ? x.mins + (x.untimed ? '*' : '') : '—') + '</td>' +
-      '<td>' + (x.latchMin || '—') + '</td>' +
-      '<td>' + (x.perHour !== null ? x.perHour : '—') + '</td></tr>';
+      '<td>' + (x.latchMin ? x.latchMin + (x.untimedLatch ? '*' : '') : '—') + '</td>' +
+      '<td>' + (x.latches || '—') + '</td></tr>';
   }).join('');
   $('pump-week').innerHTML = head + body;
   $('pump-weeknote').innerHTML =
-    '<b>Pump</b> is minutes at the pump, <b>Latch</b> minutes at the breast, ' +
-    '<b>ml/h</b> millilitres per hour of pumping. A <b>*</b> means a session that day ' +
-    'was logged without its minutes, so the figure is an undercount and ml/h is flattered. ' +
-    'Only what this app holds is counted — this phone, plus whatever the other one had ' +
-    'pushed when it was last read.';
+    '<b>Sess</b> is pumping sessions, <b>Latch</b> the minutes he spent at the breast ' +
+    'and <b>Feeds</b> how many breastfeeds those minutes came from. A <b>*</b> means one ' +
+    'of them was logged without its minutes, so the figure is an undercount. Only what ' +
+    'this app holds is counted — this phone, plus whatever the other one had pushed ' +
+    'when it was last read.';
 
   /* ── the sessions on one day ── */
   var d = pumpDay || today;
@@ -2232,11 +2254,20 @@ function renderPump() {
   $('pump-rows').innerHTML = x.rows.length
     ? x.rows.slice().reverse().map(function (r) { return rowHtml(r, false); }).join('') +
       '<p class="info">' + x.n + (x.n === 1 ? ' session' : ' sessions') + ', ' + x.ml +
-      ' ml' + (x.mins ? ' over ' + x.mins + ' min' : '') + '.</p>'
+      ' ml.</p>'
     : '<p class="info">No sessions logged on ' + esc(dayLabel(d)) + '.</p>';
 
   paintPmHow();
   paintPmSum();
+}
+
+/* One place that draws a kit chip row, used by all three forms. A hand expression uses no
+   machine, so the row is hidden rather than showing a choice that means nothing. */
+function kitChips(id, attr, chosen) {
+  $(id).innerHTML = PM_KITS.map(function (k) {
+    return '<button class="chip" data-' + attr + '="' + k[0] + '" aria-pressed="' +
+           (k[0] === chosen ? 'true' : 'false') + '">' + k[1] + '</button>';
+  }).join('');
 }
 
 function paintPmHow() {
@@ -2244,6 +2275,8 @@ function paintPmHow() {
     return '<button class="chip" data-how="' + h[0] + '" aria-pressed="' +
            (h[0] === pmHow ? 'true' : 'false') + '">' + h[1] + '</button>';
   }).join('');
+  $('pm-kit-row').hidden = pmHow === 'hand';
+  kitChips('pm-kit', 'kit', pmKit);
   $('pm-presets').innerHTML = PM_PRESETS.map(function (v) {
     return '<button class="chip" data-pmset="' + v + '">' + v + '</button>';
   }).join('');
@@ -2294,9 +2327,15 @@ function shiftPumpDay(by) {
      - Several volumes in one session — "65mL + 25mL + 15mL" — are one sitting and are
        summed. Nothing is lost: the line goes into `raw` verbatim, and `raw` is kept
        forever.
-     - A left/right split in the bracket is NOT read into `ml_l`/`ml_r`. "30/35mL" is
-       probably left then right, and probably is not good enough: a wrong side is worse
-       than no side. The text is kept either way.
+     - A left/right split in the bracket IS read into `ml_l`/`ml_r`, but only when it
+       accounts for the whole session: one pair per volume, each pair adding up to its
+       own volume. She confirmed the pair is left then right. Where the arithmetic does
+       not close - "70mL (..., 25/40mL, 5mL from hand expression)", where the 5 ml
+       belongs to no side - no side is recorded at all, because a wrong side is worse
+       than no side and the text is kept either way.
+     - The machine is not written down, and she says to take it as the Spectra unless the
+       line says otherwise. That is her assertion about her own history, not a guess by
+       this code, so it is applied and then named on the preview.
      - "50/65mL" before the bracket could be two readings or one split, so the session is
        left unread rather than resolved by guesswork.
      - Times are hardly ever written down. One stated with am or pm is used; otherwise the
@@ -2385,6 +2424,19 @@ function readSession_(chunk) {
                .trim();
   }
   var ml = vols.reduce(function (a, v) { return a + v; }, 0);
+
+  /* The per-side split, taken only when it accounts for every volume in the sitting:
+     "65mL + 25mL + 15mL (..., 30/35mL, 10/15mL, 5/10mL)" is three pumps and three pairs,
+     each adding up to its own pump, so the sides total 45 and 60. One pair short, or one
+     that does not add up, and no side is recorded. */
+  var pre = /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*ml\b/gi, pm, pairs = [];
+  while ((pm = pre.exec(note))) pairs.push([parseFloat(pm[1]), parseFloat(pm[2])]);
+  var ml_l = null, ml_r = null;
+  if (pairs.length && pairs.length === vols.length &&
+      pairs.every(function (pr, i) { return Math.abs(pr[0] + pr[1] - vols[i]) < 0.05; })) {
+    ml_l = Math.round(pairs.reduce(function (a, pr) { return a + pr[0]; }, 0) * 10) / 10;
+    ml_r = Math.round(pairs.reduce(function (a, pr) { return a + pr[1]; }, 0) * 10) / 10;
+  }
   /* "hand expression" only counts as the method when it describes the session itself,
      before the bracket. Inside it, it is usually a few ml of a larger pump. "power pump"
      is nearly always written inside the bracket, so that one is read from the whole. */
@@ -2399,8 +2451,13 @@ function readSession_(chunk) {
     if (tm[3].toLowerCase() === 'pm') hh += 12;
     mm = tm[2] ? parseInt(tm[2], 10) : 0;
   }
+  /* Hand expression uses no machine. Everything else is the Spectra unless the line
+     names the other one - her instruction, surfaced on the preview rather than applied
+     quietly. */
+  var kit = how === 'hand' ? '' : (/imani/i.test(chunk) ? 'imani' : 'spectra');
   return {
     ml: Math.round(ml * 10) / 10, pumps: vols.length, how: how,
+    ml_l: ml_l, ml_r: ml_r, kit: kit,
     note: note, raw: chunk.trim(), hh: hh, mm: mm, stray: strayMl_(note)
   };
 }
@@ -2483,6 +2540,8 @@ function renderImportPreview() {
       var how = LABELS['pump/' + s.how] || LABELS['pump/'];
       html += '<div class="pvs"><b>' + hhmm(s.ms) + (s.guessed ? '?' : '') + '</b>' +
               '<span>' + esc(how) + ' ' + s.ml + ' ml' +
+              (s.ml_l !== null ? ' (L ' + s.ml_l + ' / R ' + s.ml_r + ')' : '') +
+              (s.kit ? ' · ' + esc(KIT_LABEL[s.kit] || s.kit) : '') +
               (s.pumps > 1 ? ' <span style="color:var(--ink-faint)">(' + s.pumps +
                              ' pumps in the sitting)</span>' : '') +
               (s.note ? '<em>' + esc(s.note) + '</em>' : '') +
@@ -2510,7 +2569,10 @@ function renderImportPreview() {
           'marked <b>?</b> was not in your notes — the sessions are spread through the ' +
           'day in the order you wrote them, and each one says so in its note. Nothing ' +
           'has been saved yet.'
-        : 'Nothing new to save.') + '</p>'
+        : 'Nothing new to save.') +
+      (willAdd ? ' A left/right pair in the brackets is read as <b>left then right</b>, ' +
+                 'and only when it adds up to the session. Anything not hand expressed ' +
+                 'is recorded as the <b>Spectra</b>, as you said to assume.' : '') + '</p>'
     : '<p class="info">Nothing in there looked like a day of notes. A line has to start ' +
       'with a date and a colon, like <code>14 Oct:</code>.</p>';
   act.hidden = !willAdd;
@@ -2523,7 +2585,8 @@ function savePumpImport() {
     if (d.had) return;
     d.sessions.forEach(function (s) {
       var note = [s.note, s.guessed ? 'time not recorded' : ''].filter(function (x) { return !!x; }).join(' · ');
-      add('pump', s.how, s.ml, 'ml', note, s.raw, s.ms, {});
+      add('pump', s.how, s.ml, 'ml', note, s.raw, s.ms,
+          { ml_l: s.ml_l, ml_r: s.ml_r, pump_dev: s.kit });
       added++;
     });
     days++;
@@ -2546,6 +2609,7 @@ function savePumpImport() {
    the complete history without reading a single entry. Days this phone holds but has not
    pushed are folded in, so an unsynced day is not invisible here. */
 
+var bkKit     = 'spectra';  /* which machine a back-dated pump session used */
 var bookDay   = null;       /* the day being looked at */
 var repoDays  = null;       /* day folders in the repo, or null until fetched */
 var bookBusy  = false;
@@ -2611,8 +2675,9 @@ function paintBookKind() {
   /* A pump session carries minutes and a side split as well as its total, and a record
      added from the book should be able to say as much as one logged at the time. */
   var isPump = k.t === 'pump';
-  $('bk-min-row').hidden = !isPump;
   $('bk-lr-row').hidden  = !isPump;
+  $('bk-kit-row').hidden = !isPump || k.s === 'hand';
+  kitChips('bk-kit', 'bkkit', bkKit);
   $('bk-side-row').hidden = !k.sides;
   $('bk-side').innerHTML = k.sides
     ? '<button class="chip" data-bkside="left">left</button><button class="chip" data-bkside="right">right</button>'
@@ -2971,6 +3036,13 @@ $('pm-how').addEventListener('click', function (e) {
   paintPmHow();
 });
 
+$('pm-kit').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-kit]');
+  if (!b) return;
+  pmKit = b.dataset.kit;
+  paintPmHow();
+});
+
 $('pm-presets').addEventListener('click', function (e) {
   var b = e.target.closest('[data-pmset]');
   if (!b) return;
@@ -3003,17 +3075,20 @@ $('pm-add').addEventListener('click', function () {
     toast('Left and right add up to ' + sum + ' ml, not ' + tot + ' ml. Fix one of them first.');
     return;
   }
-  var mins = numOrNull($('pm-min').value);
-  if (mins !== null && (mins < 0 || mins > 720)) { toast('That many minutes does not look right.'); return; }
-
   var words = $('pm-note').value.trim();
   var how = LABELS['pump/' + pmHow] || LABELS['pump/'];
-  var raw = how.toLowerCase() + ' ' + tot + ' ml' + (mins !== null ? ' ' + mins + ' min' : '') +
+  var raw = how.toLowerCase() + ' ' + tot + ' ml' +
             (l !== null || r !== null ? ' l' + (l || 0) + ' r' + (r || 0) : '') +
             (words ? ' ' + words : '');
-  var e = add('pump', pmHow, tot, 'ml', words, raw, ms, { dur_min: mins, ml_l: l, ml_r: r });
+  /* `dur_min` stays in the contract and is written null. It is no longer asked for - the
+     minutes that matter are his at the breast, not hers at the pump - but the field is
+     not removed, because that would leave the archive with two row shapes and would
+     throw away the few sessions that were logged with it. */
+  var kit = pmHow === 'hand' ? '' : pmKit;
+  var e = add('pump', pmHow, tot, 'ml', words, raw, ms,
+              { ml_l: l, ml_r: r, pump_dev: kit });
 
-  ['pm-ml', 'pm-min', 'pm-l', 'pm-r', 'pm-note'].forEach(function (id) { $(id).value = ''; });
+  ['pm-ml', 'pm-l', 'pm-r', 'pm-note'].forEach(function (id) { $(id).value = ''; });
   $('pm-time').value = hhmm(Date.now());
   pumpDay = daySG(ms) === daySG(Date.now()) ? null : daySG(ms);
   render(); renderPump(); paintSync(); renderDiag(); buzz();
@@ -3052,6 +3127,7 @@ $('pm-imp-save').addEventListener('click', savePumpImport);
 
 var fixing = null;        /* msg_id of the entry being corrected */
 var fixSide = '';
+var fixKit  = '';
 
 /* The unit a kind of entry takes, whether or not this particular row carries a number.
    Without this the amount box only appeared on rows that already had one, so a tummy time
@@ -3092,9 +3168,10 @@ function openFix(id) {
      that needs more than the amount box to be corrected. The hint on the Pump tab points
      at this button to fill in minutes that were missed at the time. */
   var isPump = r.type === 'pump';
-  $('fix-min-row').hidden = !isPump;
+  fixKit = r.pump_dev || 'spectra';
+  $('fix-kit-row').hidden = !isPump || r.subtype === 'hand';
+  kitChips('fix-kit', 'fixkit', fixKit);
   $('fix-lr-row').hidden  = !isPump;
-  $('fix-min').value = isPump && r.dur_min !== null && r.dur_min !== undefined ? r.dur_min : '';
   $('fix-l').value   = isPump && r.ml_l !== null && r.ml_l !== undefined ? r.ml_l : '';
   $('fix-r').value   = isPump && r.ml_r !== null && r.ml_r !== undefined ? r.ml_r : '';
 
@@ -3176,11 +3253,9 @@ function saveFix() {
      correction never drops them - the row is rebuilt from scratch, and anything left out
      here would be silently lost. */
   var mins = numOrNull(old.dur_min), ml_l = numOrNull(old.ml_l), ml_r = numOrNull(old.ml_r);
-  if (!$('fix-min-row').hidden) {
-    mins = numOrNull($('fix-min').value);
-    if (mins !== null && (mins < 0 || mins > 720)) {
-      toast('That many minutes does not look right, so nothing was changed.'); return;
-    }
+  var kit = old.pump_dev || '';
+  if (!$('fix-kit-row').hidden) kit = fixKit;
+  if (!$('fix-lr-row').hidden) {
     ml_l = numOrNull($('fix-l').value);
     ml_r = numOrNull($('fix-r').value);
     var sum = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;
@@ -3206,7 +3281,7 @@ function saveFix() {
     type: oldType, subtype: oldSub,
     value: (value === '' || value === undefined) ? null : value,
     unit: unit, note: note, raw: oldRaw, msg_id: uid(),
-    dur_min: mins, ml_l: ml_l, ml_r: ml_r,
+    dur_min: mins, ml_l: ml_l, ml_r: ml_r, pump_dev: kit,
     own: true, device: cfg.device || 'this-device'
   };
   entries.push(e);
@@ -3395,6 +3470,8 @@ $('fix').addEventListener('click', function (e) {
   if (e.target === this) closeFix();            /* tap the dimmed area to back out */
   var sd = e.target.closest('[data-fixside]');
   if (sd) { fixSide = fixSide === sd.dataset.fixside ? '' : sd.dataset.fixside; paintFixSide(); }
+  var kd = e.target.closest('[data-fixkit]');
+  if (kd) { fixKit = kd.dataset.fixkit; kitChips('fix-kit', 'fixkit', fixKit); }
 });
 
 $('sheet-cancel').addEventListener('click', closeSheet);
@@ -3445,6 +3522,12 @@ $('book-rows').addEventListener('click', function (e) {
 });
 
 $('bk-kind').addEventListener('change', function () { bkSide = ''; paintBookKind(); });
+$('bk-kit').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-bkkit]');
+  if (!b) return;
+  bkKit = b.dataset.bkkit;
+  paintBookKind();
+});
 $('bk-side').addEventListener('click', function (e) {
   var b = e.target.closest('[data-bkside]');
   if (!b) return;
@@ -3480,10 +3563,8 @@ $('bk-add').addEventListener('click', function () {
   /* The pump's own fields, read the same way and refused the same way as on the Pump tab:
      a split that does not add up to the total is said out loud rather than one of the two
      being quietly preferred. */
-  var mins = null, ml_l = null, ml_r = null;
-  if (!$('bk-min-row').hidden) {
-    mins = numOrNull($('bk-min').value);
-    if (mins !== null && (mins < 0 || mins > 720)) { toast('That many minutes does not look right.'); return; }
+  var ml_l = null, ml_r = null;
+  if (!$('bk-lr-row').hidden) {
     ml_l = numOrNull($('bk-l').value);
     ml_r = numOrNull($('bk-r').value);
     var sum = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;
@@ -3497,12 +3578,12 @@ $('bk-add').addEventListener('click', function () {
   var note = k.sides ? bkSide : (textOnly ? '' : words);
   var raw  = textOnly ? words
            : (k.label.toLowerCase() + (value !== null ? ' ' + value + ' ' + k.unit : '') +
-              (mins !== null ? ' ' + mins + ' min' : '') +
               (k.sides && bkSide ? ' ' + bkSide : ''));
 
   var e = add(k.t, k.s, value, k.unit, textOnly ? words : note, raw, ms,
-              { dur_min: mins, ml_l: ml_l, ml_r: ml_r });
-  ['bk-amt', 'bk-note', 'bk-min', 'bk-l', 'bk-r'].forEach(function (id) { $(id).value = ''; });
+              { ml_l: ml_l, ml_r: ml_r,
+                pump_dev: (k.t === 'pump' && k.s !== 'hand') ? bkKit : '' });
+  ['bk-amt', 'bk-note', 'bk-l', 'bk-r'].forEach(function (id) { $(id).value = ''; });
   bkSide = '';
   paintBookKind();
   bookDay = daySG(ms);

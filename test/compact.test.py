@@ -70,13 +70,15 @@ check("the original nine still come first, in order",
       list(out[0].keys())[:9],
       ["ts", "sender", "type", "subtype", "value", "unit", "note", "raw", "msg_id"])
 check("and the added ones come after, in order",
-      list(out[0].keys())[9:], ["dur_min", "ml_l", "ml_r"])
-check("a row written before they existed gets them as null",
+      list(out[0].keys())[9:], ["dur_min", "ml_l", "ml_r", "pump_dev"])
+check("a row written before they existed gets the number ones as null",
       [out[0]["dur_min"], out[0]["ml_l"], out[0]["ml_r"]], [None, None, None])
-pumped = compact.merge([row(type="pump", subtype="", value=65, unit="ml", raw="pump 65",
-                            dur_min=20, ml_l=30, ml_r=35)])[0]
-check("a pump session keeps all three", [pumped["dur_min"], pumped["ml_l"], pumped["ml_r"]],
-      [20, 30, 35])
+check("and the text one as an empty string, like every other text field",
+      out[0]["pump_dev"], "")
+pumped = compact.merge([row(type="pump", subtype="power", value=65, unit="ml", raw="pump 65",
+                            ml_l=30, ml_r=35, pump_dev="imani")])[0]
+check("a pump session keeps its split and its machine",
+      [pumped["ml_l"], pumped["ml_r"], pumped["pump_dev"]], [30, 35, "imani"])
 check("zero minutes is kept as zero, not turned into null",
       compact.merge([row(dur_min=0)])[0]["dur_min"], 0)
 check('an empty string in a number field becomes null',

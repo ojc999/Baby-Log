@@ -160,17 +160,22 @@ Unchanged from the bot, and checked by the test suite against the committed
 | `note` | Leftover text, or `left`/`right` for a breastfeed side. |
 | `raw` | What was entered — the button's own words, or the typed text. |
 | `msg_id` | **Now a generated id** (`web-<base36>-<random>`), not a Telegram message id. Still the key `data/derived/` rows point at via `from_raw`, so it must stay unique forever. |
-| `dur_min` | **Added for the Pump tab.** Minutes spent expressing. `null` on every other kind of entry, and on a pump session whose minutes were not recorded. |
+| `dur_min` | **Added for the Pump tab, then retired.** Minutes spent expressing. No longer collected — the minutes that matter beside the volume are his at the breast, not hers at the pump. Kept in the contract and written `null`, so the archive has one shape and the sessions already logged with it keep it. |
 | `ml_l`, `ml_r` | **Added for the Pump tab.** The per-side split of a pump session. `null` unless it was actually measured. `value` stays the total and is the authoritative figure; these are detail. |
 
-**Why `dur_min` could not be folded into `value`.** A pump session is the only entry with
-two numbers that both matter: how much came out, and how long it took. 60 ml in 15 minutes
-and 60 ml in 40 minutes are different mornings, and the ratio is the figure worth watching.
-`value` holds one number, so the second needs a field. The three were **appended after
-`msg_id`**, not inserted, so anything reading these files by position keeps working, and
-they are written onto **every** row — null where they do not apply — so `data/raw/` has one
-shape throughout instead of two. Rows written before they existed get them as null in
-`compact.py`.
+**Why the fields were appended, not inserted.** All three went in **after `msg_id`**, so
+anything reading these files by position keeps working, and they are written onto **every**
+row — null where they do not apply — so `data/raw/` has one shape throughout instead of
+two. Rows written before they existed get them as null in `compact.py`.
+
+**`dur_min` was a wrong guess, kept rather than removed.** It was added on the reasoning
+that a pump session has two numbers that matter: how much came out and how long it took.
+That is a sound thing to measure and not the thing she wants measured. The question she is
+actually asking is whether the supply is holding up, and the figure that explains a low day
+is how long he was on the breast — the more he takes directly, the less there is left to
+express. Time at the pump answers a different question. So it is no longer asked for.
+It is not deleted: removing a field would leave the archive with two row shapes and would
+throw away the handful of sessions already logged with one.
 
 The side split could have gone into `note` as text. It did not, because a number kept as
 prose is a number nobody can total later: a month of `30/35mL` in a free-text field is a
@@ -535,17 +540,23 @@ woken, and the things it needs under a thumb — a date field, a minutes field, 
 notes to type up — are exactly the things that should not be near a 3am nappy button. The
 same argument that put the Book tab where it is.
 
-**Lactation time includes the latch.** The volume on its own does not say whether a session
-went well. Time at the pump comes from `dur_min`; time at the breast comes from the
-breastfeed entries on the Log tab, which already carry minutes. Both are shown, separately
-and added, because a short milk figure under a long time figure is the day worth asking
-about — and that is the comparison the chart is drawn for.
+**The number beside the volume is his, not hers.** A day's expressed volume on its own
+says nothing about supply: an 80 ml day after six hours of latching and an 80 ml day after
+none are not the same day. So the figure that sits next to it is **minutes at the breast**,
+taken from the breastfeed entries on the Log tab, which already carry them. Nothing extra
+is typed for it. A short milk bar under a long breast bar is usually a day he took more
+directly, not a day the supply dropped — and that is the reading the chart is drawn for.
 
-**An untimed session is flagged, not filled in.** A session logged without its minutes
-makes the day's time an undercount and flatters its ml-per-hour. It is counted in the
-volume, marked with a `*` in the table, and named on the screen, the same way an unpaired
-sleep entry is left visible on the summary. Guessing a duration would make the one figure
-the tab exists for quietly wrong.
+Today's volume is also shown against **yesterday** and **the last seven days**, because
+"is it holding up" is a comparison and one number cannot answer it. The week is a total
+over the days that had anything rather than an average over seven, so the days before she
+started do not quietly halve it.
+
+**An untimed breastfeed is flagged, not filled in.** A breastfeed logged without its
+minutes makes the day's time at the breast an undercount, which on this tab is not a
+cosmetic gap — it is the figure that explains the volume. It still counts as a feed, is
+marked with a `*` in the table, and is named on the screen with where to fix it, the same
+way an unpaired sleep entry is left visible on the summary.
 
 **The chart's two bars are scaled separately.** Millilitres and minutes share no axis, so
 there is no honest single scale for both. Each bar is a share of its own three-week
@@ -566,9 +577,16 @@ alternative to being strict is a month of wrong numbers nobody notices.
 - `5mL x2` is two pumps of 5 ml in that sitting, so 10 ml.
 - Several volumes in one session — `65mL + 25mL + 15mL` — are one sitting, summed. Nothing
   is lost: the line goes into `raw` verbatim, and `raw` is kept forever.
-- A left/right split in the bracket is **not** read into `ml_l`/`ml_r`. `30/35mL` is
-  probably left then right, and probably is not good enough — a wrong side is worse than no
-  side, and the text is kept either way.
+- A left/right split in the bracket **is** read into `ml_l`/`ml_r` — she confirmed the pair
+  is left then right — but only when it accounts for the whole session: one pair per
+  volume, each adding up to its own volume. `65mL + 25mL + 15mL (…, 30/35mL, 10/15mL,
+  5/10mL)` is three pumps and three pairs that each close, so the sides total 45 and 60.
+  Where the arithmetic does not close — `70mL (…, 25/40mL, 5mL from hand expression)`,
+  where 5 ml belongs to no side — no side is recorded at all. A wrong side is worse than
+  no side, and the text is kept either way.
+- The machine is never written down. She says to take it as the Spectra unless a line says
+  otherwise; that is her assertion about her own history rather than a guess by this code,
+  so it is applied and then named on the preview.
 - `23/41mL` before the bracket could be two readings or one split, so that session is left
   **unread and named on screen** rather than resolved by guesswork.
 - A millilitre figure left in the bracket that is neither half of a left/right split nor

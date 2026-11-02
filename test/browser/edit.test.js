@@ -112,12 +112,12 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('hand expression can be chosen', kinds.includes('pump/hand'), true);
   t('so can a power pump', kinds.includes('pump/power'), true);
   await page.selectOption('#bk-kind','pump/hand'); await page.waitForTimeout(250);
-  t('a minutes box appears for it', await page.isVisible('#bk-min-row'), true);
-  t('and the left/right boxes', await page.isVisible('#bk-lr-row'), true);
+  t('the left/right boxes appear for it', await page.isVisible('#bk-lr-row'), true);
+  t('and no box asking how long she pumped for',
+     await page.isVisible('#bk-min-row').catch(()=>false), false);
   await page.fill('#bk-date','2026-10-28');
   await page.fill('#bk-time','04:30');
   await page.fill('#bk-amt','55');
-  await page.fill('#bk-min','18');
   await page.fill('#bk-l','25'); await page.fill('#bk-r','20');
   await page.click('#bk-add'); await page.waitForTimeout(400);
   t('a split that does not add up is refused',
@@ -131,10 +131,10 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('the day four days ago was pushed', pumped.length, 1);
   t('as a hand expression', pumped[0].type+'/'+pumped[0].subtype, 'pump/hand');
   t('with its total', pumped[0].value, 55);
-  t('its minutes', pumped[0].dur_min, 18);
   t('and its split', pumped[0].ml_l+'/'+pumped[0].ml_r, '25/30');
+  t('no pump duration is invented', pumped[0].dur_min, null);
   t('at the time given', pumped[0].ts, '2026-10-28T04:30:00+08:00');
-  t('and the form was cleared', await page.inputValue('#bk-min'), '');
+  t('and the form was cleared', await page.inputValue('#bk-l'), '');
 
   console.log('--- and it reaches the Pump tab ---');
   await page.click('#tab-pump'); await page.waitForTimeout(500);
@@ -142,7 +142,7 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
     const tr=[...document.querySelectorAll('#pump-week tr')].find(r=>(r.cells[0]||{}).textContent==='28 Oct');
     return tr?[...tr.cells].map(c=>c.textContent):null;});
   t('the back-dated session is in the day-by-day table',
-     JSON.stringify(row), JSON.stringify(['28 Oct','55','1','18','—','183']));
+     JSON.stringify(row), JSON.stringify(['28 Oct','55','1','—','—']));
 
   await b.close(); srv.close();
   console.log(fail?'\n======== '+fail+' FAILURES ========':'\n======== ALL PASS ========');

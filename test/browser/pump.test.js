@@ -90,10 +90,27 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('the date box opens on today', await page.inputValue('#pm-date'), '2026-11-01');
   t('and the time box on now', await page.inputValue('#pm-time'), '14:00');
 
+  console.log('--- which machine ---');
+  t('the kit row is on screen', await page.isVisible('#pm-kit-row'), true);
+  t('with the Spectra already chosen', await page.evaluate(()=>
+    document.querySelector('#pm-kit [data-kit="spectra"]').getAttribute('aria-pressed')), 'true');
+  await page.click('#pm-how [data-how="hand"]'); await page.waitForTimeout(200);
+  t('hand expression hides it, since it uses no machine',
+     await page.isVisible('#pm-kit-row'), false);
+  await page.click('#pm-how [data-how="power"]'); await page.waitForTimeout(200);
+  t('a power pump brings it back, because you power pump on a machine',
+     await page.isVisible('#pm-kit-row'), true);
+  await page.click('#pm-kit [data-kit="imani"]'); await page.waitForTimeout(200);
+  t('and the other one can be chosen', await page.evaluate(()=>
+    document.querySelector('#pm-kit [data-kit="imani"]').getAttribute('aria-pressed')), 'true');
+  await page.click('#pm-how [data-how=""]');
+  await page.click('#pm-kit [data-kit="spectra"]'); await page.waitForTimeout(200);
+
   console.log('--- logging a session, with both its numbers and the split ---');
   await page.click('#pm-presets [data-pmset="60"]');
   t('a preset fills the total', await page.inputValue('#pm-ml'), '60');
-  await page.fill('#pm-min','22');
+  t('there is no box asking how long she pumped for',
+     await page.isVisible('#pm-min').catch(()=>false), false);
   await page.fill('#pm-l','25'); await page.fill('#pm-r','30');
   await page.waitForTimeout(150);
   t('it says the split does not match the total',
@@ -115,8 +132,9 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
     JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'));
   t('one pump entry saved', saved.length, 1);
   t('the volume is the value', saved[0].value, 60);
-  t('the minutes have their own field', saved[0].dur_min, 22);
-  t('and each side', saved[0].ml_l+'/'+saved[0].ml_r, '25/35');
+  t('each side has its own field', saved[0].ml_l+'/'+saved[0].ml_r, '25/35');
+  t('the machine is recorded, defaulting to the Spectra', saved[0].pump_dev, 'spectra');
+  t('and no pump duration is invented', saved[0].dur_min, null);
   t('it is a pump, never a feed', saved[0].type, 'pump');
   t('the form is cleared for the next one', await page.inputValue('#pm-ml'), '');
 
@@ -127,11 +145,11 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('with the nine original fields first, in order',
      JSON.stringify(Object.keys(pushed).slice(0,9)),
      JSON.stringify(['ts','sender','type','subtype','value','unit','note','raw','msg_id']));
-  t('and the three new ones after', JSON.stringify(Object.keys(pushed).slice(9)),
-     JSON.stringify(['dur_min','ml_l','ml_r']));
-  t('the latch entry it did not touch carries them as null',
-     JSON.stringify([todayRows[0].dur_min,todayRows[0].ml_l,todayRows[0].ml_r]),
-     JSON.stringify([null,null,null]));
+  t('and the four new ones after', JSON.stringify(Object.keys(pushed).slice(9)),
+     JSON.stringify(['dur_min','ml_l','ml_r','pump_dev']));
+  t('the latch entry it did not touch carries them empty',
+     JSON.stringify([todayRows[0].dur_min,todayRows[0].ml_l,todayRows[0].ml_r,todayRows[0].pump_dev]),
+     JSON.stringify([null,null,null,'']));
   t('no internal fields leaked', ['own','ms','device'].some(k=>k in pushed), false);
 
   console.log('--- production is not consumption ---');
@@ -139,11 +157,12 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   console.log('   cards:', JSON.stringify(c1));
   t('expressed today is 60, not the 140 that adding the bottle would give', c1['Expressed'][0], '60');
   t('counted as one session', c1['Expressed'][1], '1 session');
-  t('pumping time is its own figure', c1['Pumping'][0], '22 min');
-  t('time at the breast comes from the feed entries', c1['At the breast'][0], '25 min');
-  t('and names how many latches', c1['At the breast'][1], '1 latch');
-  t('lactation time is both added together', c1['Lactation time'][0], '47 min');
-  t('with the yield per pumping hour', c1['Lactation time'][1], '164 ml per pumping hour');
+  t('time at the breast comes from the breastfeeds', c1['At the breast'][0], '25 min');
+  t('and names how many of them', c1['At the breast'][1], '1 latch');
+  t('there is no card for time at the pump', 'Pumping' in c1, false);
+  t('nor one adding the two together', 'Lactation time' in c1, false);
+  t('yesterday sits beside today for comparison', c1['Yesterday'][0], '—');
+  t('and the week behind it', c1['Last 7 days'][0], '60');
   await page.click('#tab-sum'); await page.waitForTimeout(300);
   const sum2 = (await page.textContent('#sum-today')).replace(/\s+/g,' ');
   t('the summary still counts the 80 ml as a feed', /80 ml/.test(sum2), true);
@@ -167,42 +186,49 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('a day with nothing paints no bar at all', bars[0].ml, 0);
   t('the minutes bar is scaled on its own', bars[20].mins, 100);
 
-  t('the table row for today reads ml, sessions, pump, latch, ml/h',
+  t('the table row for today reads ml, sessions, latch minutes and feeds',
      JSON.stringify(await tableRow(page,'1 Nov')),
-     JSON.stringify(['1 Nov','60','1','22','25','164']));
+     JSON.stringify(['1 Nov','60','1','25','1']));
 
-  console.log('--- a session logged without its minutes is flagged, not filled in ---');
+  console.log('--- a second session adds to the day ---');
   await page.fill('#pm-ml','30'); await page.fill('#pm-time','13:00');
   await page.click('#pm-add'); await page.waitForTimeout(900);
   const c2 = await cards(page);
-  t('the untimed one is counted in the volume', c2['Expressed'][0], '90');
-  t('but reported as not timed', c2['Pumping'][1], '1 not timed');
-  t('and the day is starred in the table',
-     (await tableRow(page,'1 Nov'))[3], '22*');
-  t('with the reason said out loud',
+  t('both sessions are in the volume', c2['Expressed'][0], '90');
+  t('and counted', c2['Expressed'][1], '2 sessions');
+
+  console.log('--- a breastfeed logged without its minutes is flagged, not filled in ---');
+  await page.evaluate(()=>{
+    add('feed','breast',null,'','','bf',Date.parse('2026-11-01T11:00:00+08:00'));
+    render(); renderPump(); });
+  await page.waitForTimeout(400);
+  const c2b = await cards(page);
+  t('it still counts as a feed', c2b['At the breast'][1], '2 latches, 1 untimed');
+  t('but adds no minutes', c2b['At the breast'][0], '25 min');
+  t('the day is starred in the table', (await tableRow(page,'1 Nov'))[3], '25*');
+  t('with the reason said out loud, and where to fix it',
      /undercount/.test(await page.textContent('#pump-hint')), true);
 
-  console.log('--- Fix fills in the minutes that were missed ---');
+  console.log('--- Fix corrects a session after the event ---');
   const picked = await page.evaluate(()=>{
     for(const row of document.querySelectorAll('#pump-rows .row'))
-      if(/30 ml/.test(row.textContent)&&!/min/.test(row.textContent)){
+      if(/30 ml/.test(row.textContent)){
         row.querySelector('[data-fix]').click(); return row.textContent; }
     return null;});
-  t('the row with no minutes on it is the one being corrected', /30 ml/.test(picked||''), true);
+  t('the 30 ml session is the one being corrected', /30 ml/.test(picked||''), true);
   await page.waitForTimeout(300);
-  t('the correction box offers a minutes field for a pump session',
-     await page.isVisible('#fix-min-row'), true);
-  t('and the left/right boxes', await page.isVisible('#fix-lr-row'), true);
-  await page.fill('#fix-min','12');
+  t('the correction box offers no pump-duration field',
+     await page.isVisible('#fix-min-row').catch(()=>false), false);
+  t('but does offer the left/right boxes', await page.isVisible('#fix-lr-row'), true);
+  await page.fill('#fix-amt','45');
   await page.click('#fix-save'); await page.waitForTimeout(900);
   const c3 = await cards(page);
-  t('the minutes are now counted', c3['Pumping'][0], '34 min');
-  t('nothing is untimed any more', c3['Pumping'][1], 'all timed');
+  t('the corrected volume is counted', c3['Expressed'][0], '105');
   const afterFix = await page.evaluate(()=>
     JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'||r.type==='deleted'));
   t('the original is kept, struck out', afterFix.filter(r=>r.type==='deleted').length, 1);
-  t('and the correction carries the three fields',
-     afterFix.filter(r=>r.type==='pump'&&r.dur_min===12).length, 1);
+  t('and the correction is a new row',
+     afterFix.filter(r=>r.type==='pump'&&r.value===45).length, 1);
 
   console.log('--- reading up a page of notes ---');
   const NOTES = ['Breastfeeding',
@@ -240,7 +266,14 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('seven sessions saved', imported.length, 7);
   t('every one is a pump entry', imported.every(r=>r.type==='pump'), true);
   t('none of them invented a duration', imported.every(r=>r.dur_min===null), true);
-  t('none of them invented a side', imported.every(r=>r.ml_l===null&&r.ml_r===null), true);
+  t('the one sitting whose split accounts for it got its sides',
+     imported.filter(r=>r.ml_l===20&&r.ml_r===20).length, 1);
+  t('and the rest, whose splits do not, got none',
+     imported.filter(r=>r.ml_l===null).length, 6);
+  t('everything but the hand expression is recorded as the Spectra',
+     imported.filter(r=>r.pump_dev==='spectra').length, 6);
+  t('and the hand expression names no machine',
+     imported.filter(r=>r.subtype==='hand'&&r.pump_dev==='').length, 1);
   t('the whole line is kept in raw',
      imported.some(r=>r.raw==='44mL (2h after feed, 7mL from hand expression)'), true);
   t('a placed time is marked in the note',

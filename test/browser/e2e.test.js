@@ -103,9 +103,10 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   t('one row pushed', rows.length, 1);
   t('field order matches the contract', JSON.stringify(Object.keys(rows[0])),
      JSON.stringify(['ts','sender','type','subtype','value','unit','note','raw','msg_id',
-                     'dur_min','ml_l','ml_r']));
-  t('and the three added for the pump tab are null on a feed',
-     JSON.stringify([rows[0].dur_min,rows[0].ml_l,rows[0].ml_r]), JSON.stringify([null,null,null]));
+                     'dur_min','ml_l','ml_r','pump_dev']));
+  t('and the ones added for the pump tab are empty on a feed',
+     JSON.stringify([rows[0].dur_min,rows[0].ml_l,rows[0].ml_r,rows[0].pump_dev]),
+     JSON.stringify([null,null,null,'']));
   t('row is a bottle feed', rows[0].type+'/'+rows[0].subtype, 'feed/bottle');
   t('ts carries +08:00', /\+08:00$/.test(rows[0].ts), true);
   t('file ends with a newline', /\n$/.test(decoded), true);

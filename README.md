@@ -69,26 +69,29 @@ this tab counts what comes out of her, the Log tab counts what goes into him. Ex
 80 ml and him drinking 80 ml are two events, and adding them would count the same milk
 twice.
 
-**Today so far.** Four figures: how much was expressed and over how many sessions, how
-many minutes at the pump, how many at the breast, and the two added — with millilitres per
-hour of pumping beside it. Time at the breast is taken from the breastfeeds already logged
-on the Log tab, so it needs entering only once.
+**Today so far.** How much was expressed and over how many sessions, how many minutes he
+spent at the breast, and the same volume figure for yesterday and the last seven days,
+because "is it holding up" is a comparison. Time at the breast comes from the breastfeeds
+already logged on the Log tab, so nothing extra is typed for it.
 
-**Logging a session.** Pick how (pump, by hand, power pump), tap a preset or type the
-total, and add how long it took. Left and right are optional: fill both and it checks they
-add up to the total, and says so plainly if they do not rather than quietly changing one.
-Date and time open on now, so a session logged straight after it happened is three taps.
+**Logging a session.** Pick how (pump, by hand, power pump) and which machine (Spectra or
+Imani — the row disappears for a hand expression, which uses neither), then tap a preset or
+type the total. Left and right are optional: fill both and it checks they add up to the total, and
+says so plainly if they do not rather than quietly changing one. Date and time open on now,
+so a session logged straight after it happened is three taps. How long you spent at the
+pump is not asked for.
 
-**How long matters.** 60 ml in 15 minutes and 60 ml in 40 minutes are not the same
-morning, and the ratio is the figure worth watching. A session saved without its minutes
-is still counted in the volume, but the day is marked with a `*` and the screen says the
-time is an undercount — tap **Fix** on the session to add the minutes later.
+**Why minutes at the breast.** An 80 ml day after six hours of latching and an 80 ml day
+after none are not the same day. The more he takes directly, the less there is left to
+express, so that is the figure that sits beside the volume. A breastfeed logged without its
+minutes makes the day an undercount: it still counts as a feed, but the day is marked with
+a `*` and the screen says so — tap **Fix** on that feed in the Log tab to add them.
 
 **Daily production.** Three weeks, oldest at the top. Two bars to a day: millilitres above,
-total lactation time below. They are scaled separately — there is no honest shared scale
+minutes at the breast below. They are scaled separately — there is no honest shared scale
 for a millilitre and a minute — so the chart answers *which days were out of step*. A short
-milk bar under a long time bar is a day that took a lot of work for a little. The table
-underneath gives the exact figures, day by day.
+milk bar under a long breast bar is usually a day he took more directly, not a day the
+supply dropped. The table underneath gives the exact figures, day by day.
 
 **Typing up a page of notes.** For catching up from the notebook. Paste it in, one day to
 a line, in the shape you already write them:
@@ -106,9 +109,12 @@ important part:
   hand expression)` is one 40 ml session, not 50.
 - A comma inside a bracket is not a session break. `65mL + 25mL + 15mL` is one sitting,
   totalled — and the whole line is kept word for word on the entry, so nothing is lost.
-- A left/right split in the bracket is **not** filed as left and right. `30/35mL` is
-  probably left then right, and probably is not good enough to put in the record. It is
-  kept as the note instead.
+- A left/right split in the bracket **is** filed as left and right, but only when it adds
+  up to the session: one pair per pump, each matching its own pump. Where it leaves
+  millilitres unaccounted for — `70mL (…, 25/40mL, 5mL from hand expression)` — no side is
+  recorded, because a wrong side is worse than none. The text is kept either way.
+- Anything not hand expressed is recorded as the **Spectra**, since the notes don't say and
+  that is what you asked for. A line mentioning the Imani is read as the Imani.
 - `23/41mL` before a bracket could be two readings or one split, so that session is listed
   as **not read** for you to key in by hand, rather than guessed at.
 - A volume left in the bracket that is not part of a left/right split and not called hand

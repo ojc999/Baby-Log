@@ -111,16 +111,17 @@ t('undo marks it deleted', A.entries().find(r=>r.msg_id===e3.msg_id).type, 'dele
 const real = JSON.parse('{"ts":"2026-01-02T03:14:00+08:00","sender":"EXAMPLE","type":"sleep",' +
   '"subtype":"start","value":null,"unit":"","note":"","raw":"asleep now","msg_id":"web-example-0001"}');
 // The three fields the pump tab added, appended after msg_id and written onto every row.
-const ADDED = ['dur_min','ml_l','ml_r'];
+const ADDED = ['dur_min','ml_l','ml_r','pump_dev'];
 const out = A.jsonlFor('2026-10-01').trim().split('\n').map(JSON.parse);
 t('export has all three incl deleted', out.length, 3);
 t('the original nine come first, in the original order',
   JSON.stringify(Object.keys(out[0]).slice(0, 9)), JSON.stringify(Object.keys(real)));
 t('and the added ones come after, in order',
   JSON.stringify(Object.keys(out[0]).slice(9)), JSON.stringify(ADDED));
-t('nothing else crept in', Object.keys(out[0]).length, 12);
-t('they are null on a row that has no use for them',
-  ADDED.every(k => out[0][k] === null), true);
+t('nothing else crept in', Object.keys(out[0]).length, 13);
+t('the number ones are null on a row that has no use for them',
+  ['dur_min','ml_l','ml_r'].every(k => out[0][k] === null), true);
+t('and the text one is an empty string, not null', out[0].pump_dev, '');
 t('ts carries +08:00', /\+08:00$/.test(out[0].ts), true);
 t('ts is SG wall clock', out[0].ts, '2026-10-01T19:30:00+08:00');
 t('absent value is null', out[1].value, null);
@@ -170,16 +171,31 @@ t('describe temp degree', A.describe({type:'measure',subtype:'temp',value:37.8,u
 console.log('\n--- the pump tab: a session carries two numbers, not one ---');
 A.setEntries([]);
 const pbase = Date.UTC(2026, 9, 31, 1, 0);          // 09:00 SG, 31 Oct
-const ps = A.add('pump', '', 65, 'ml', '', 'pump 65 ml 20 min', pbase, {dur_min: 20, ml_l: 30, ml_r: 35});
+const ps = A.add('pump', '', 65, 'ml', '', 'pump 65 ml', pbase, {ml_l: 30, ml_r: 35});
 t('the volume is the value', ps.value, 65);
-t('the minutes are their own field', ps.dur_min, 20);
-t('so is each side', ps.ml_l + '/' + ps.ml_r, '30/35');
-t('an empty box is null, not zero', A.add('pump','',40,'ml','','pump 40',pbase+60000,{}).dur_min, null);
+t('each side is its own field', ps.ml_l + '/' + ps.ml_r, '30/35');
+t('an empty box is null, not zero', A.add('pump','',40,'ml','','pump 40',pbase+60000,{}).ml_l, null);
 t('they survive the export',
-  JSON.parse(A.jsonlFor('2026-10-31').trim().split('\n')[0]).dur_min, 20);
-t('describe says both numbers',
-  A.describe({type:'pump',subtype:'',value:65,unit:'ml',note:'',dur_min:20,ml_l:30,ml_r:35}),
-  'Mum expressed 65 ml in 20 min (L 30 / R 35)');
+  JSON.parse(A.jsonlFor('2026-10-31').trim().split('\n')[0]).ml_l, 30);
+// dur_min is no longer collected - the minutes that matter are his at the breast - but it
+// stays in the contract so the archive keeps one shape and the rows that have it keep it.
+t('pump duration is no longer written', ps.dur_min, null);
+t('which machine is its own field, not a subtype',
+  A.add('pump','',50,'ml','','p',pbase+120000,{pump_dev:'imani'}).pump_dev, 'imani');
+t('so a power pump on the Imani can say both',
+  A.describe({type:'pump',subtype:'power',value:50,unit:'ml',note:'',pump_dev:'imani'}),
+  'Power pumped 50 ml · Imani');
+t('and a hand expression names no machine',
+  A.describe({type:'pump',subtype:'hand',value:8,unit:'ml',note:'',pump_dev:''}),
+  'Hand expressed 8 ml');
+t('but the field is still exported',
+  'dur_min' in JSON.parse(A.jsonlFor('2026-10-31').trim().split('\n')[0]), true);
+t('and a row that already carries one still reads back',
+  A.describe({type:'pump',subtype:'',value:65,unit:'ml',note:'',dur_min:20}),
+  'Mum expressed 65 ml in 20 min');
+t('describe names the split',
+  A.describe({type:'pump',subtype:'',value:65,unit:'ml',note:'',ml_l:30,ml_r:35}),
+  'Mum expressed 65 ml (L 30 / R 35)');
 t('and leaves out what was not recorded',
   A.describe({type:'pump',subtype:'',value:65,unit:'ml',note:''}), 'Mum expressed 65 ml');
 t('hand expression has its own label', A.label({type:'pump',subtype:'hand'}), 'Hand expressed');
@@ -188,20 +204,21 @@ t('an old row with no subtype still reads', A.label({type:'pump',subtype:''}), '
 
 console.log('\n--- a day\u2019s pump figures ---');
 A.setEntries([]);
-A.add('pump', '',      60, 'ml', '', 'p', pbase,            {dur_min: 20});
-A.add('pump', 'power', 30, 'ml', '', 'p', pbase + 3600000,  {dur_min: 10});
-A.add('pump', 'hand',  10, 'ml', '', 'p', pbase + 7200000,  {});          // not timed
+A.add('pump', '',      60, 'ml', '', 'p', pbase);
+A.add('pump', 'power', 30, 'ml', '', 'p', pbase + 3600000);
+A.add('pump', 'hand',  10, 'ml', '', 'p', pbase + 7200000);
 A.add('feed', 'breast', 25, 'min', 'left', 'bf', pbase + 1800000);
+A.add('feed', 'breast', 15, 'min', 'right', 'bf', pbase + 9000000);
+A.add('feed', 'breast', null, '', '', 'bf', pbase + 10800000);   // logged without minutes
 A.add('feed', 'expressed', 80, 'ml', '', 'ebm 80', pbase + 5400000);
 const st = A.pumpStats('2026-10-31');
 t('three sessions', st.n, 3);
 t('volumes summed', st.ml, 100);
 t('expressed milk he drank is not counted as production', st.ml === 100, true);
-t('minutes summed from the sessions that have them', st.mins, 30);
-t('an untimed session is counted and flagged, not dropped', st.untimed, 1);
-t('time at the breast comes from the feed entries', st.latchMin, 25);
-t('lactation time is both', st.lactMin, 55);
-t('ml per pumping hour', st.perHour, 200);
+t('time at the breast comes from the breastfeeds', st.latchMin, 40);
+t('every breastfeed is counted, timed or not', st.latches, 3);
+t('and the untimed one is flagged rather than treated as zero', st.untimedLatch, 1);
+t('how long she spent at the pump is not among the figures', 'mins' in st, false);
 t('a day with nothing is empty, not an error', A.pumpStats('2026-10-30').n, 0);
 
 console.log('\n--- reading up a page of notes ---');
@@ -235,7 +252,30 @@ const r5 = A.parsePumpNotes('7 Oct: 21mL + 13mL + 6mL (2h after latching, 11/10m
 t('several volumes in one sitting are one session', r5.days[0].sessions.length, 1);
 t('summed', r5.days[0].sessions[0].ml, 40);
 t('and counted', r5.days[0].sessions[0].pumps, 3);
-t('the split is NOT guessed into the side fields', r5.days[0].sessions[0].ml_l, undefined);
+// one pair per pump, each adding up to its own pump, so the sides account for the sitting
+t('left is the sum of the first of each pair', r5.days[0].sessions[0].ml_l, 20);
+t('and right the second', r5.days[0].sessions[0].ml_r, 20);
+
+console.log('\n--- the side split is taken only when it accounts for the session ---');
+const s1 = A.parsePumpNotes('18 Oct: 61mL (2h after latch, 28/33mL)', NOW).days[0].sessions[0];
+t('a single pair that adds up is read as left then right', s1.ml_l + '/' + s1.ml_r, '28/33');
+const s2 = A.parsePumpNotes('19 Oct: 71mL (3h after pump, 26/40mL, 5mL from hand expression)', NOW).days[0].sessions[0];
+t('a pair that leaves millilitres unaccounted for records no side', s2.ml_l, null);
+t('and the session total is still right', s2.ml, 71);
+const s3 = A.parsePumpNotes('20 Oct: 66mL + 16mL + 6mL (4h, 36/30mL, 6/10mL, 6mL hand expression)', NOW).days[0].sessions[0];
+t('one pair short of the pumps records no side', s3.ml_l, null);
+const s4 = A.parsePumpNotes('21 Oct: 41mL (2h after feed, 9mL from hand expression)', NOW).days[0].sessions[0];
+t('no pair at all records no side', s4.ml_l, null);
+
+console.log('\n--- which machine ---');
+t('an ordinary pump is taken as the Spectra, as she said to assume',
+  A.parsePumpNotes('22 Oct: 51mL pump', NOW).days[0].sessions[0].kit, 'spectra');
+t('a line naming the other one is read',
+  A.parsePumpNotes('23 Oct: 51mL pump (on the Imani)', NOW).days[0].sessions[0].kit, 'imani');
+t('a hand expression names no machine',
+  A.parsePumpNotes('24 Oct: 7mL hand expression', NOW).days[0].sessions[0].kit, '');
+t('a power pump is still a machine', 
+  A.parsePumpNotes('25 Oct: 31mL (power pump after latch)', NOW).days[0].sessions[0].kit, 'spectra');
 
 const r6 = A.parsePumpNotes('8 Oct: 23/41mL (2h after latch, 11/30mL)', NOW);
 t('an ambiguous reading before the bracket is left unread', r6.days[0].sessions.length, 0);

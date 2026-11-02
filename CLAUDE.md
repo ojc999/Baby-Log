@@ -35,9 +35,10 @@ what it is, and lists decisions that look arbitrary and are not.
   whose undo survived depended on what the devices were called.
 - **Never silently repair data.** An unpaired sleep entry is a missed message and must
   stay visible as a gap, named on the screen, not quietly paired with the next event.
-  A pump session logged without its minutes is the same thing: it counts towards the day's
-  volume, it is marked with a `*`, and the screen says the day's time is an undercount.
-  Guessing a duration would make wrong the one figure that tab exists to show.
+  A breastfeed logged without its minutes is the same thing: it still counts as a feed,
+  it is marked with a `*`, and the screen says the day's time at the breast is an
+  undercount. That figure is load-bearing on the Pump tab — it is what explains a low
+  expressing day — so guessing at it would make wrong the comparison the tab exists for.
 - **Never invent a number the notebook does not have.** The notes reader fills in nothing.
   It places a session in the day when no time was written, and then says `time not
   recorded` on the entry, because a timestamp has to exist for the row to be filed at all.
@@ -116,19 +117,27 @@ what it is, and lists decisions that look arbitrary and are not.
 One JSON object per line. Field names and order must not drift.
 
 `ts` (ISO 8601, `+08:00`) · `sender` · `type` · `subtype` · `value` · `unit` · `note` ·
-`raw` · `msg_id` · `dur_min` · `ml_l` · `ml_r`
+`raw` · `msg_id` · `dur_min` · `ml_l` · `ml_r` · `pump_dev`
 
-The last three were **appended** for the pump tab, never inserted: the original nine keep
+The last four were **appended** for the pump tab, never inserted: the original nine keep
 their names and their order, so anything reading these files by position still works. They
 are written onto every row, null where they do not apply, so `data/raw/` has one shape
-throughout rather than two. `dur_min` exists because a pump session is the only entry with
-two numbers that both matter — how much, and over how long — and `value` holds one.
+throughout rather than two. `dur_min` held how long a pump session took. It is **no longer collected**: the minutes
+that belong beside the volume are his at the breast, not hers at the pump, because the
+more he takes directly the less there is left to express. The field stays in the contract
+and is written `null`, because removing it would leave the archive with two row shapes and
+would throw away the sessions already logged with it. Do not reuse it for anything else.
+
+`pump_dev` is which machine: `spectra`, `imani`, or empty for a hand expression. It is a
+field rather than more `subtype` values because power pumping is a technique and the
+Spectra is a thing — you can power pump on either machine, and folding the two into one
+field would lose that pairing. It is a string, so its absent value is `""`, not `null`.
 
 `type` is one of `sleep` `feed` `pump` `nappy` `hygiene` `measure` `vomit` `cry` `tummy`
 `med` `vax` `milestone` `note` `deleted`.
 
 `raw` is kept forever. `value` is `null`, never `""`, when absent, and so are `dur_min`,
-`ml_l` and `ml_r`; on a pump session `value` is the total and is authoritative, with the
+`ml_l` and `ml_r`; `pump_dev` is a string and is `""`; on a pump session `value` is the total and is authoritative, with the
 side split as detail beside it. `msg_id` must be
 unique for all time — rows in the data repo's `data/derived/` point back at it. One id can
 appear in **two** event files, once live and once struck, when one phone undoes the other's

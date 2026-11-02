@@ -41,10 +41,12 @@ from pathlib import Path
 # `dur_min` (minutes spent expressing), `ml_l` and `ml_r` (the per-side split). They are
 # appended rather than inserted so that anything already reading these files by position
 # keeps working, and they are written onto every row - null where they do not apply - so
-# that data/raw/ has one shape throughout rather than two.
+# that data/raw/ has one shape throughout rather than two. `pump_dev` names the machine
+# ("spectra", "imani", or empty for a hand expression) and is a string, not a number, so
+# its absent value is "" like every other text field.
 FIELDS = ["ts", "sender", "type", "subtype", "value", "unit", "note", "raw", "msg_id"]
 NUMERIC_FIELDS = ["value", "dur_min", "ml_l", "ml_r"]
-FIELDS = FIELDS + ["dur_min", "ml_l", "ml_r"]
+FIELDS = FIELDS + ["dur_min", "ml_l", "ml_r", "pump_dev"]
 
 # Set by main() once --repo is known. Defaults to the repo this script sits in, which
 # is right when it lives at apps/baby-log-web/ inside the data repo, and overridable
