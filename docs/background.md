@@ -552,6 +552,20 @@ Today's volume is also shown against **yesterday** and **the last seven days**, 
 over the days that had anything rather than an average over seven, so the days before she
 started do not quietly halve it.
 
+**The total is the sum when there is a split.** Entering left and right used to leave the
+total as a third number you typed, with a refusal at save time if the three did not agree.
+That was correct and it made her do arithmetic the machine was already doing. Now a side
+entry locks the total to left plus right and keeps it in step. There is nothing left to
+disagree with, so the refusal is gone. Clearing both sides hands the box back.
+
+**The tab fetches the days it draws.** The chart covers three weeks and the table a
+fortnight, but nothing was fetching them. A phone pulls today and yesterday on its poll and
+reaches further back only when the Book tab opens a day or the log is scrolled into it — so
+a day sitting in the repo, written by the other phone or typed straight into it, simply did
+not appear here, silently. Opening the tab now asks for the days it is about to draw, once
+per visit, five at a time, and redraws when they land. It reads only: nothing is marked as
+owing a push.
+
 **An untimed breastfeed is flagged, not filled in.** A breastfeed logged without its
 minutes makes the day's time at the breast an undercount, which on this tab is not a
 cosmetic gap — it is the figure that explains the volume. It still counts as a feed, is

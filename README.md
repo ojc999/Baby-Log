@@ -76,10 +76,14 @@ already logged on the Log tab, so nothing extra is typed for it.
 
 **Logging a session.** Pick how (pump, by hand, power pump) and which machine (Spectra or
 Imani — the row disappears for a hand expression, which uses neither), then tap a preset or
-type the total. Left and right are optional: fill both and it checks they add up to the total, and
-says so plainly if they do not rather than quietly changing one. Date and time open on now,
-so a session logged straight after it happened is three taps. How long you spent at the
-pump is not asked for.
+type the total. Date and time open on now, so a session logged straight after it happened
+is three taps. How long you spent at the pump is not asked for.
+
+**Left and right add themselves up.** Fill in either side and the total stops being
+something you type: it becomes left plus right, worked out as you go and greyed out so the
+two can never disagree. Clear both sides and the box is yours again. Tapping a preset while
+the sides are filled clears them and says so, since a preset can only mean you wanted a
+total after all. The same holds in the Book form and the correction box.
 
 **Why minutes at the breast.** An 80 ml day after six hours of latching and an 80 ml day
 after none are not the same day. The more he takes directly, the less there is left to
