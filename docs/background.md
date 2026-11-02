@@ -562,9 +562,14 @@ disagree with, so the refusal is gone. Clearing both sides hands the box back.
 fortnight, but nothing was fetching them. A phone pulls today and yesterday on its poll and
 reaches further back only when the Book tab opens a day or the log is scrolled into it — so
 a day sitting in the repo, written by the other phone or typed straight into it, simply did
-not appear here, silently. Opening the tab now asks for the days it is about to draw, once
-per visit, five at a time, and redraws when they land. It reads only: nothing is marked as
-owing a push.
+not appear here, silently. Opening the tab now asks for the days behind it, once per visit,
+five at a time, and redraws when they land. It reads only: nothing is marked as owing a
+push.
+
+The fetch reaches forty days, wider than the twenty-one the chart draws. The chart is a
+rolling three weeks because sixty bars do not read on a phone, but the history behind it
+should still be on the device: a day that is local costs nothing to open later from the
+Book tab, and a day that is not is invisible until something goes and asks for it.
 
 **An untimed breastfeed is flagged, not filled in.** A breastfeed logged without its
 minutes makes the day's time at the breast an undercount, which on this tab is not a
