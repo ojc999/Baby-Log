@@ -334,6 +334,9 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
   font-family:var(--mono);font-size:16px;padding:10px 12px;min-height:48px;
 }
 .fixrow input:focus{outline:2px solid var(--teal);outline-offset:-1px}
+/* A total worked out from left + right, not typed. Greyed so it reads as a result
+   rather than an empty box somebody forgot to fill in. */
+.fixrow input.derived{background:var(--surface-2);color:var(--ink-dim);font-weight:600}
 .fixrow .unit{flex:none;font-family:var(--mono);font-size:13px;color:var(--ink-faint)}
 
 /* ───── which side next ───── */
@@ -2150,6 +2153,37 @@ function pumpStats(day) {
   };
 }
 
+/* The chart draws three weeks and the table a fortnight, but nothing was ever fetching
+   those days. A phone only pulls today and yesterday on its poll, and reaches further back
+   only when the Book tab opens a day or the log is scrolled into it - so a day sitting in
+   the repo, written by the other phone or typed up from the notebook, simply did not
+   appear here. The tab now asks for the days it is about to draw, once per visit, and
+   redraws when they land. Reading only: nothing is marked as owing a push. */
+var pumpFetched = false;
+
+function pumpBackfill() {
+  if (pumpFetched || !configured() || backfilling) return;
+  pumpFetched = true;
+  var list = [];
+  for (var i = 0; i < PUMP_BARS; i++) {
+    var d = daySG(Date.now() - i * 86400000);
+    if (!dayTried[d]) { dayTried[d] = true; list.push(d); }
+  }
+  if (!list.length) return;
+  backfilling = true;
+  (function step() {
+    if (!list.length) {
+      backfilling = false;
+      saveEntries();
+      if (!$('pane-pump').hidden) renderPump();
+      render(); renderDiag();
+      return;
+    }
+    var chunk = list.splice(0, 5);        /* five at a time, not twenty-one at once */
+    Promise.all(chunk.map(backfillDay)).then(step, step);
+  })();
+}
+
 function pumpDays(n) {
   var out = [];
   for (var i = n - 1; i >= 0; i--) out.push(daySG(Date.now() - i * 86400000));
@@ -2282,27 +2316,37 @@ function paintPmHow() {
   }).join('');
 }
 
-/* Left plus right against the total. It never rewrites the total - a typed figure is
-   what she measured, and quietly replacing it with a sum that disagrees is exactly the
-   kind of silent repair that makes a record untrustworthy. It fills the total in only
-   when the box is empty, and otherwise says plainly that the two do not agree. */
-function paintPmSum() {
-  var l = numOrNull($('pm-l').value), r = numOrNull($('pm-r').value);
-  var tot = numOrNull($('pm-ml').value);
-  var hint = $('pm-sum');
-  if (l === null && r === null) { hint.hidden = true; return; }
-  var sum = Math.round(((l || 0) + (r || 0)) * 10) / 10;
-  hint.hidden = false;
-  if (tot === null) {
-    hint.innerHTML = 'Left and right add up to <b>' + sum + ' ml</b>. Leave the total ' +
-                     'blank and that is what is saved.';
-  } else if (Math.abs(tot - sum) > 0.05) {
-    hint.innerHTML = 'Left and right add up to <b>' + sum + ' ml</b>, not the <b>' + tot +
-                     ' ml</b> in the total. Fix one of them before saving.';
-  } else {
-    hint.innerHTML = 'Left and right add up to the total.';
+/* Fill in either side and the total stops being something you type: it becomes left plus
+   right, worked out as you go and locked so the two can never disagree. Clearing both
+   sides hands the box back. This replaces an earlier arrangement where a typed total that
+   disagreed with the sides was refused at save time - correct, but it made you do
+   arithmetic the machine was already doing.
+
+   Shared by the Pump tab, the Book form and the correction box, so the rule is the same
+   wherever a split can be entered. `hintId` is optional; the Book form and the correction
+   box have no room for a line of prose. */
+function autoTotal(lId, rId, totId, hintId) {
+  var l = numOrNull($(lId).value), r = numOrNull($(rId).value);
+  var tot = $(totId), hint = hintId ? $(hintId) : null;
+  if (l === null && r === null) {
+    tot.readOnly = false;
+    tot.classList.remove('derived');
+    if (hint) hint.hidden = true;
+    return null;
   }
+  var sum = Math.round(((l || 0) + (r || 0)) * 10) / 10;
+  tot.value = sum;
+  tot.readOnly = true;
+  tot.classList.add('derived');
+  if (hint) {
+    hint.hidden = false;
+    hint.innerHTML = 'Total is left + right: <b>' + sum + ' ml</b>. Clear both sides to ' +
+                     'type a total instead.';
+  }
+  return sum;
 }
+
+function paintPmSum() { autoTotal('pm-l', 'pm-r', 'pm-ml', 'pm-sum'); }
 
 function shiftPumpDay(by) {
   var d = shiftDay(pumpDay || daySG(Date.now()), by);
@@ -3046,6 +3090,13 @@ $('pm-kit').addEventListener('click', function (e) {
 $('pm-presets').addEventListener('click', function (e) {
   var b = e.target.closest('[data-pmset]');
   if (!b) return;
+  /* The total is locked while the sides are filled in, so tapping a preset can only mean
+     the figure is a total after all. The sides go, and it says so rather than appearing
+     to ignore the tap. */
+  if ($('pm-ml').readOnly) {
+    $('pm-l').value = ''; $('pm-r').value = '';
+    toast('Left and right cleared — the total is what you tapped.');
+  }
   $('pm-ml').value = b.dataset.pmset;
   paintPmSum();
 });
@@ -3063,18 +3114,13 @@ $('pm-add').addEventListener('click', function () {
   if (ms > Date.now() + 60000) { toast('That is in the future, so it cannot have happened yet.'); return; }
 
   var l = numOrNull($('pm-l').value), r = numOrNull($('pm-r').value);
-  var tot = numOrNull($('pm-ml').value);
-  var sum = Math.round(((l || 0) + (r || 0)) * 10) / 10;
-  /* An empty total with a split filled in is the one case where the sum is used: there
-     is no typed figure for it to overrule. Where both exist and disagree, neither is
-     silently preferred - she is told, and nothing is saved. */
-  if (tot === null && (l !== null || r !== null)) tot = sum;
+  /* With a side filled in the total is their sum by construction - the box is locked and
+     kept in step - so there is no second figure for it to disagree with. */
+  var tot = (l !== null || r !== null)
+    ? Math.round(((l || 0) + (r || 0)) * 10) / 10
+    : numOrNull($('pm-ml').value);
   if (tot === null) { toast('How much came out? The total is the figure the trend counts.'); return; }
   if (tot < 0) { toast('A volume cannot be negative.'); return; }
-  if ((l !== null || r !== null) && Math.abs(tot - sum) > 0.05) {
-    toast('Left and right add up to ' + sum + ' ml, not ' + tot + ' ml. Fix one of them first.');
-    return;
-  }
   var words = $('pm-note').value.trim();
   var how = LABELS['pump/' + pmHow] || LABELS['pump/'];
   var raw = how.toLowerCase() + ' ' + tot + ' ml' +
@@ -3089,6 +3135,7 @@ $('pm-add').addEventListener('click', function () {
               { ml_l: l, ml_r: r, pump_dev: kit });
 
   ['pm-ml', 'pm-l', 'pm-r', 'pm-note'].forEach(function (id) { $(id).value = ''; });
+  paintPmSum();                       /* hands the total box back, unlocked and empty */
   $('pm-time').value = hhmm(Date.now());
   pumpDay = daySG(ms) === daySG(Date.now()) ? null : daySG(ms);
   render(); renderPump(); paintSync(); renderDiag(); buzz();
@@ -3174,6 +3221,7 @@ function openFix(id) {
   $('fix-lr-row').hidden  = !isPump;
   $('fix-l').value   = isPump && r.ml_l !== null && r.ml_l !== undefined ? r.ml_l : '';
   $('fix-r').value   = isPump && r.ml_r !== null && r.ml_r !== undefined ? r.ml_r : '';
+  autoTotal('fix-l', 'fix-r', 'fix-amt');
 
   var sides = r.type === 'feed' && r.subtype === 'breast';
   $('fix-side-row').hidden = !sides;
@@ -3258,11 +3306,8 @@ function saveFix() {
   if (!$('fix-lr-row').hidden) {
     ml_l = numOrNull($('fix-l').value);
     ml_r = numOrNull($('fix-r').value);
-    var sum = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;
-    if ((ml_l !== null || ml_r !== null) && value !== null && Math.abs(value - sum) > 0.05) {
-      toast('Left and right add up to ' + sum + ' ml, not ' + value +
-            ' ml, so nothing was changed.');
-      return;
+    if (ml_l !== null || ml_r !== null) {
+      value = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;   /* the sum, by construction */
     }
   }
 
@@ -3320,6 +3365,7 @@ function show(tab) {
     if (!$('pm-date').value) $('pm-date').value = daySG(Date.now());
     if (!$('pm-time').value) $('pm-time').value = hhmm(Date.now());
     renderPump();
+    pumpBackfill();
   }
   if (tab === 'sum') renderSummary();
   if (tab === 'set') { renderFirstRun(); renderDiag(); checkBuild(false); }
@@ -3464,6 +3510,10 @@ $('toast-act').addEventListener('click', function () {
   hideToast();
 });
 
+['fix-l', 'fix-r'].forEach(function (id) {
+  $(id).addEventListener('input', function () { autoTotal('fix-l', 'fix-r', 'fix-amt'); });
+});
+
 $('fix-cancel').addEventListener('click', closeFix);
 $('fix-save').addEventListener('click', saveFix);
 $('fix').addEventListener('click', function (e) {
@@ -3522,6 +3572,10 @@ $('book-rows').addEventListener('click', function (e) {
 });
 
 $('bk-kind').addEventListener('change', function () { bkSide = ''; paintBookKind(); });
+['bk-l', 'bk-r'].forEach(function (id) {
+  $(id).addEventListener('input', function () { autoTotal('bk-l', 'bk-r', 'bk-amt'); });
+});
+
 $('bk-kit').addEventListener('click', function (e) {
   var b = e.target.closest('[data-bkkit]');
   if (!b) return;
@@ -3567,11 +3621,8 @@ $('bk-add').addEventListener('click', function () {
   if (!$('bk-lr-row').hidden) {
     ml_l = numOrNull($('bk-l').value);
     ml_r = numOrNull($('bk-r').value);
-    var sum = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;
-    if (value === null && (ml_l !== null || ml_r !== null)) value = sum;
-    if ((ml_l !== null || ml_r !== null) && value !== null && Math.abs(value - sum) > 0.05) {
-      toast('Left and right add up to ' + sum + ' ml, not ' + value + ' ml. Fix one of them first.');
-      return;
+    if (ml_l !== null || ml_r !== null) {
+      value = Math.round(((ml_l || 0) + (ml_r || 0)) * 10) / 10;   /* the sum, by construction */
     }
   }
 
@@ -3584,6 +3635,7 @@ $('bk-add').addEventListener('click', function () {
               { ml_l: ml_l, ml_r: ml_r,
                 pump_dev: (k.t === 'pump' && k.s !== 'hand') ? bkKit : '' });
   ['bk-amt', 'bk-note', 'bk-l', 'bk-r'].forEach(function (id) { $(id).value = ''; });
+  autoTotal('bk-l', 'bk-r', 'bk-amt');
   bkSide = '';
   paintBookKind();
   bookDay = daySG(ms);

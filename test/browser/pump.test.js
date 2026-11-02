@@ -11,6 +11,13 @@ const srv=http.createServer((q,r)=>{let p=decodeURIComponent(url.parse(q.url).pa
   r.writeHead(200,{'Content-Type':MIME[path.extname(f)]||'application/octet-stream'});r.end(fs.readFileSync(f));});
 const NOW=new Date('2026-11-01T06:00:00Z');   // 14:00 Singapore, 1 Nov
 const repoFiles={}; let sha=0; const puts=[];
+// A day inside the chart's three weeks, written by something other than this phone - the
+// other parent, or a notebook typed up straight into the repo. The poll only ever reaches
+// today and yesterday, so nothing on this tab fetched a day like this.
+repoFiles['data/events/2026-10-20/notebook.jsonl']={sha:'nb1',content:Buffer.from(
+  JSON.stringify({ts:'2026-10-20T09:00:00+08:00',sender:'Des',type:'pump',subtype:'',
+    value:10,unit:'ml',note:'',raw:'pump 10',msg_id:'nb-1',
+    dur_min:null,ml_l:4,ml_r:6,pump_dev:'spectra'})+'\n').toString('base64')};
 let fail=0;
 const t=(n,got,want)=>{const ok=String(got)===String(want);if(!ok)fail++;
   console.log((ok?'ok   ':'FAIL ')+n+' -> '+got+(ok?'':'   expected: '+want));};
@@ -84,11 +91,24 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
     return Math.round(n.width)+'x'+Math.round(n.height);});
   t('the new tab is still a 44px target', (()=>{const [w,h]=tabBox.split('x').map(Number);return w>=44&&h>=44;})(), true);
 
+  t('a day three weeks back, written by another device, is not held before the tab opens',
+     await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2')||'[]')
+       .some(r=>r.msg_id==='nb-1')), false);
   await page.click('#tab-pump'); await page.waitForTimeout(400);
   t('no horizontal overflow on the pane', await page.evaluate(()=>
     document.documentElement.scrollWidth<=document.documentElement.clientWidth+1), true);
   t('the date box opens on today', await page.inputValue('#pm-date'), '2026-11-01');
   t('and the time box on now', await page.inputValue('#pm-time'), '14:00');
+
+  console.log('--- the tab fetches the days it is about to draw ---');
+  await page.waitForTimeout(2500);
+  t('opening the tab pulls it in', await page.evaluate(()=>
+     JSON.parse(localStorage.getItem('babylog.entries.v2')).some(r=>r.msg_id==='nb-1')), true);
+  t('and it lands in the day-by-day table without visiting any other tab',
+     JSON.stringify(await tableRow(page,'20 Oct')),
+     JSON.stringify(['20 Oct','10','1','—','—']));
+  t('it was not marked as owing a push', await page.evaluate(()=>
+     !!JSON.parse(localStorage.getItem('babylog.dirty.v2')||'{}')['2026-10-20']), false);
 
   console.log('--- which machine ---');
   t('the kit row is on screen', await page.isVisible('#pm-kit-row'), true);
@@ -113,23 +133,20 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
      await page.isVisible('#pm-min').catch(()=>false), false);
   await page.fill('#pm-l','25'); await page.fill('#pm-r','30');
   await page.waitForTimeout(150);
-  t('it says the split does not match the total',
-     /add up to 55 ml, not the 60 ml/.test((await page.textContent('#pm-sum')).replace(/\s+/g,' ')), true);
-  await page.fill('#pm-r','35');
-  await page.waitForTimeout(150);
-  t('and says so when it does', /add up to the total/.test(await page.textContent('#pm-sum')), true);
-  // a mismatch must refuse rather than quietly pick one
-  await page.fill('#pm-r','99'); await page.waitForTimeout(120);
-  await page.click('#pm-add'); await page.waitForTimeout(250);
-  t('a mismatched split refuses to save',
-     /not 60 ml/.test(((await page.textContent('#toast'))||'')), true);
-  t('and nothing was written', await page.evaluate(()=>
-    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump').length), 0);
-
-  await page.fill('#pm-r','35'); await page.waitForTimeout(120);
+  t('the total becomes left plus right on its own', await page.inputValue('#pm-ml'), '55');
+  t('and the box is locked, so the two can never disagree',
+     await page.evaluate(()=>document.querySelector('#pm-ml').readOnly), true);
+  t('with a line saying where the figure came from',
+     /Total is left \+ right: 55 ml/.test((await page.textContent('#pm-sum')).replace(/\s+/g,' ')), true);
+  await page.fill('#pm-r','35'); await page.waitForTimeout(150);
+  t('changing a side moves the total with it', await page.inputValue('#pm-ml'), '60');
+  await page.fill('#pm-l',''); await page.fill('#pm-r',''); await page.waitForTimeout(150);
+  t('clearing both sides hands the box back',
+     await page.evaluate(()=>document.querySelector('#pm-ml').readOnly), false);
+  await page.fill('#pm-l','25'); await page.fill('#pm-r','35'); await page.waitForTimeout(150);
   await page.click('#pm-add'); await page.waitForTimeout(1200);
   const saved = await page.evaluate(()=>
-    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'));
+    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'&&r.msg_id!=='nb-1'));
   t('one pump entry saved', saved.length, 1);
   t('the volume is the value', saved[0].value, 60);
   t('each side has its own field', saved[0].ml_l+'/'+saved[0].ml_r, '25/35');
@@ -137,10 +154,12 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('and no pump duration is invented', saved[0].dur_min, null);
   t('it is a pump, never a feed', saved[0].type, 'pump');
   t('the form is cleared for the next one', await page.inputValue('#pm-ml'), '');
+  t('and the total box is unlocked again',
+     await page.evaluate(()=>document.querySelector('#pm-ml').readOnly), false);
 
   console.log('--- what reached the repo ---');
   const todayRows = rowsIn('data/events/2026-11-01/des.jsonl');
-  const pushed = todayRows.find(r=>r.type==='pump');
+  const pushed = todayRows.find(r=>r.type==='pump'&&r.msg_id!=='nb-1');
   t('the day was pushed', !!pushed, true);
   t('with the nine original fields first, in order',
      JSON.stringify(Object.keys(pushed).slice(0,9)),
@@ -225,10 +244,10 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   const c3 = await cards(page);
   t('the corrected volume is counted', c3['Expressed'][0], '105');
   const afterFix = await page.evaluate(()=>
-    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'||r.type==='deleted'));
+    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'&&r.msg_id!=='nb-1'||r.type==='deleted'));
   t('the original is kept, struck out', afterFix.filter(r=>r.type==='deleted').length, 1);
   t('and the correction is a new row',
-     afterFix.filter(r=>r.type==='pump'&&r.value===45).length, 1);
+     afterFix.filter(r=>r.type==='pump'&&r.msg_id!=='nb-1'&&r.value===45).length, 1);
 
   console.log('--- reading up a page of notes ---');
   const NOTES = ['Breastfeeding',
@@ -244,7 +263,7 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   const pv = (await page.textContent('#pm-preview')).replace(/\s+/g,' ');
   console.log('   preview:', pv.slice(0,300));
   t('nothing is saved by reading', await page.evaluate(()=>
-    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump').length), 2);
+    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'&&r.msg_id!=='nb-1').length), 2);
   t('the save button appears', await page.isVisible('#pm-imp-save'), true);
   t('six days read', (await page.$$('#pm-preview .pvd:not(.skip)')).length, 6);
   t('the day whose only session was unreadable says so', /nothing read/.test(pv), true);
@@ -262,9 +281,9 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
 
   await page.click('#pm-imp-save'); await page.waitForTimeout(4000);
   const all = await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2')));
-  const imported = all.filter(r=>r.type==='pump'&&r.ms<Date.parse('2026-10-20T00:00:00+08:00'));
+  const imported = all.filter(r=>r.type==='pump'&&r.msg_id!=='nb-1'&&r.ms<Date.parse('2026-10-20T00:00:00+08:00'));
   t('seven sessions saved', imported.length, 7);
-  t('every one is a pump entry', imported.every(r=>r.type==='pump'), true);
+  t('every one is a pump entry', imported.every(r=>r.type==='pump'&&r.msg_id!=='nb-1'), true);
   t('none of them invented a duration', imported.every(r=>r.dur_min===null), true);
   t('the one sitting whose split accounts for it got its sides',
      imported.filter(r=>r.ml_l===20&&r.ml_r===20).length, 1);
@@ -298,7 +317,7 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('and says why', /already has/.test(pv2), true);
   t('there is nothing to save', await page.isVisible('#pm-imp-save'), false);
   t('so the count is unchanged', await page.evaluate(()=>
-    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump').length), 9);
+    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump'&&r.msg_id!=='nb-1').length), 9);
 
   console.log('--- stepping back through the days ---');
   await page.click('#pm-prev'); await page.waitForTimeout(300);

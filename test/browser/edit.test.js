@@ -119,13 +119,13 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   await page.fill('#bk-time','04:30');
   await page.fill('#bk-amt','55');
   await page.fill('#bk-l','25'); await page.fill('#bk-r','20');
-  await page.click('#bk-add'); await page.waitForTimeout(400);
-  t('a split that does not add up is refused',
-     /add up to 45 ml, not 55 ml/.test((await page.textContent('#toast'))||''), true);
-  t('and nothing was written', await page.evaluate(()=>
-    JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='pump').length), 0);
-
-  await page.fill('#bk-r','30');
+  await page.waitForTimeout(200);
+  t('the sides take over the total, rather than being refused for disagreeing',
+     await page.inputValue('#bk-amt'), '45');
+  t('and the total box locks, so the two cannot drift apart',
+     await page.evaluate(()=>document.querySelector('#bk-amt').readOnly), true);
+  await page.fill('#bk-r','30'); await page.waitForTimeout(200);
+  t('changing a side moves the total with it', await page.inputValue('#bk-amt'), '55');
   await page.click('#bk-add'); await page.waitForTimeout(1500);
   const pumped = rowsIn('data/events/2026-10-28/simon.jsonl');
   t('the day four days ago was pushed', pumped.length, 1);
@@ -135,6 +135,8 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('no pump duration is invented', pumped[0].dur_min, null);
   t('at the time given', pumped[0].ts, '2026-10-28T04:30:00+08:00');
   t('and the form was cleared', await page.inputValue('#bk-l'), '');
+  t('with the total box handed back', await page.evaluate(()=>
+     document.querySelector('#bk-amt').readOnly), false);
 
   console.log('--- and it reaches the Pump tab ---');
   await page.click('#tab-pump'); await page.waitForTimeout(500);
