@@ -82,6 +82,17 @@ what it is, and lists decisions that look arbitrary and are not.
   has not happened yet. Both failed every night and passed every morning. Derive the time
   from the page's own clock — `earlier()` in those two files — or pin the clock with
   `page.clock.install`, as the Book, Pump and edit tests do.
+- **iPhones run WebKit, and every other test here runs Chromium.** They differ on exactly
+  what a phone app lives on: native form controls, safe areas, rubber-band scrolling.
+  `test/browser/ios.test.js` runs the real engine, and the same checks on Chromium so an
+  iOS fix cannot quietly cost Android. It needs `npx playwright install webkit` and
+  `npx playwright install-deps webkit`; without them it says so and skips the iOS engine
+  rather than passing quietly.
+- **Keep the safe-area insets behind `--sat`/`--sar`/`--sab`/`--sal`.** `env()` cannot be
+  set from a stylesheet or a test, so a notch was something only a real iPhone could show
+  you — and the bug it causes, content hidden under the notch or the home indicator, is
+  invisible everywhere else. Read through variables, a test can set an iPhone's real
+  numbers and measure what happens. Never go back to `env()` at the point of use.
 - **See a new test fail before trusting it.** The service worker's cache bug was first
   "proved fixed" by a test that passed against the broken worker too, because
   `page.reload()` forces revalidation and hid the fault. Revert the fix, watch the test

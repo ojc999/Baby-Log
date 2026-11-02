@@ -9,7 +9,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- "default", not "black-translucent". black-translucent runs the page under the status
+     bar and forces the clock and battery white, which on this app's light background is
+     white on near-white. "default" lets iOS keep the status bar to itself and colour it
+     for the current appearance. The safe-area padding below holds either way. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#161b2e">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,6 +39,15 @@
   --play:#9c3f63; --play-bg:#fbe9ef; --play-line:#e3aec0;
   --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  /* The four safe-area insets, behind variables rather than used directly. env() cannot
+     be set from a stylesheet or a test, so a notch was something only a real iPhone could
+     show you - and the one bug it causes, content hidden under the notch or the home
+     indicator, is invisible everywhere else. Behind a variable, test/browser/ios.test.js
+     can set them to an iPhone's real numbers and check nothing is cut off. */
+  --sat:env(safe-area-inset-top,0px);
+  --sar:env(safe-area-inset-right,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --ground:#12161c; --surface:#1a2129; --surface-2:#232c36; --line:#2f3a45;
@@ -66,10 +79,22 @@ body{
   margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
   font-size:15px;line-height:1.45;overscroll-behavior:none;
   -webkit-text-size-adjust:100%;touch-action:manipulation;
+  /* iOS flashes a grey box over anything tappable. Every control here has its own
+     pressed state, so the flash adds nothing but lag on a row of chips. */
+  -webkit-tap-highlight-color:transparent;
 }
+/* A long press on a button in iOS Safari starts a text selection and raises the
+   magnifier. Nothing here is meant to be selected except the entries themselves. */
+button,.tab,.chip,.tile{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-.app{display:flex;flex-direction:column;height:100%}
-.pane{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px 26px}
+.app{display:flex;flex-direction:column;height:100%;padding-top:var(--sat)}
+/* The side insets are the notch in landscape: without them a chart bar or a row of
+   chips runs under it. overscroll-behavior stops a pull at the top of a pane turning
+   into Safari's pull-to-refresh, which on a logging app means losing what you typed. */
+.pane{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:12px calc(16px + var(--sar)) 26px calc(16px + var(--sal));
+}
 .pane[hidden],[hidden]{display:none!important}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
@@ -89,7 +114,7 @@ body{
 
 /* ───── state header ───── */
 .state{
-  flex:none;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;
+  flex:none;position:sticky;top:0;z-index:5;
   background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px 9px;
 }
 .state-main{display:flex;align-items:baseline;gap:9px}
@@ -194,10 +219,14 @@ body{
   min-height:44px;min-width:44px;cursor:pointer;
 }
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.chip:active{background:var(--surface-2)}
+.chip[aria-pressed="true"]:active{opacity:.8}
+.tab:active{background:var(--surface-2)}
 .chip:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
 .timein{
   flex:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);
   font-family:var(--mono);font-size:16px;padding:6px 7px;min-height:44px;
+  -webkit-appearance:none;appearance:none;
 }
 
 /* ───── amount sheet ───── */
@@ -222,6 +251,7 @@ body{
 .ta{
   width:100%;min-height:56px;resize:vertical;background:var(--surface);border:1px solid var(--line);
   border-radius:11px;color:var(--ink);font-family:var(--sans);font-size:16px;padding:11px 12px;line-height:1.4;
+  -webkit-appearance:none;appearance:none;
 }
 .ta:focus{outline:2px solid var(--teal);outline-offset:-1px}
 .preview{margin-top:8px;padding:10px 12px;border-radius:10px;font-size:13px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-dim)}
@@ -270,6 +300,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 .field input{
   width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);
   font-family:var(--mono);font-size:16px;padding:11px 12px;min-height:46px;
+  -webkit-appearance:none;appearance:none;
 }
 .field input:focus{outline:2px solid var(--teal);outline-offset:-1px}
 .field p{margin:5px 0 0;font-size:11.5px;color:var(--ink-faint);line-height:1.4}
@@ -286,7 +317,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
    the wrong answer to it. */
 .toast{
   position:fixed;left:12px;right:12px;z-index:40;
-  bottom:calc(env(safe-area-inset-bottom,0px) + 66px);
+  bottom:calc(var(--sab) + 66px);
   display:flex;align-items:center;gap:10px;
   background:var(--ink);color:var(--ground);border-radius:12px;padding:11px 12px;
   font-size:14px;font-weight:500;box-shadow:0 6px 22px rgba(0,0,0,.26);
@@ -322,7 +353,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:flex-end}
 .modal[hidden]{display:none!important}
 .modal-card{
-  width:100%;background:var(--ground);border-radius:16px 16px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 16px);
+  width:100%;background:var(--ground);border-radius:16px 16px 0 0;padding:16px 16px calc(var(--sab) + 16px);
   max-height:88%;overflow-y:auto;border-top:1px solid var(--line);
 }
 .modal-card h3{margin:0 0 3px;font-size:17px;font-weight:700}
@@ -332,7 +363,16 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 .fixrow input{
   flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);
   font-family:var(--mono);font-size:16px;padding:10px 12px;min-height:48px;
+  /* Safari draws its own inset shadow and rounding on a text or number box and ignores
+     the border radius set here. Date and time are left alone: stripping the appearance
+     off those removes the tap-to-open behaviour on iOS. */
+  -webkit-appearance:none;appearance:none;
 }
+.fixrow input[type="date"],.fixrow input[type="time"]{-webkit-appearance:none;appearance:none;text-align:left}
+/* Safari leaves a date or time box its intrinsic width and will not stretch it. */
+input[type="date"],input[type="time"]{min-width:0}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .fixrow input:focus{outline:2px solid var(--teal);outline-offset:-1px}
 /* A total worked out from left + right, not typed. Greyed so it reads as a result
    rather than an empty box somebody forgot to fill in. */
@@ -373,11 +413,23 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
   text-transform:uppercase;letter-spacing:.06em}
 .fixrow select{
   flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;
-  color:var(--ink);font-family:var(--sans);font-size:16px;padding:10px 12px;min-height:48px;
+  color:var(--ink);font-family:var(--sans);font-size:16px;padding:10px 34px 10px 12px;min-height:48px;
+  /* Without this iOS renders its own rounded grey control, which sits oddly beside the
+     boxes above and below it. The chevron is drawn here instead, in currentColor so it
+     follows the dark scheme. */
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235d6a73' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 13px center;background-size:10px 6px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fixrow select{
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2398a6b2' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}}
+:root[data-theme="dark"] .fixrow select{
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2398a6b2' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 /* ───── tabs ───── */
-.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);gap:2px;background:var(--line);border-top:1px solid var(--line);padding-bottom:var(--sab)}
 .tab{
   appearance:none;border:0;background:var(--surface);color:var(--ink-dim);font-family:var(--sans);
   font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
@@ -418,6 +470,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
 /* 16px, not smaller: iOS Safari zooms the whole page when you focus a box under 16px,
    and this is the one box on the app you type a lot into. */
 .imp{width:100%;min-height:120px;font-family:var(--mono);font-size:16px;line-height:1.5;
+  -webkit-appearance:none;appearance:none;
   padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);
   color:var(--ink);resize:vertical}
 .imp:focus{outline:2px solid var(--teal);outline-offset:-1px}
@@ -544,7 +597,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <div class="sect"><h2>Paste a setup link</h2><hr></div>
     <div class="field">
       <label for="in-paste">Setup link</label>
-      <input id="in-paste" type="text" autocomplete="off" inputmode="url" placeholder="https://…#s=…">
+      <input id="in-paste" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" placeholder="https://…#s=…">
       <p>If someone sent you a link, copy it and paste it here. Tapping a link opens it in
       Safari, which on iPhone is a different app with its own storage — so pasting it in
       here is the way to set <b>this</b> app up.</p>
@@ -554,23 +607,23 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <div class="sect"><h2>Who and where</h2><hr></div>
     <div class="field">
       <label for="in-who">Your name</label>
-      <input id="in-who" type="text" autocomplete="off" placeholder="Simon">
+      <input id="in-who" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Simon">
       <p>Stored on every entry, so you can see who did which night feed.</p>
     </div>
     <div class="field">
       <label for="in-device">This device</label>
-      <input id="in-device" type="text" autocomplete="off" placeholder="simon-phone">
+      <input id="in-device" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="simon-phone">
       <p>Lowercase, no spaces. Each device writes its own file in the repo, which is
       why two phones can log at the same time without ever clashing.</p>
     </div>
     <div class="field">
       <label for="in-repo">Private data repo</label>
-      <input id="in-repo" type="text" autocomplete="off" placeholder="owner/private-repo">
+      <input id="in-repo" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="owner/private-repo">
       <p>Owner slash name. This must be a <b>private</b> repo.</p>
     </div>
     <div class="field">
       <label for="in-branch">Branch</label>
-      <input id="in-branch" type="text" autocomplete="off" placeholder="main">
+      <input id="in-branch" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="main">
     </div>
     <div class="field">
       <label for="in-token">GitHub token</label>
@@ -587,7 +640,7 @@ table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink
     <div class="sect"><h2>Set up the other phone</h2><hr></div>
     <div class="field">
       <label for="in-other">Name for the other phone</label>
-      <input id="in-other" type="text" autocomplete="off" placeholder="wife-phone">
+      <input id="in-other" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="wife-phone">
       <p>Must differ from this phone's name. Whoever opens the link becomes this device.</p>
     </div>
     <div class="grid g2">

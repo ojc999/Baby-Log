@@ -656,6 +656,54 @@ strike plus a new row, wherever the new row lands.
 
 ---
 
+## 7i. iOS
+
+Both phones are iPhones and the app is used from the home screen, so Safari's differences
+are not edge cases here — they are the normal case. Every other browser test runs Chromium,
+which cannot see any of this.
+
+**The status bar was set to run under the page.** `apple-mobile-web-app-status-bar-style`
+was `black-translucent`, which fills the screen edge to edge and forces the clock and
+battery white. Against this app's light background that is white on near-white, and the
+header sat under it besides. It is now `default`: iOS keeps the status bar to itself and
+colours it for the current appearance. The top inset is padded for anyway, so the layout
+holds whichever style is in force.
+
+**The safe areas are now testable.** They were written as `env(safe-area-inset-*)` at the
+point of use, which is correct and untestable: `env()` cannot be set from a stylesheet or
+from a test, so a notch was something only a real iPhone could show you. They are read
+through `--sat`/`--sar`/`--sab`/`--sal` instead, and `ios.test.js` sets those to an iPhone
+15 Pro's real numbers — 59pt under the clock, 34pt over the home indicator, 59pt either
+side in landscape — and measures what gets cut off. That caught the one that had been
+missed: the panes had a flat 16px side padding, so in landscape a chart bar or a row of
+chips ran under the notch.
+
+**Safari styles form controls whatever the stylesheet says.** A `select` rendered as its
+own grey rounded control beside boxes that had been given a 10px radius, and text and
+number inputs carried an inset shadow. `-webkit-appearance:none` removes both; the
+dropdown chevron is drawn here instead, in two colours so it follows the dark scheme. Date
+and time inputs are left with their appearance intact except for the width, because
+stripping them breaks the tap-to-open on iOS.
+
+**A tap flashed a grey box.** iOS draws one over anything tappable. Every control here has
+its own pressed state, so the flash only added lag on a row of chips;
+`-webkit-tap-highlight-color:transparent` removes it, and `:active` states were added to
+the chips and tabs that had been relying on it. A long press no longer starts a text
+selection or raises the magnifier on a button, which is what `-webkit-touch-callout` and
+`user-select` are for.
+
+**A pull at the top of a pane became Safari's pull-to-refresh**, which on a logging app
+means losing what you had typed. `overscroll-behavior:contain` on the panes stops the
+gesture chaining out to the page.
+
+**What is not verified here.** Playwright's iPhone profiles report zero safe-area insets,
+so the real values are simulated rather than observed, and standalone mode — the app
+launched from the home screen rather than from Safari — cannot be emulated at all. The
+status bar change is reasoned, not measured. Everything else in this section is checked by
+`ios.test.js` on WebKit, and each fix was confirmed to fail without it.
+
+---
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.

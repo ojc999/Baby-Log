@@ -433,6 +433,16 @@ node test/browser/e2e.test.js        # the real page against a stubbed GitHub
 node test/browser/contrast.test.js   # text contrast, light and dark
 ```
 
+For the iPhone checks, which run Safari's engine rather than Chrome's:
+
+```
+npx playwright install webkit && npx playwright install-deps webkit
+node test/browser/ios.test.js        # iPhones on WebKit, and Android on Chromium
+```
+
+Without WebKit installed that file says so and runs the Chromium half only, rather than
+passing quietly and leaving you thinking iOS was covered.
+
 Optional, and the only ones that can catch a layout or a network bug — the first run of
 these found three. See `test/browser/README.md`. The app itself still has no
 dependencies and no build step; these are development tools that sit beside it.
