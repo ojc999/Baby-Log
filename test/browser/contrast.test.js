@@ -98,6 +98,27 @@ const parse=s=>{const m=s.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);retur
     await page.screenshot({path:`${SH}/${scheme}-tummy.png`});
     await page.click('#cat-back').catch(()=>{});
 
+    // the whole-story screen, which has its own fact list and two more bar colours
+    await page.click('#tab-sum'); await page.waitForTimeout(300);
+    await page.evaluate(()=>{const b=document.getElementById('go-stats'); b&&b.click();});
+    await page.waitForTimeout(500);
+    const lowS = await page.evaluate(()=>{
+      const out=[];
+      const bgOf=el=>{let n=el;while(n){const c=getComputedStyle(n).backgroundColor;
+        if(c&&!/rgba\(0, 0, 0, 0\)|transparent/.test(c))return c;n=n.parentElement}return 'rgb(255,255,255)'};
+      for(const el of document.querySelectorAll('#pane-stats button,#pane-stats h1,#pane-stats h2,#pane-stats b,#pane-stats span,#pane-stats em,#pane-stats i,#pane-stats u,#pane-stats p,#pane-stats dt,#pane-stats dd,#pane-stats small')){
+        const txt=(el.textContent||'').trim(); if(!txt||el.children.length)continue;
+        const r=el.getBoundingClientRect(); if(r.width<2||r.height<2)continue;
+        const cs=getComputedStyle(el);
+        out.push({txt:txt.slice(0,20),fg:cs.color,bg:bgOf(el),size:parseFloat(cs.fontSize),weight:cs.fontWeight});
+      }
+      return out;
+    });
+    low.push(...lowS);
+    await page.screenshot({path:`${SH}/${scheme}-stats.png`,fullPage:true});
+    await page.evaluate(()=>{const b=document.getElementById('stats-back'); b&&b.click();});
+    await page.waitForTimeout(300);
+
     // the Pump tab: the chart numbers and the import preview are coloured, not plain ink
     await page.click('#tab-pump'); await page.waitForTimeout(500);
     await page.evaluate(()=>{

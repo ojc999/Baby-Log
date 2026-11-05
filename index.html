@@ -438,6 +438,12 @@ input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0
 .tab[aria-selected="true"]{color:var(--ink);box-shadow:inset 0 3px 0 var(--teal)}
 .tab:focus-visible{outline:2px solid var(--teal);outline-offset:-3px}
 
+/* ───── the whole story: one fact to a line ───── */
+.facts{border:1px solid var(--line);border-radius:11px;background:var(--surface);overflow:hidden}
+.facts p{margin:0;padding:11px 13px;font-size:13.5px;line-height:1.45;color:var(--ink-dim)}
+.facts p+p{border-top:1px solid var(--line)}
+.facts b{color:var(--ink);font-family:var(--mono);font-weight:600}
+
 /* ───── pump tab: the daily production chart ─────
    Two bars to a day, one above the other: millilitres on top, minutes spent below.
    Drawn with divs rather than a chart library, because there is no build step to put one
@@ -581,6 +587,10 @@ input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0
     <div class="sect"><h2>Last seven days</h2><hr></div>
     <div class="wrap"><table class="week" id="sum-week"></table></div>
     <p class="info" id="sum-weeknote"></p>
+
+    <button class="btn quiet" id="go-stats" style="width:100%;margin-top:4px">
+      The whole story so far &rarr;
+    </button>
 
     <div class="sect"><h2>Growth</h2><hr></div>
     <div id="sum-growth"></div>
@@ -785,6 +795,36 @@ input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0
       finish syncing. A day that already has sessions in it is left alone rather than
       doubled &mdash; undo the ones there first if you want to key it again.</p>
     </div>
+  </div>
+
+  <!-- ═══════════ STATS ═══════════
+       The whole record added up. This one is for fun, so it is deliberately not a tab:
+       it sits behind a button halfway down the Summary tab, where you go looking for it
+       rather than meeting it at 3am. Nothing here is needed to log anything, and nothing
+       on the daily screens depends on it. -->
+  <div class="pane" id="pane-stats" hidden>
+    <div class="back">
+      <button id="stats-back">&larr; Back</button>
+      <h1>The whole story</h1>
+    </div>
+    <p class="info" id="stats-span"></p>
+
+    <div class="sect"><h2>All of it, added up</h2><hr></div>
+    <dl class="lastgrid" id="stats-big"></dl>
+
+    <div class="sect"><h2>Odds and ends</h2><hr></div>
+    <div id="stats-odd"></div>
+
+    <div class="sect"><h2>Growing</h2><hr></div>
+    <div id="stats-weight"></div>
+
+    <div class="sect"><h2>Who logged it</h2><hr></div>
+    <div id="stats-who"></div>
+
+    <p class="info" id="stats-note"></p>
+    <button class="btn quiet" id="stats-load" style="width:100%" hidden>
+      Fetch every day in the repo
+    </button>
   </div>
 
   <!-- ═══════════ BOOK ═══════════
@@ -2145,6 +2185,249 @@ function renderSummary() {
    day and steps back through them. A day with nothing held locally is fetched from the
    repo on arrival, which is what makes a phone set up last week able to show last week. */
 
+/* ═══════════════════════ the whole story ═══════════════════════
+   Every entry the phone holds, added up. This is the one screen in the app that exists
+   for pleasure rather than use, so it is kept off the tab bar: a sixth tab would squeeze
+   the five that matter to 62px each and put a novelty where a nappy button should be. It
+   lives behind a button halfway down the Summary tab instead.
+
+   It counts what this device holds, which is not the same as what the repo holds - the
+   phone pulls recent days and whatever it has been asked for. Rather than quietly
+   totalling a subset, the screen says which days it is counting and offers to fetch the
+   rest. A number that is wrong by a week of missing nappies is worse than no number. */
+
+var statsOpen = false;
+var statsBusy = false;
+
+function statsOf() {
+  var rows = live().slice().sort(function (a, b) { return a.ms - b.ms; });
+  var out = {
+    rows: rows.length, days: {},
+    nappies: 0, wet: 0, dirty: 0,
+    ml: 0, feeds: 0, breastMin: 0, biggest: null,
+    pumpMl: 0, pumps: 0,
+    tummyMin: 0, tummies: 0, baths: 0, vomits: 0, cryMin: 0,
+    weights: [], who: {}, nights: {},
+    first: null, last: null
+  };
+  rows.forEach(function (r) {
+    var d = daySG(r.ms);
+    out.days[d] = true;
+    if (out.first === null) out.first = r.ms;
+    out.last = r.ms;
+
+    var who = r.sender || 'someone';
+    out.who[who] = (out.who[who] || 0) + 1;
+
+    /* The small hours, which is the number everybody wants to see afterwards. */
+    var h = Number(sgParts(r.ms).hour);
+    if (h < 6) out.nights[d] = (out.nights[d] || 0) + 1;
+
+    if (r.type === 'nappy') {
+      out.nappies++;
+      if (r.subtype === 'wet' || r.subtype === 'both') out.wet++;
+      if (r.subtype === 'dirty' || r.subtype === 'both') out.dirty++;
+    } else if (r.type === 'feed') {
+      out.feeds++;
+      if (r.unit === 'ml' && r.value) {
+        out.ml += r.value;
+        if (!out.biggest || r.value > out.biggest.value) out.biggest = r;
+      }
+      if (r.unit === 'min' && r.value) out.breastMin += r.value;
+    } else if (r.type === 'pump') {
+      out.pumps++; out.pumpMl += (r.value || 0);
+    } else if (r.type === 'tummy') {
+      out.tummies++; out.tummyMin += (r.value || 0);
+    } else if (r.type === 'cry') {
+      out.cryMin += (r.value || 0);
+    } else if (r.type === 'vomit') {
+      out.vomits++;
+    } else if ((r.type === 'hygiene' && r.subtype === 'bath') || r.type === 'bath') {
+      out.baths++;
+    } else if (r.type === 'measure' && r.subtype === 'weight' && r.value) {
+      out.weights.push(r);
+    }
+  });
+
+  var si = sleepIntervals(rows);
+  out.sleeps = si.pairs.length;
+  out.unpaired = si.unpaired.length;
+  out.sleepMs = si.pairs.reduce(function (a, p) { return a + p.ms; }, 0);
+  out.longest = si.pairs.reduce(function (a, p) { return (!a || p.ms > a.ms) ? p : a; }, null);
+
+  out.dayCount = Object.keys(out.days).length;
+  out.span = (out.first === null) ? 0
+    : Math.round((msFromIso(daySG(out.last) + 'T12:00:00+08:00') -
+                  msFromIso(daySG(out.first) + 'T12:00:00+08:00')) / 86400000) + 1;
+
+  var bn = null;
+  for (var d in out.nights) if (!bn || out.nights[d] > out.nights[bn]) bn = d;
+  out.busiestNight = bn ? { day: bn, n: out.nights[bn] } : null;
+  return out;
+}
+
+/* A number with thousands separators. Intl is everywhere these phones are. */
+function grp(n) {
+  try { return Number(n).toLocaleString('en-SG'); } catch (e) { return String(n); }
+}
+
+/* "1 feeds" reads like a bug even when the number is right. */
+function plural(n, one, many) { return grp(n) + ' ' + (n === 1 ? one : (many || one + 's')); }
+
+function renderStats() {
+  var s = statsOf();
+  if (!s.rows) {
+    $('stats-span').innerHTML = 'Nothing logged yet, so there is nothing to add up.';
+    ['stats-big', 'stats-odd', 'stats-weight', 'stats-who'].forEach(function (i) { $(i).innerHTML = ''; });
+    $('stats-note').innerHTML = '';
+    $('stats-load').hidden = true;
+    return;
+  }
+
+  $('stats-span').innerHTML =
+    '<b>' + esc(dayLabel(daySG(s.first))) + '</b> to <b>' + esc(dayLabel(daySG(s.last))) +
+    '</b> — ' + plural(s.span, 'day') + ', ' + plural(s.rows, 'entry', 'entries') +
+    ', ' + s.dayCount + ' of those days with something logged.';
+
+  var litres = Math.round(s.ml / 100) / 10;
+  var sleepH = Math.round(s.sleepMs / 3600000);
+  $('stats-big').innerHTML =
+    lcard('Nappies', grp(s.nappies), s.wet + ' wet · ' + s.dirty + ' dirty', false) +
+    lcard('Milk drunk', litres ? litres + ' L' : '—',
+          grp(Math.round(s.ml)) + ' ml in ' + plural(s.feeds, 'feed'), false) +
+    lcard('Asleep', sleepH ? sleepH + ' h' : '—',
+          plural(s.sleeps, 'complete sleep'), false) +
+    lcard('At the breast', s.breastMin ? Math.round(s.breastMin / 60) + ' h' : '—',
+          plural(Math.round(s.breastMin), 'minute'), false) +
+    lcard('Expressed', s.pumpMl ? Math.round(s.pumpMl / 100) / 10 + ' L' : '—',
+          grp(Math.round(s.pumpMl)) + ' ml in ' + plural(s.pumps, 'session'), false) +
+    lcard('Tummy time', s.tummyMin ? plural(Math.round(s.tummyMin), 'min', 'min') : '—',
+          plural(s.tummies, 'go', 'goes'), false);
+
+  /* The lines worth reading out to somebody. */
+  var bits = [];
+  var perDay = s.span ? s.nappies / s.span : 0;
+  if (s.nappies) {
+    bits.push('That is <b>' + (Math.round(perDay * 10) / 10) + ' nappies a day</b>' +
+      (perDay > 0 ? ', or one every <b>' + dur(Math.round(86400000 / perDay)) + '</b>' : '') + '.');
+  }
+  if (litres >= 1) {
+    bits.push('<b>' + litres + ' litres</b> of milk — about <b>' + Math.round(s.ml / 1000) +
+      '</b> one-litre cartons.');
+  }
+  if (s.longest) {
+    bits.push('Longest unbroken sleep: <b>' + dur(s.longest.ms) + '</b>, starting ' +
+      hhmm(s.longest.start.ms) + ' on <b>' + esc(dayLabel(daySG(s.longest.start.ms))) + '</b>.');
+  }
+  if (s.sleepMs) {
+    bits.push('Asleep for <b>' + Math.round(s.sleepMs / 86400000 * 10) / 10 + ' days</b> in total' +
+      (s.span ? ', out of ' + s.span : '') + '.');
+  }
+  if (s.biggest) {
+    bits.push('Biggest single feed: <b>' + s.biggest.value + ' ml</b> on <b>' +
+      esc(dayLabel(daySG(s.biggest.ms))) + '</b>.');
+  }
+  if (s.busiestNight) {
+    bits.push('Busiest night: <b>' + plural(s.busiestNight.n, 'entry', 'entries') + '</b> between midnight and ' +
+      '6am on <b>' + esc(dayLabel(s.busiestNight.day)) + '</b>.');
+  }
+  if (s.baths) bits.push('<b>' + s.baths + '</b> bath' + (s.baths === 1 ? '' : 's') + ' so far.');
+  if (s.vomits) bits.push('Brought back up <b>' + s.vomits + '</b> time' + (s.vomits === 1 ? '' : 's') + '.');
+  if (s.unpaired) {
+    bits.push('<b>' + s.unpaired + '</b> sleep entr' + (s.unpaired === 1 ? 'y has' : 'ies have') +
+      ' no pair, so the sleep total is an undercount.');
+  }
+  $('stats-odd').innerHTML = bits.length
+    ? '<div class="facts">' + bits.map(function (b) { return '<p>' + b + '</p>'; }).join('') + '</div>'
+    : '<p class="info">Not enough logged yet for anything interesting.</p>';
+
+  /* Weight, oldest first, scaled from zero - the bar is the weight, not the gain, and
+     the gain is given as a number underneath where it cannot mislead. */
+  if (s.weights.length) {
+    var maxW = s.weights.reduce(function (a, r) { return Math.max(a, r.value); }, 0);
+    var first = s.weights[0], last = s.weights[s.weights.length - 1];
+    var gain = Math.round((last.value - first.value) * 1000);
+    var days = Math.round((last.ms - first.ms) / 86400000);
+    $('stats-weight').innerHTML =
+      '<div class="bars">' + s.weights.map(function (r) {
+        var w = maxW ? Math.round(r.value / maxW * 100) : 0;
+        return '<div class="brow">' +
+          '<span class="bd">' + dayShort(daySG(r.ms)) + '</span>' +
+          '<span class="bt"><span class="btrack">' +
+            '<span class="bfill" style="width:' + w + '%"></span></span></span>' +
+          '<span class="bn"><i>' + r.value + ' kg</i></span>' +
+        '</div>';
+      }).join('') + '</div>' +
+      (s.weights.length > 1
+        ? '<p class="info"><b>' + (gain >= 0 ? '+' : '') + grp(gain) + ' g</b> since ' +
+          esc(dayLabel(daySG(first.ms))) + (days > 0
+            ? ', over ' + days + (days === 1 ? ' day' : ' days') + ' — <b>' +
+              Math.round(gain / days) + ' g a day</b>.'
+            : '.') + '</p>'
+        : '<p class="info">One weight so far. The second one is where this gets interesting.</p>');
+  } else {
+    $('stats-weight').innerHTML = '<p class="info">No weights logged yet. ' +
+      'They go in under <b>More</b> on the Log tab.</p>';
+  }
+
+  var names = Object.keys(s.who).sort(function (a, b) { return s.who[b] - s.who[a]; });
+  $('stats-who').innerHTML = '<div class="bars">' + names.map(function (n) {
+    var w = Math.round(s.who[n] / s.who[names[0]] * 100);
+    return '<div class="brow">' +
+      '<span class="bd">' + esc(n.slice(0, 7)) + '</span>' +
+      '<span class="bt"><span class="btrack">' +
+        '<span class="bfill mins" style="width:' + w + '%"></span></span></span>' +
+      '<span class="bn"><i>' + grp(s.who[n]) + '</i></span>' +
+    '</div>';
+  }).join('') + '</div>';
+
+  var held = Object.keys(s.days).length;
+  var known = (repoDays || []).length;
+  var missing = (repoDays || []).filter(function (d) { return !s.days[d]; }).length;
+  $('stats-note').innerHTML =
+    'Counted from the ' + plural(held, 'day') + ' this phone holds. ' +
+    (known
+      ? (missing
+          ? '<b>' + missing + ' more ' + (missing === 1 ? 'day is' : 'days are') +
+            ' in the repo and not counted here.</b>'
+          : 'That is every day in the repo.')
+      : 'It has not checked what else is in the repo.') +
+    ' Undone entries are left out, as they are everywhere else.';
+  $('stats-load').hidden = !configured() || statsBusy || (known > 0 && missing === 0);
+  $('stats-load').textContent = statsBusy ? 'Fetching…' : 'Fetch every day in the repo';
+}
+
+/* Pull every day the repo has, so the totals are the whole record rather than the last
+   few weeks. One listing gives the day folders; the days themselves go five at a time. */
+function statsLoadAll() {
+  if (!configured() || statsBusy) return;
+  statsBusy = true;
+  renderStats();
+  var p = (repoDays === null) ? loadRepoDays() : Promise.resolve();
+  p.then(function () {
+    var list = (repoDays || []).filter(function (d) { return !dayTried[d]; });
+    list.forEach(function (d) { dayTried[d] = true; });
+    var done = 0, total = list.length;
+    return (function step() {
+      if (!list.length) return Promise.resolve();
+      var chunk = list.splice(0, 5);
+      return Promise.all(chunk.map(backfillDay)).then(function () {
+        done += chunk.length;
+        if (total > 10) $('stats-load').textContent = 'Fetching… ' + done + ' of ' + total;
+        return step();
+      });
+    })();
+  }).then(function () {
+    statsBusy = false;
+    saveEntries();
+    if (!$('pane-stats').hidden) renderStats();
+    render(); renderDiag();
+  }).catch(function () {
+    statsBusy = false;
+    if (!$('pane-stats').hidden) renderStats();
+  });
+}
+
 /* ═══════════════════════ the pump tab ═══════════════════════
    What comes out of Mum, counted on its own. It is deliberately not part of the feed
    figures: expressing 80 ml and him drinking 80 ml are two events, and adding them would
@@ -2939,6 +3222,7 @@ function render() {
   renderState(); renderLast(); renderTiles(); renderHomeRecent();
   if (screen === 'cat') renderCat();
   if (!$('pane-sum').hidden) renderSummary();
+  if (!$('pane-stats').hidden) renderStats();
   /* The poll calls this every ten seconds, so the pump tab picks up the other phone's
      sessions without being left and re-entered. Only when it is the tab on screen -
      rebuilding a chart nobody is looking at is work for nothing. */
@@ -3414,7 +3698,8 @@ function show(tab) {
   // every pane set explicitly, so two can never be visible at once
   $('pane-home').hidden = !(tab === 'log' && screen === 'home');
   $('pane-cat').hidden  = !(tab === 'log' && screen === 'cat');
-  $('pane-sum').hidden  = tab !== 'sum';
+  $('pane-sum').hidden   = !(tab === 'sum' && !statsOpen);
+  $('pane-stats').hidden = !(tab === 'sum' && statsOpen);
   $('pane-pump').hidden = tab !== 'pump';
   $('pane-book').hidden = tab !== 'book';
   $('pane-set').hidden  = tab !== 'set';
@@ -3426,9 +3711,10 @@ function show(tab) {
     renderPump();
     pumpBackfill();
   }
-  if (tab === 'sum') renderSummary();
+  if (tab === 'sum' && statsOpen) renderStats();
+  if (tab === 'sum' && !statsOpen) renderSummary();
   if (tab === 'set') { renderFirstRun(); renderDiag(); checkBuild(false); }
-  if (tab === 'sum') startLogObserver();
+  if (tab === 'sum' && !statsOpen) startLogObserver();
   if (tab === 'book') {
     renderBook();
     paintBookKind();
@@ -3460,9 +3746,23 @@ $('cat-back').addEventListener('click', goHome);
 ['log', 'sum', 'pump', 'book', 'set'].forEach(function (n) {
   $('tab-' + n).addEventListener('click', function () {
     if (n === 'log' && screen === 'cat') { goHome(); return; }
+    /* Tapping Summary while the story is open goes back to the summary, the same way
+       tapping Log while a category is open goes back to the tiles. */
+    if (n === 'sum' && statsOpen) { statsOpen = false; show('sum'); return; }
     show(n);
   });
 });
+
+$('go-stats').addEventListener('click', function () {
+  statsOpen = true;
+  show('sum');
+  $('pane-stats').scrollTop = 0;
+  /* One listing says how much of the record is not on this phone, so the screen can say
+     so rather than quietly totalling a subset. It reads nothing else by itself. */
+  if (repoDays === null && configured()) loadRepoDays().then(renderStats);
+});
+$('stats-back').addEventListener('click', function () { statsOpen = false; show('sum'); });
+$('stats-load').addEventListener('click', statsLoadAll);
 
 /* ═══════════════════════ when ═══════════════════════ */
 

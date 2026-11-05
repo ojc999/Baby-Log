@@ -45,6 +45,11 @@ what it is, and lists decisions that look arbitrary and are not.
   Everything else it cannot read with confidence — an ambiguous `23/41mL`, a left/right
   split, a duration — it leaves empty and names on the screen as unread. A wrong side is
   worse than no side.
+- **Never total a subset without saying so.** The whole-story screen adds up what this
+  phone holds, which is not what the repo holds. It names the days it counted, says how
+  many more are in the repo, and offers to fetch them. A lifetime total that is quietly
+  short by a week of nappies is worse than no total, because nobody checks a number that
+  looks plausible.
 - **Never add expressing to a feed.** `pump` is what came out of her; `feed/expressed` is
   what he drank. Summing them counts the same milk twice. The Pump tab's figures and the
   Log tab's figures are drawn from the two separately, and must stay that way.

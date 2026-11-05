@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -330,6 +330,68 @@ A.add('pump', '', 50, 'ml', '', 'p', Date.parse('2026-10-20T10:00:00+08:00'), {}
 const r13 = A.parsePumpNotes('20 Oct: 60mL pump\n21 Oct: 70mL pump', NOW);
 t('a day that already has sessions is marked as such', r13.days[0].had, 1);
 t('and one that does not, is not', r13.days[1].had, 0);
+
+console.log('\n--- the whole story: everything added up ---');
+A.setEntries([]);
+const D = d => Date.parse('2026-10-' + String(d).padStart(2,'0') + 'T12:00:00+08:00');
+A.add('nappy','wet',  null,'','','n', D(10));
+A.add('nappy','dirty',null,'','','n', D(11));
+A.add('nappy','both', null,'','','n', D(12));
+A.add('feed','bottle',   90,'ml','','f', D(10) + 3600000);
+A.add('feed','expressed',60,'ml','','f', D(11) + 3600000);
+A.add('feed','breast',   25,'min','left','f', D(12) + 3600000);
+A.add('pump','',         80,'ml','','p', D(12) + 7200000);
+A.add('tummy','',        10,'min','','t', D(12) + 9000000);
+A.add('hygiene','bath',null,'','','b', D(12) + 10800000);
+A.add('vomit','',      null,'','','v', D(12) + 12600000);
+A.add('measure','weight', 2.8,'kg','','w', D(10));
+A.add('measure','weight', 3.5,'kg','','w', D(14));
+// a 3-hour sleep, and a start whose end was never logged
+A.add('sleep','start',null,'','','s', D(11) + 72000000);
+A.add('sleep','end',  null,'','','s', D(11) + 82800000);
+A.add('sleep','start',null,'','','s', D(13) + 72000000);
+const S = A.statsOf();
+t('every nappy counted', S.nappies, 3);
+t('"both" counts as wet', S.wet, 2);
+t('and as dirty', S.dirty, 2);
+t('milk drunk is the millilitre feeds', S.ml, 150);
+t('expressing is not added to it', S.ml === 150, true);
+t('expressing has its own total', S.pumpMl, 80);
+t('time at the breast is kept in minutes', S.breastMin, 25);
+t('all three feeds counted', S.feeds, 3);
+t('the biggest single feed is found', S.biggest.value, 90);
+t('tummy time summed', S.tummyMin, 10);
+t('baths counted', S.baths, 1);
+t('and what came back up', S.vomits, 1);
+t('one complete sleep', S.sleeps, 1);
+t('of three hours', A.dur(S.sleepMs), '3h 0m');
+t('the longest is that one', A.dur(S.longest.ms), '3h 0m');
+t('the sleep with no end is reported, not guessed at', S.unpaired, 1);
+t('both weights kept, oldest first', S.weights.map(r=>r.value).join(','), '2.8,3.5');
+t('the span runs first day to last', S.span, 5);
+// 13 Oct has nothing on it: the 23-hour sleep started on the 11th ends on the 12th, and
+// the last sleep start lands on the 14th. The span covers it; the day count does not.
+t('a day inside the span with nothing on it is not counted', S.dayCount, 4);
+t('every row is attributed', Object.values(S.who).reduce((a,b)=>a+b,0), S.rows);
+
+console.log('\n--- what it leaves out ---');
+const undone = A.entries().find(r => r.type === 'nappy');
+A.undo(undone.msg_id);
+const S2 = A.statsOf();
+t('an undone nappy is not counted', S2.nappies, 2);
+t('nor is it counted as an entry', S2.rows, S.rows - 1);
+
+console.log('\n--- the small hours ---');
+A.setEntries([]);
+A.add('feed','bottle',60,'ml','','f', Date.parse('2026-10-20T02:10:00+08:00'));
+A.add('nappy','wet',null,'','','n', Date.parse('2026-10-20T03:40:00+08:00'));
+A.add('feed','bottle',60,'ml','','f', Date.parse('2026-10-20T05:55:00+08:00'));
+A.add('feed','bottle',60,'ml','','f', Date.parse('2026-10-21T06:05:00+08:00'));
+A.add('nappy','wet',null,'','','n', Date.parse('2026-10-21T14:00:00+08:00'));
+const S3 = A.statsOf();
+t('the busiest night is the one with most before 6am', S3.busiestNight.day, '2026-10-20');
+t('and counts only those hours', S3.busiestNight.n, 3);
+t('06:05 is morning, not night', S3.nights['2026-10-21'] || 0, 0);
 
 console.log(fail ? '\n======== ' + fail + ' FAILURES ========' : '\n======== ALL PASS ========');
 process.exit(fail ? 1 : 0);

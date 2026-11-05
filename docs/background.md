@@ -704,6 +704,37 @@ status bar change is reasoned, not measured. Everything else in this section is 
 
 ---
 
+## 7j. The whole story
+
+Every entry added up: nappies, litres, hours asleep, the longest sleep and when, the
+biggest feed, the busiest night, weight gain in grams a day, and which of the two of them
+has logged more. It exists for pleasure, not use.
+
+**It is not a tab, and that is the whole design.** A sixth tab would squeeze the five that
+matter to about 62px each on a 375px phone and put a novelty where a nappy button should
+be. It sits behind a quiet button halfway down the Summary tab — below the fold, so it is
+something you go looking for rather than meet at 3am — and opens as a second screen behind
+that tab, the same way a category opens behind the Log tab. Tapping Summary while it is
+open goes back to the summary, exactly as tapping Log while a category is open goes back
+to the tiles. Nothing on the daily screens reads from it, and the browser test checks that
+a nappy still logs in three taps with it open.
+
+**It says what it has not counted.** The totals come from what this device holds, and a
+phone holds recent days plus whatever it has been asked for. A lifetime nappy count that
+is quietly short by a week is worse than no count, because a plausible number does not get
+checked. So the screen names the span it counted, says how many more days are in the repo,
+and offers to fetch them — one listing gives the day folders, then five days at a time. It
+reads only; nothing is marked as owing a push, which the test checks against the live
+queue rather than the saved one, because a day marked dirty in memory would be pushed by
+the next flush with nothing on disk to show for it.
+
+**Undone entries are left out**, as everywhere else, and an unpaired sleep is named rather
+than quietly dropped — the sleep total says it is an undercount when one exists. The weight
+bars are scaled from zero, which flattens the shape of the gain; the gain itself is given
+as a number in grams and grams a day underneath, where a truncated axis cannot flatter it.
+
+---
+
 ## 8. Privacy
 
 - **Public repo: the app only.** No data, ever.

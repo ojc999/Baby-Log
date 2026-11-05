@@ -167,6 +167,19 @@ const VIEWPORTS = [
       return [...new Set(dup)]; });
     for (const d of dupIds) note(name, `duplicate id #${d} — getElementById returns only the first`);
 
+    // the whole-story screen, behind the Summary tab
+    await page.click('#tab-sum'); await page.waitForTimeout(250);
+    await page.evaluate(()=>{const b=document.getElementById('go-stats'); b&&b.click();});
+    await page.waitForTimeout(400);
+    const m6 = await page.evaluate(() => {
+      const p = document.querySelector('#pane-stats');
+      return { scrollW: p.scrollWidth, clientW: p.clientWidth, visible: !p.hidden }; });
+    if (!m6.visible) note(name, 'the whole-story screen did not open');
+    if (m6.scrollW > m6.clientW + 1) note(name, `horizontal overflow inside the whole story: ${m6.scrollW} > ${m6.clientW}`);
+    await page.screenshot({ path: `${SHOTS}/${name}-stats.png`, fullPage: true });
+    await page.evaluate(()=>{const b=document.getElementById('stats-back'); b&&b.click();});
+    await page.waitForTimeout(250);
+
     // Pump tab: the chart and the notes box are the widest things in the app
     await page.click('#tab-pump'); await page.waitForTimeout(400);
     await page.screenshot({ path: `${SHOTS}/${name}-pump.png`, fullPage: true });

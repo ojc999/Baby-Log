@@ -135,6 +135,23 @@ important part:
 Each day becomes one commit, so a long paste takes a minute to finish syncing. Watch the
 strip at the top of the screen; it says when everything is saved.
 
+## The whole story
+
+A button halfway down the Summary tab, below the fold: **The whole story so far**. It adds
+up every entry the app holds — nappies and the wet/dirty split, litres of milk, hours
+asleep and the longest unbroken one, time at the breast, millilitres expressed, tummy time
+— and then the things worth reading out to somebody: nappies per day and one every so many
+hours, how many one-litre cartons the milk comes to, the biggest single feed, the busiest
+night between midnight and 6am, how many days he has spent asleep in total. Underneath,
+weight over time with the gain in grams a day, and a scoreboard of who logged more.
+
+It is for fun, so it is deliberately not a tab — a sixth would crowd the five you use at
+3am. Nothing on the daily screens depends on it.
+
+**It tells you what it has not counted.** The totals come from the days this phone holds,
+which is not every day in the repo. The note at the bottom says which, and the button
+under it fetches the rest. That is a read: nothing is queued for pushing.
+
 ## The Book tab
 
 For checking the app against a paper record, and filling in what is missing. It is a
