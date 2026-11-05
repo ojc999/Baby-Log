@@ -169,6 +169,17 @@ const VIEWPORTS = [
 
     // the whole-story screen, behind the Summary tab
     await page.click('#tab-sum'); await page.waitForTimeout(250);
+    // the way into it sits on a section heading, which is the one place in the app where
+    // a control is next to text rather than in a row of its own
+    const sumSmall = await page.evaluate(() => {
+      const out = [];
+      for (const el of document.querySelectorAll('#pane-sum button')) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        if (r.width < 44 || r.height < 44) out.push(`${Math.round(r.width)}x${Math.round(r.height)}px : ${(el.textContent||el.id).trim().slice(0,24)}`);
+      }
+      return out; });
+    for (const sm of sumSmall) note(name, `tap target ${sm} (<44) on Summary`);
     await page.evaluate(()=>{const b=document.getElementById('go-stats'); b&&b.click();});
     await page.waitForTimeout(400);
     const m6 = await page.evaluate(() => {

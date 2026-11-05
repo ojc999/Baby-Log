@@ -20,6 +20,14 @@ const repoFiles={}; let sha=0; const calls=[];
       value:null,unit:'',note:'',raw:'n',msg_id:'old-n'+i,dur_min:null,ml_l:null,ml_r:null,pump_dev:''})
     ].join('\n')+'\n').toString('base64')};
 });
+// The other phone's file, on a day that already has this phone's. A day is only complete
+// once both have been read, and totalling one of them is the failure worth testing for.
+repoFiles['data/events/2026-10-03/simon.jsonl']={sha:'rs',content:Buffer.from(
+  [JSON.stringify({ts:'2026-10-03T22:00:00+08:00',sender:'Simon',type:'feed',subtype:'bottle',
+    value:75,unit:'ml',note:'',raw:'b',msg_id:'his-f',dur_min:null,ml_l:null,ml_r:null,pump_dev:''}),
+   JSON.stringify({ts:'2026-10-03T23:00:00+08:00',sender:'Simon',type:'nappy',subtype:'dirty',
+    value:null,unit:'',note:'',raw:'n',msg_id:'his-n',dur_min:null,ml_l:null,ml_r:null,pump_dev:''})
+  ].join('\n')+'\n').toString('base64')};
 let fail=0;
 const t=(n,got,want)=>{const ok=String(got)===String(want);if(!ok)fail++;
   console.log((ok?'ok   ':'FAIL ')+n+' -> '+got+(ok?'':'   expected: '+want));};
@@ -83,52 +91,61 @@ const card=(page,label)=>page.evaluate(l=>{
   t('and the story is not on it', await page.isVisible('#pane-stats'), false);
   t('nor is the way in', await page.isVisible('#go-stats'), false);
 
-  console.log('--- the way in is on the Summary tab, below the fold ---');
+  console.log('--- the way in is on the Summary tab, and findable without scrolling ---');
   await page.click('#tab-sum'); await page.waitForTimeout(500);
   t('the summary itself is what you land on', await page.isVisible('#pane-sum'), true);
   const where = await page.evaluate(()=>{
-    const b=document.getElementById('go-stats'), p=document.getElementById('pane-sum');
-    return {top:Math.round(b.getBoundingClientRect().top), vh:window.innerHeight,
-            paneTop:Math.round(p.getBoundingClientRect().top)};});
-  t('the button is below the fold, so it is not the first thing you meet',
-     where.top > where.vh, true);
+    const b=document.getElementById('go-stats');
+    const r=b.getBoundingClientRect();
+    return {top:Math.round(r.top), h:Math.round(r.height), w:Math.round(r.width),
+            vh:window.innerHeight};});
+  t('the way in is on screen the moment the tab opens', where.top < where.vh, true);
+  t('and is a 44px target like everything else', where.h >= 44, true);
+  t('but small enough to read as a side door, not a feature',
+     where.w < 200, true);
 
-  await page.evaluate(()=>document.getElementById('go-stats').click());
-  await page.waitForTimeout(700);
+  await page.click('#go-stats');
+  await page.waitForTimeout(3000);
   t('tapping it opens the story', await page.isVisible('#pane-stats'), true);
   t('and hides the summary behind it', await page.isVisible('#pane-sum'), false);
   t('the Summary tab stays the selected one', await page.getAttribute('#tab-sum','aria-selected'), 'true');
   t('no horizontal overflow', await page.evaluate(()=>{
     const p=document.querySelector('#pane-stats'); return p.scrollWidth<=p.clientWidth+1;}), true);
 
-  console.log('--- what it counts, from what the phone holds ---');
-  t('nappies', (await card(page,'Nappies'))[0], '2');
+  console.log('--- opening it pulls the repo, both phones, without being asked ---');
+  t('it listed the day folders by itself', calls.filter(c=>c==='GET data/events').length, 1);
+  t('and read the days it did not hold',
+     calls.filter(c=>/^GET data\/events\/2026-10-0/.test(c)).length >= 3, true);
+  t('the other phone\u2019s entries are in the totals too',
+     await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2'))
+       .some(r=>r.msg_id==='his-f')), true);
+  t('nappies, from both phones and every day', (await card(page,'Nappies'))[0], '6');
   t('with the wet and dirty split, counting "both" as each',
-     (await card(page,'Nappies'))[1], '1 wet · 2 dirty');
-  t('milk drunk, singular when there is one', (await card(page,'Milk drunk'))[1], '100 ml in 1 feed');
-  t('sleep, likewise', (await card(page,'Asleep'))[1], '1 complete sleep');
+     (await card(page,'Nappies'))[1], '4 wet · 3 dirty');
+  t('milk drunk, his 75 ml included', (await card(page,'Milk drunk'))[1], '595 ml in 5 feeds');
+  t('sleep, singular when there is one', (await card(page,'Asleep'))[1], '1 complete sleep');
   const odd = (await page.textContent('#stats-odd')).replace(/\s+/g,' ');
   t('the longest sleep is named with its day', /Longest unbroken sleep: 1h 30m/.test(odd), true);
-  t('the biggest feed too', /Biggest single feed: 100 ml/.test(odd), true);
+  t('the biggest feed too, which is one of hers', /Biggest single feed: 160 ml/.test(odd), true);
   t('one weight shows, and says it needs a second',
      /second one is where this gets interesting/.test(await page.textContent('#stats-weight')), true);
   const who = await page.evaluate(()=>[...document.querySelectorAll('#stats-who .brow')]
     .map(r=>r.querySelector('.bd').textContent+'='+r.querySelector('.bn').textContent));
-  t('both people are on the scoreboard, most first', JSON.stringify(who), JSON.stringify(['Des=4','Simon=2']));
+  t('both people are on the scoreboard, most first',
+     JSON.stringify(who), JSON.stringify(['Des=10','Simon=4']));
 
-  console.log('--- it says what it has not counted, rather than totalling a subset ---');
+  console.log('--- and says so, rather than leaving you to wonder ---');
   const note = (await page.textContent('#stats-note')).replace(/\s+/g,' ');
   console.log('   note:', note);
-  t('it names the days it holds', /Counted from the 1 day this phone holds/.test(note), true);
-  t('and says how many it is missing', /3 more days are in the repo and not counted/.test(note), true);
-  t('so the offer to fetch them is there', await page.isVisible('#stats-load'), true);
+  t('it says both phones are counted', /both phones\u2019 entries included/.test(note), true);
+  t('and that nothing is missing', /That is every day in the repo/.test(note), true);
+  t('the re-read button stays, for when the other phone has logged since',
+     await page.isVisible('#stats-load'), true);
 
-  await page.click('#stats-load'); await page.waitForTimeout(2500);
-  t('fetching brings the older days in', (await card(page,'Nappies'))[0], '5');
-  t('and their milk, plural now', (await card(page,'Milk drunk'))[1], '520 ml in 4 feeds');
-  const note2 = (await page.textContent('#stats-note')).replace(/\s+/g,' ');
-  t('the note now says nothing is missing', /That is every day in the repo/.test(note2), true);
-  t('and the offer is gone', await page.isVisible('#stats-load'), false);
+  const before = calls.length;
+  await page.click('#stats-load'); await page.waitForTimeout(3000);
+  t('it reads every day again on request', calls.length > before + 3, true);
+  t('and the totals do not double', (await card(page,'Nappies'))[0], '6');
   // read the live queue, not the saved one: a day marked dirty in memory would be pushed
   // by the next flush even though nothing had written it to storage yet
   t('nothing was marked as owing a push', await page.evaluate(()=>
@@ -136,7 +153,9 @@ const card=(page,label)=>page.evaluate(l=>{
   t('and nothing is queued on disk either', await page.evaluate(()=>
      Object.keys(JSON.parse(localStorage.getItem('babylog.dirty.v2')||'{}')).length), 0);
   t('fetching wrote nothing to the repo', calls.filter(c=>c.startsWith('PUT')).length, 0);
-  t('it took one listing of data/events', calls.filter(c=>c==='GET data/events').length, 1);
+  // one on opening, one for the re-read just above
+  t('each pass took a single listing of data/events',
+     calls.filter(c=>c==='GET data/events').length, 2);
 
   console.log('--- getting back out ---');
   await page.click('#stats-back'); await page.waitForTimeout(400);
@@ -162,9 +181,9 @@ const card=(page,label)=>page.evaluate(l=>{
   await page.evaluate(()=>{const x=[...document.querySelectorAll('#cat-body button')]
     .find(e=>/^wet/i.test(e.textContent.trim())); x&&x.click();});
   await page.waitForTimeout(900);
-  // 2 seeded + 3 pulled from the repo above + this one
+  // 2 seeded + 3 of hers + 1 of his pulled from the repo + this one
   t('a nappy still logs in three taps', await page.evaluate(()=>
-     JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='nappy').length), 6);
+     JSON.parse(localStorage.getItem('babylog.entries.v2')).filter(r=>r.type==='nappy').length), 7);
 
   await b.close(); srv.close();
   console.log(fail?'\n======== '+fail+' FAILURES ========':'\n======== ALL PASS ========');

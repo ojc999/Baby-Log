@@ -220,6 +220,14 @@ button,.tab,.chip,.tile{-webkit-touch-callout:none;-webkit-user-select:none;user
 }
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
 .chip:active{background:var(--surface-2)}
+/* The one chip that lives on a section heading rather than in a row of inputs. It is the
+   way into the whole-story screen: on the Summary tab, where looking back belongs, and
+   visible the moment that tab opens rather than a scroll down it - the first version was
+   below the fold and simply was not found. Still nowhere near the Log tab. */
+.chip.onhead{min-width:0;padding:6px 11px;font-size:11px;font-family:var(--sans);
+  letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;
+  color:var(--teal);border-color:var(--teal-line);background:var(--teal-bg)}
+.chip.onhead:active{background:var(--teal-line)}
 .chip[aria-pressed="true"]:active{opacity:.8}
 .tab:active{background:var(--surface-2)}
 .chip:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
@@ -580,17 +588,16 @@ input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0
 
   <!-- ═══════════ SUMMARY ═══════════ -->
   <div class="pane" id="pane-sum" hidden>
-    <div class="sect"><h2>Today so far</h2><hr></div>
+    <div class="sect">
+      <h2>Today so far</h2><hr>
+      <button class="chip onhead" id="go-stats">The whole story &rarr;</button>
+    </div>
     <dl class="lastgrid" id="sum-today"></dl>
     <div id="sum-gaps"></div>
 
     <div class="sect"><h2>Last seven days</h2><hr></div>
     <div class="wrap"><table class="week" id="sum-week"></table></div>
     <p class="info" id="sum-weeknote"></p>
-
-    <button class="btn quiet" id="go-stats" style="width:100%;margin-top:4px">
-      The whole story so far &rarr;
-    </button>
 
     <div class="sect"><h2>Growth</h2><hr></div>
     <div id="sum-growth"></div>
@@ -2198,6 +2205,7 @@ function renderSummary() {
 
 var statsOpen = false;
 var statsBusy = false;
+var statsDone = 0, statsTotal = 0;
 
 function statsOf() {
   var rows = live().slice().sort(function (a, b) { return a.ms - b.ms; });
@@ -2385,45 +2393,65 @@ function renderStats() {
   var known = (repoDays || []).length;
   var missing = (repoDays || []).filter(function (d) { return !s.days[d]; }).length;
   $('stats-note').innerHTML =
-    'Counted from the ' + plural(held, 'day') + ' this phone holds. ' +
-    (known
-      ? (missing
-          ? '<b>' + missing + ' more ' + (missing === 1 ? 'day is' : 'days are') +
-            ' in the repo and not counted here.</b>'
-          : 'That is every day in the repo.')
-      : 'It has not checked what else is in the repo.') +
+    (statsBusy
+      ? 'Reading the repo' + (statsTotal ? ' — ' + statsDone + ' of ' + statsTotal +
+        (statsTotal === 1 ? ' day' : ' days') : '') + '. Both phones\u2019 entries are ' +
+        'counted, so the figures will move as it goes.'
+      : 'Counted from the ' + plural(held, 'day') + ' this phone holds, both phones\u2019 ' +
+        'entries included. ' +
+        (known
+          ? (missing
+              ? '<b>' + missing + ' more ' + (missing === 1 ? 'day is' : 'days are') +
+                ' in the repo and not counted here.</b>'
+              : 'That is every day in the repo.')
+          : (configured()
+              ? 'It has not managed to check what else is in the repo.'
+              : 'Not connected, so it cannot see what else is in the repo.'))) +
     ' Undone entries are left out, as they are everywhere else.';
-  $('stats-load').hidden = !configured() || statsBusy || (known > 0 && missing === 0);
-  $('stats-load').textContent = statsBusy ? 'Fetching…' : 'Fetch every day in the repo';
+  $('stats-load').hidden = !configured() || statsBusy;
+  $('stats-load').textContent = 'Read every day again';
 }
 
 /* Pull every day the repo has, so the totals are the whole record rather than the last
-   few weeks. One listing gives the day folders; the days themselves go five at a time. */
-function statsLoadAll() {
+   few weeks, and both phones rather than this one. One listing gives the day folders;
+   `backfillDay` then reads every device file in each of them - ours through `absorbOwn`
+   and the other phone's through `mergeForeign` - so a day is only complete once it has
+   been through here. That is why this runs on its own when the screen opens rather than
+   waiting to be asked: a total that silently left out the other parent's night feeds is
+   the kind of plausible wrong number nobody checks.
+
+   `force` re-reads days already fetched this session, for the button. Without it only
+   days not yet tried are read, so opening the screen a second time costs nothing. */
+function statsLoadAll(force) {
   if (!configured() || statsBusy) return;
   statsBusy = true;
   renderStats();
-  var p = (repoDays === null) ? loadRepoDays() : Promise.resolve();
+  var p = (repoDays === null || force) ? loadRepoDays() : Promise.resolve();
   p.then(function () {
+    if (force) (repoDays || []).forEach(function (d) { delete dayTried[d]; });
     var list = (repoDays || []).filter(function (d) { return !dayTried[d]; });
     list.forEach(function (d) { dayTried[d] = true; });
     var done = 0, total = list.length;
+    statsTotal = total;
     return (function step() {
       if (!list.length) return Promise.resolve();
       var chunk = list.splice(0, 5);
       return Promise.all(chunk.map(backfillDay)).then(function () {
         done += chunk.length;
-        if (total > 10) $('stats-load').textContent = 'Fetching… ' + done + ' of ' + total;
+        statsDone = done;
+        if (!$('pane-stats').hidden) renderStats();   /* the count climbs as it goes */
         return step();
       });
     })();
   }).then(function () {
-    statsBusy = false;
+    statsBusy = false; statsDone = 0; statsTotal = 0;
     saveEntries();
     if (!$('pane-stats').hidden) renderStats();
     render(); renderDiag();
   }).catch(function () {
-    statsBusy = false;
+    /* A failed read leaves the totals short, and the note already says how many days are
+       missing - so the screen stays honest without needing to shout. */
+    statsBusy = false; statsDone = 0; statsTotal = 0;
     if (!$('pane-stats').hidden) renderStats();
   });
 }
@@ -3757,12 +3785,13 @@ $('go-stats').addEventListener('click', function () {
   statsOpen = true;
   show('sum');
   $('pane-stats').scrollTop = 0;
-  /* One listing says how much of the record is not on this phone, so the screen can say
-     so rather than quietly totalling a subset. It reads nothing else by itself. */
-  if (repoDays === null && configured()) loadRepoDays().then(renderStats);
+  /* Pull the whole record before totalling it. A day is only complete once backfillDay
+     has read every device file in it, so without this the figures would be this phone's
+     recent weeks dressed up as a lifetime. */
+  statsLoadAll(false);
 });
 $('stats-back').addEventListener('click', function () { statsOpen = false; show('sum'); });
-$('stats-load').addEventListener('click', statsLoadAll);
+$('stats-load').addEventListener('click', function () { statsLoadAll(true); });
 
 /* ═══════════════════════ when ═══════════════════════ */
 

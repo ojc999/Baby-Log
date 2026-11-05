@@ -137,8 +137,9 @@ strip at the top of the screen; it says when everything is saved.
 
 ## The whole story
 
-A button halfway down the Summary tab, below the fold: **The whole story so far**. It adds
-up every entry the app holds — nappies and the wet/dirty split, litres of milk, hours
+**Summary tab, top right: the teal chip marked "The whole story →".** That is the only way
+in — it is not a tab, because a sixth would crowd the five you use at 3am. It adds up every
+entry in the record — nappies and the wet/dirty split, litres of milk, hours
 asleep and the longest unbroken one, time at the breast, millilitres expressed, tummy time
 — and then the things worth reading out to somebody: nappies per day and one every so many
 hours, how many one-litre cartons the milk comes to, the biggest single feed, the busiest
@@ -148,9 +149,16 @@ weight over time with the gain in grams a day, and a scoreboard of who logged mo
 It is for fun, so it is deliberately not a tab — a sixth would crowd the five you use at
 3am. Nothing on the daily screens depends on it.
 
-**It tells you what it has not counted.** The totals come from the days this phone holds,
-which is not every day in the repo. The note at the bottom says which, and the button
-under it fetches the rest. That is a read: nothing is queued for pushing.
+**It reads the repo when you open it**, so the figures are the whole record and both
+phones, not this phone's recent weeks. One request lists the days, then it reads each one
+— every device's file in it, hers and yours — five days at a time, with the count climbing
+as it goes. Opening it again in the same session costs nothing, since it only reads days
+it has not already read. **Read every day again** at the bottom forces a fresh pass, for
+when the other phone has logged something since.
+
+All of that is reading. Nothing is queued for pushing, and nothing is written to the repo.
+If a read fails, the note says how many days are missing rather than quietly totalling
+what it managed to get.
 
 ## The Book tab
 
