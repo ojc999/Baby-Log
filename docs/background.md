@@ -161,12 +161,21 @@ Unchanged from the bot, and checked by the test suite against the committed
 | `raw` | What was entered — the button's own words, or the typed text. |
 | `msg_id` | **Now a generated id** (`web-<base36>-<random>`), not a Telegram message id. Still the key `data/derived/` rows point at via `from_raw`, so it must stay unique forever. |
 | `dur_min` | **Added for the Pump tab, then retired.** Minutes spent expressing. No longer collected — the minutes that matter beside the volume are his at the breast, not hers at the pump. Kept in the contract and written `null`, so the archive has one shape and the sessions already logged with it keep it. |
-| `ml_l`, `ml_r` | **Added for the Pump tab.** The per-side split of a pump session. `null` unless it was actually measured. `value` stays the total and is the authoritative figure; these are detail. |
+| `ml_l`, `ml_r` | **Added for the Pump tab.** The per-side split of a pump session, left and right. `null` unless it was actually measured. `value` stays the total and is the authoritative figure; these are detail. |
+| `pump_dev` | **Added for the Pump tab.** Which machine: `spectra`, `imani`, or empty for a hand expression. A string, so its absent value is `""`. |
+| `added` | What went into a milk feed: `simeticone`, `biogaia`, or both joined with `+` alphabetically. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` carry one. A string, so its absent value is `""`. |
 
-**Why the fields were appended, not inserted.** All three went in **after `msg_id`**, so
+**Why the fields were appended, not inserted.** They all went in **after `msg_id`**, so
 anything reading these files by position keeps working, and they are written onto **every**
 row — null where they do not apply — so `data/raw/` has one shape throughout instead of
 two. Rows written before they existed get them as null in `compact.py`.
+
+**Why the machine is a field and not a subtype.** `subtype` already carries how the milk
+came out — an ordinary pump, by hand, or a power-pump cycle. Which machine is a different
+question: you can power pump on either one. Folding both into `subtype` would force a
+choice between recording the technique and recording the kit, and lose the pairing that
+makes a run of low days interpretable. So `pump_dev` sits beside it. A hand expression
+leaves it empty, because it uses no machine.
 
 **`dur_min` was a wrong guess, kept rather than removed.** It was added on the reasoning
 that a pump session has two numbers that matter: how much came out and how long it took.
@@ -741,6 +750,39 @@ short by a week is worse than no count, because a plausible number does not get 
 than quietly dropped — the sleep total says it is an undercount when one exists. The weight
 bars are scaled from zero, which flattens the shape of the gain; the gain itself is given
 as a number in grams and grams a day underneath, where a truncated axis cannot flatter it.
+
+---
+
+## 7k. What goes into a bottle, and the Bottle that went
+
+**Simeticone and BioGaia are logged on the feed, not beside it.** They are not events of
+their own: they go into a bottle he is drinking anyway, and an entry of their own would
+make a wind-drop look like a feed in every count that follows. So they are chips on the
+Formula and EBM pickers, and on the same row in the Book form and the correction box — a
+dose forgotten at the time can be added later without re-keying the feed.
+
+They are a field, `added`, rather than words in `note`. The reasoning is the one that put
+`ml_l` and `ml_r` in fields: "how many feeds had simeticone in them" is a question worth
+being able to answer, and a category kept as prose is a month of regular expressions.
+Both can go into one bottle, so it is not a subtype, and the pair is joined alphabetically
+so that tapping them in either order spells the same thing — the same order-independence
+`compact.py` needs when it resolves a struck row.
+
+A breastfeed cannot take one. There is nothing to stir it into, and the picker used most
+often should not grow a row that never applies to it.
+
+**The Bottle button is gone.** Every bottle he drinks is either formula or expressed milk,
+so Bottle only ever asked a question the next two buttons already answer, and a row saying
+`bottle` tells you less than one saying which. Breast now takes the full width it earns —
+it outnumbers everything else on this record several times over — with Formula and EBM
+beneath it.
+
+**`feed/bottle` is not gone.** It is still labelled, still described and still correctable,
+and the rows logged under it are real. Removing a button is not removing a kind of row. The
+shared free-text parser also still files a bare `60ml` as `feed/bottle`; that is left
+alone, because `docs/parser-source.gs` is its source of truth and the older Telegram bot
+reads the same file. What changed is the suggestion line on the Feed screen, which no
+longer offers a bare `60ml` as an example.
 
 ---
 

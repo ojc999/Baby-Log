@@ -64,6 +64,11 @@ what it is, and lists decisions that look arbitrary and are not.
   repo, where history keeps everything anyway. Do not reuse it for anything narrower: if
   a single entry is wrong, that is what Fix and undo are for.
 - **Never rename or repurpose a field** in the data contract. Add one if you must.
+- **Never retire a subtype out of `LABELS`.** The Bottle button is gone, because every
+  bottle he drinks is either formula or expressed milk and the button only asked a
+  question the other two answer. `feed/bottle` is still labelled, still described and
+  still correctable, because the rows logged under it are real and the free-text parser
+  still produces it for a bare `60ml`. Removing a button is not removing a kind of row.
 - **Never add a build step, a framework, or a bundler.** One HTML file, plain
   JavaScript, no dependencies. If something seems to need React, it does not.
 
@@ -133,9 +138,9 @@ what it is, and lists decisions that look arbitrary and are not.
 One JSON object per line. Field names and order must not drift.
 
 `ts` (ISO 8601, `+08:00`) · `sender` · `type` · `subtype` · `value` · `unit` · `note` ·
-`raw` · `msg_id` · `dur_min` · `ml_l` · `ml_r` · `pump_dev`
+`raw` · `msg_id` · `dur_min` · `ml_l` · `ml_r` · `pump_dev` · `added`
 
-The last four were **appended** for the pump tab, never inserted: the original nine keep
+The last five were **appended**, never inserted: the original nine keep
 their names and their order, so anything reading these files by position still works. They
 are written onto every row, null where they do not apply, so `data/raw/` has one shape
 throughout rather than two. `dur_min` held how long a pump session took. It is **no longer collected**: the minutes
@@ -143,6 +148,13 @@ that belong beside the volume are his at the breast, not hers at the pump, becau
 more he takes directly the less there is left to express. The field stays in the contract
 and is written `null`, because removing it would leave the archive with two row shapes and
 would throw away the sessions already logged with it. Do not reuse it for anything else.
+
+`added` is what went into a milk feed: `simeticone`, `biogaia`, or both joined with `+`
+in alphabetical order, so the pair has exactly one spelling whichever order they were
+tapped. A field rather than words in `note`, because "how many feeds had simeticone in
+them" is a question worth being able to answer, and a category kept as prose cannot be
+counted. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` can carry
+one — there is nothing to stir into a breastfeed.
 
 `pump_dev` is which machine: `spectra`, `imani`, or empty for a hand expression. It is a
 field rather than more `subtype` values because power pumping is a technique and the

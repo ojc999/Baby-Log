@@ -164,11 +164,12 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   t('with the nine original fields first, in order',
      JSON.stringify(Object.keys(pushed).slice(0,9)),
      JSON.stringify(['ts','sender','type','subtype','value','unit','note','raw','msg_id']));
-  t('and the four new ones after', JSON.stringify(Object.keys(pushed).slice(9)),
-     JSON.stringify(['dur_min','ml_l','ml_r','pump_dev']));
+  t('and the five new ones after', JSON.stringify(Object.keys(pushed).slice(9)),
+     JSON.stringify(['dur_min','ml_l','ml_r','pump_dev','added']));
   t('the latch entry it did not touch carries them empty',
-     JSON.stringify([todayRows[0].dur_min,todayRows[0].ml_l,todayRows[0].ml_r,todayRows[0].pump_dev]),
-     JSON.stringify([null,null,null,'']));
+     JSON.stringify([todayRows[0].dur_min,todayRows[0].ml_l,todayRows[0].ml_r,
+                     todayRows[0].pump_dev,todayRows[0].added]),
+     JSON.stringify([null,null,null,'','']));
   t('no internal fields leaked', ['own','ms','device'].some(k=>k in pushed), false);
 
   console.log('--- production is not consumption ---');

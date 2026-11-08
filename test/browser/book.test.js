@@ -73,22 +73,28 @@ const t=(n,got,want)=>{const ok=String(got)===String(want);if(!ok)fail++;
   t('the heading names the day', /5 Oct 2026/.test(await page.textContent('#book-day-head')), true);
 
   console.log('--- adding a record on a date of my choosing ---');
-  t('it opens on Bottle, not whatever is alphabetically first',
-     await page.inputValue('#bk-kind'), 'feed/bottle');
-  await page.selectOption('#bk-kind','feed/bottle');
+  t('it opens on Breast, not whatever is alphabetically first',
+     await page.inputValue('#bk-kind'), 'feed/breast');
+  t('and Bottle is no longer offered, the button having gone',
+     await page.evaluate(()=>[...document.querySelectorAll('#bk-kind option')]
+       .some(o=>o.value==='feed/bottle')), false);
+  await page.selectOption('#bk-kind','feed/formula');
   await page.waitForTimeout(200);
   t('an amount box appears for a kind that has one', await page.isVisible('#bk-amt-row'), true);
   t('with its unit', (await page.textContent('#bk-unit')).trim(), 'ml');
+  t('and a row for what went into it', await page.isVisible('#bk-adds-row'), true);
   await page.fill('#bk-date','2026-10-05');
   await page.fill('#bk-time','03:20');
   await page.fill('#bk-amt','45');
+  await page.click('#bk-adds [data-bkadd="simeticone"]'); await page.waitForTimeout(150);
   await page.click('#bk-add'); await page.waitForTimeout(1500);
   const added = await page.evaluate(()=>{
-    const r = entries.filter(x=>x.type==='feed'&&x.subtype==='bottle').pop();
-    return r ? {ts:r.ts, v:r.value, u:r.unit, own:r.own, sender:r.sender} : null;});
+    const r = entries.filter(x=>x.type==='feed'&&x.subtype==='formula').pop();
+    return r ? {ts:r.ts, v:r.value, u:r.unit, own:r.own, sender:r.sender, added:r.added} : null;});
   console.log('   stored as:', JSON.stringify(added));
   t('it lands on the date given, three weeks back', added.ts.slice(0,16), '2026-10-05T03:20');
   t('with the amount', added.v, 45);
+  t('and what was added to it', added.added, 'simeticone');
   t('and it is ours', added.own, true);
   const put = calls.filter(c=>c.startsWith('PUT')).pop();
   t('and it was pushed to that day\'s file', put, 'PUT data/events/2026-10-05/simon.jsonl');

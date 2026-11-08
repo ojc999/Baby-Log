@@ -36,7 +36,7 @@ just a static file, and an entry is in the repo within a second of the tap.
 | | |
 | --- | --- |
 | **Sleep** | Asleep now · Awake now |
-| **Feed** | Bottle · Breast (minutes, and which side) · Formula · EBM · **Vomit** — then Mum's expressing, kept separate |
+| **Feed** | Breast (minutes, and which side) · Formula · EBM, each with **Simeticone** and **BioGaia** · **Vomit** — then Mum's expressing, kept separate |
 | **Diapers** | Wet · Dirty · Both |
 | **Tummy time** | How long was it (minutes) · Just log it, when you did not time it |
 | **More** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream · Weight · Length · Head · Temperature · Unsettled · Medicine · Vaccination · Milestone · Note |
@@ -48,6 +48,15 @@ The split is frequency, not importance: anything in More is two taps rather than
 is the right trade for something done once a day or once a week. **Last bath** stays on the
 home screen even so — the input moved, the readout did not, because how long since the last
 bath is exactly the sort of thing you forget.
+
+**Simeticone and BioGaia go on the feed they went into**, as chips on the Formula and EBM
+pickers — not as entries of their own, which would make a wind-drop look like a feed in
+every count. Both can go into one bottle. Forgot at the time? **Fix** on that feed adds
+them later. A breastfeed has nothing to stir them into, so it does not offer them.
+
+There is **no Bottle button**: every bottle is either formula or expressed milk, so it only
+asked a question the other two answer. Feeds already logged as Bottle are untouched and can
+still be corrected.
 
 Breastfeeds show **which side comes next** — on the Last feed card, and on the Breast
 screen itself, where the side opposite the last one is already selected. It is a chip,

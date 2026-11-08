@@ -64,7 +64,7 @@ const decode = p => Buffer.from(repoFiles[p].content,'base64').toString('utf8').
   await A.page.click('[data-go="feed"]');
   await A.page.fill('#when-time','23:40');
   await A.page.waitForTimeout(150);
-  await A.page.click('[data-sheet="bottle"]'); await A.page.waitForTimeout(200);
+  await A.page.click('[data-sheet="formula"]'); await A.page.waitForTimeout(200);
   await A.page.click('#sheet-save'); await A.page.waitForTimeout(1500);
   const got = await A.page.evaluate(()=>{const r=entries[entries.length-1];return {ts:r.ts, day:daySG(r.ms)};});
   console.log('   stored as      :', got.ts);
@@ -112,7 +112,7 @@ const decode = p => Buffer.from(repoFiles[p].content,'base64').toString('utf8').
   await A.page.click('[data-go="feed"]');
   await A.page.fill('#when-time','22:10');
   await A.page.waitForTimeout(150);
-  await A.page.click('[data-sheet="bottle"]'); await A.page.waitForTimeout(200);
+  await A.page.click('[data-sheet="formula"]'); await A.page.waitForTimeout(200);
   await A.page.click('#sheet-save'); await A.page.waitForTimeout(1500);
   // B polls for a while
   // Yesterday is polled one tick in six - about once a minute - so this has to run for

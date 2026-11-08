@@ -566,6 +566,7 @@ input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0
       </div>
       <div class="sheet-row" id="sheet-presets"></div>
       <div class="sheet-row" id="sheet-side" style="margin-top:6px"></div>
+      <div class="sheet-row" id="sheet-adds" style="margin-top:6px"></div>
     <p class="sidehint" id="sheet-hint" hidden></p>
       <div class="sheet-act">
         <button class="btn" id="sheet-cancel">Cancel</button>
@@ -868,6 +869,10 @@ input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0
       <input id="bk-amt" type="number" inputmode="decimal" step="any">
       <span class="unit" id="bk-unit"></span>
     </div>
+    <div class="fixrow" id="bk-adds-row" hidden>
+      <label>Added</label>
+      <div class="sheet-row" id="bk-adds"></div>
+    </div>
     <div class="fixrow" id="bk-kit-row" hidden>
       <label>Which</label>
       <div class="sheet-row" id="bk-kit"></div>
@@ -915,6 +920,10 @@ input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0
       <label for="fix-amt">Amount</label>
       <input id="fix-amt" type="number" inputmode="decimal" step="any">
       <span class="unit" id="fix-unit"></span>
+    </div>
+    <div class="fixrow" id="fix-adds-row" hidden>
+      <label>Added</label>
+      <div class="sheet-row" id="fix-adds"></div>
     </div>
     <div class="fixrow" id="fix-kit-row" hidden>
       <label>Which</label>
@@ -1122,9 +1131,8 @@ var CATS = {
   feed: {
     title: 'Feed', tone: 'amberb',
     groups: [
-      { cols: 2, items: [
-        { sheet: 'bottle' }, { sheet: 'breast' }, { sheet: 'formula' }, { sheet: 'expressed' }
-      ] },
+      { cols: 1, items: [{ sheet: 'breast' }] },
+      { cols: 2, items: [{ sheet: 'formula' }, { sheet: 'expressed' }] },
       /* Straight under the feed buttons, full width. It used to sit third, below Mum's
          expressing and under the heading "Came back up", and was missed entirely - asked
          for as a feature that had been there all along. The moment you need it is the
@@ -1134,9 +1142,16 @@ var CATS = {
       ] },
       { head: 'Mum', cols: 2, items: [{ sheet: 'pump' }] }
     ],
-    hint: 'Expressing is stored as its own kind of entry, never as a feed. Expressing ' +
-          '80 ml and him drinking 80 ml are different events and must not be added together.',
-    free: '60ml · bf 20 · bf left 20 · formula 90'
+    hint: 'Simeticone and BioGaia are logged on the feed they went into, not as entries ' +
+          'of their own — tap them on the Formula or EBM picker. Expressing is stored as ' +
+          'its own kind of entry, never as a feed: expressing 80 ml and him drinking ' +
+          '80 ml are different events and must not be added together.',
+    /* No bare "60ml" in the examples any more. The shared parser still reads one, and
+       still files it as `feed/bottle` - which is now a subtype with no button - so the
+       suggestions point at the words that say which kind of milk it was. The parser
+       itself is left alone: docs/parser-source.gs is its source of truth and the older
+       Telegram bot reads the same file. */
+    free: 'formula 90 · ebm 60 · bf 20 · bf left 20'
   },
   nappy: {
     title: 'Diapers', tone: 'tealb',
@@ -1187,10 +1202,13 @@ var CATS = {
 };
 
 var SHEETS = {
-  bottle:   { title: 'Bottle',        t: 'feed',    s: 'bottle',    unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150, 180] },
+  /* No Bottle. Every bottle he drinks is either formula or expressed milk, so the button
+     only ever asked a question the next two already answer, and a row saying "bottle"
+     tells you less than one saying which. `feed/bottle` is still labelled and still
+     corrected, because the rows logged under it are real. */
   breast:   { title: 'Breast',        t: 'feed',    s: 'breast',    unit: 'min', step: 5,    dec: 0, presets: [5, 10, 15, 20, 25, 30], sides: true },
-  formula:  { title: 'Formula',       t: 'feed',    s: 'formula',   unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150, 180] },
-  expressed:{ title: 'EBM',           t: 'feed',    s: 'expressed', unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150] },
+  formula:  { title: 'Formula',       t: 'feed',    s: 'formula',   unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150, 180], adds: true },
+  expressed:{ title: 'EBM',           t: 'feed',    s: 'expressed', unit: 'ml',  step: 10,   dec: 0, presets: [30, 60, 90, 120, 150], adds: true },
   pump:     { title: 'Expressed',     t: 'pump',    s: '',          unit: 'ml',  step: 10,   dec: 0, presets: [40, 60, 80, 100, 120, 150], tone: 'mums' },
   cry:      { title: 'Unsettled',     t: 'cry',     s: '',          unit: 'min', step: 5,    dec: 0, presets: [5, 10, 15, 30, 45, 60], tone: 'plain' },
   tummy:    { title: 'Tummy time',    t: 'tummy',   s: '',          unit: 'min', step: 1,    dec: 0, presets: [2, 5, 10, 15, 20], tone: 'plain' },
@@ -1199,6 +1217,29 @@ var SHEETS = {
   length:   { title: 'Length',        t: 'measure', s: 'length',    unit: 'cm',  step: 0.5,  dec: 1, presets: [50, 52, 54, 56, 58, 60], tone: 'plain' },
   head:     { title: 'Head',          t: 'measure', s: 'head',      unit: 'cm',  step: 0.5,  dec: 1, presets: [34, 36, 38, 40, 42], tone: 'plain' }
 };
+
+/* Things that go into a milk feed rather than being a feed of their own. Kept as their
+   own field, not as words in `note`, because "how many feeds had simeticone in them" is a
+   question worth being able to answer later, and a category written as prose cannot be
+   counted. Joined alphabetically so the pair has exactly one spelling - the same reason
+   `compact.py` resolves a struck row without reference to order. */
+var ADDS = [['simeticone', 'Simeticone'], ['biogaia', 'BioGaia']];
+var ADD_LABEL = { simeticone: 'Simeticone', biogaia: 'BioGaia' };
+
+function addsJoin(set) {
+  return ADDS.map(function (a) { return a[0]; })
+             .filter(function (k) { return !!set[k]; })
+             .sort().join('+');
+}
+function addsSplit(v) {
+  var set = {};
+  String(v || '').split('+').forEach(function (k) { if (k) set[k] = true; });
+  return set;
+}
+function addsWords(v) {
+  return String(v || '').split('+').filter(Boolean)
+    .map(function (k) { return ADD_LABEL[k] || k; }).join(' + ');
+}
 
 var LABELS = {
   'sleep/start': 'Went down', 'sleep/end': 'Woke up',
@@ -1263,6 +1304,7 @@ var offsetMin = 0;
 var absTime = '';            // 'HH:MM' from the time picker, wins over offsetMin
 var dayBack = 0;             // 0 = the time picked is today's, 1 = yesterday's
 var sheetKind = null, sheetVal = 0, sheetSide = '';
+var sheetAdds = {};         /* { simeticone: true, biogaia: true } for the feed being logged */
 
 function lsGet(k, dflt) {
   try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : dflt; }
@@ -1368,7 +1410,7 @@ function add(type, subtype, value, unit, note, raw, ms, extra) {
     value: (value === '' || value === undefined || value === null) ? null : value,
     unit: unit || '', note: note || '', raw: raw || '', msg_id: uid(),
     dur_min: numOrNull(x.dur_min), ml_l: numOrNull(x.ml_l), ml_r: numOrNull(x.ml_r),
-    pump_dev: x.pump_dev || '',
+    pump_dev: x.pump_dev || '', added: x.added || '',
     own: true, device: cfg.device || 'this-device'
   };
   entries.push(e);
@@ -1452,6 +1494,7 @@ function describe(r) {
   if (r.dur_min !== null && r.dur_min !== undefined && r.dur_min !== '') base += ' in ' + r.dur_min + ' min';
   if (hasSides(r)) base += ' (L ' + (r.ml_l || 0) + ' / R ' + (r.ml_r || 0) + ')';
   if (r.pump_dev && KIT_LABEL[r.pump_dev]) base += ' · ' + KIT_LABEL[r.pump_dev];
+  if (r.added) base += ' · with ' + addsWords(r.added);
   return base;
 }
 
@@ -1543,7 +1586,7 @@ function jsonlFor(day) {
         ts: r.ts, sender: r.sender, type: r.type, subtype: r.subtype,
         value: r.value, unit: r.unit, note: r.note, raw: r.raw, msg_id: r.msg_id,
         dur_min: numOrNull(r.dur_min), ml_l: numOrNull(r.ml_l), ml_r: numOrNull(r.ml_r),
-        pump_dev: r.pump_dev || ''
+        pump_dev: r.pump_dev || '', added: r.added || ''
       });
     }).join('\n') + '\n';
 }
@@ -2667,6 +2710,24 @@ function renderPump() {
 
 /* One place that draws a kit chip row, used by all three forms. A hand expression uses no
    machine, so the row is hidden rather than showing a choice that means nothing. */
+/* The additions row, drawn the same way in the sheet, the Book form and the correction
+   box. Multi-select: both can go into one bottle, which is the whole reason this is not
+   a single-choice subtype. */
+function addChips(id, attr, set) {
+  $(id).innerHTML = ADDS.map(function (a) {
+    return '<button class="chip" data-' + attr + '="' + a[0] + '" aria-pressed="' +
+           (set[a[0]] ? 'true' : 'false') + '">' + a[1] + '</button>';
+  }).join('');
+}
+
+/* Which kinds of entry can carry an addition: the ones given in a bottle. A breastfeed
+   cannot have something stirred into it, and `feed/bottle` is here only so the rows
+   already logged under the retired button can still be corrected. */
+function takesAdds(type, subtype) {
+  return type === 'feed' &&
+         (subtype === 'formula' || subtype === 'expressed' || subtype === 'bottle');
+}
+
 function kitChips(id, attr, chosen) {
   $(id).innerHTML = PM_KITS.map(function (k) {
     return '<button class="chip" data-' + attr + '="' + k[0] + '" aria-pressed="' +
@@ -3024,6 +3085,7 @@ function savePumpImport() {
    pushed are folded in, so an unsynced day is not invisible here. */
 
 var bkKit     = 'spectra';  /* which machine a back-dated pump session used */
+var bkAdds    = {};         /* what went into a back-dated bottle */
 var bookDay   = null;       /* the day being looked at */
 var repoDays  = null;       /* day folders in the repo, or null until fetched */
 var bookBusy  = false;
@@ -3089,6 +3151,8 @@ function paintBookKind() {
   /* A pump session carries minutes and a side split as well as its total, and a record
      added from the book should be able to say as much as one logged at the time. */
   var isPump = k.t === 'pump';
+  $('bk-adds-row').hidden = !takesAdds(k.t, k.s);
+  addChips('bk-adds', 'bkadd', bkAdds);
   $('bk-lr-row').hidden  = !isPump;
   $('bk-kit-row').hidden = !isPump || k.s === 'hand';
   kitChips('bk-kit', 'bkkit', bkKit);
@@ -3110,8 +3174,9 @@ function renderBook() {
     $('bk-kind').innerHTML = bookKinds().map(function (k) {
       return '<option value="' + esc(k.key) + '">' + esc(k.label) + '</option>';
     }).join('');
-    /* Alphabetical order puts Bath first, which is not what anyone is here to add. */
-    $('bk-kind').value = 'feed/bottle';
+    /* Alphabetical order puts Bath first, which is not what anyone is here to add.
+       Breastfeeds outnumber everything else on this record several times over. */
+    $('bk-kind').value = 'feed/breast';
   }
   if (!$('bk-date').value) $('bk-date').value = daySG(Date.now());
 
@@ -3546,6 +3611,7 @@ $('pm-imp-save').addEventListener('click', savePumpImport);
 var fixing = null;        /* msg_id of the entry being corrected */
 var fixSide = '';
 var fixKit  = '';
+var fixAdds = {};
 
 /* The unit a kind of entry takes, whether or not this particular row carries a number.
    Without this the amount box only appeared on rows that already had one, so a tummy time
@@ -3585,6 +3651,10 @@ function openFix(id) {
   /* A pump session is the one entry with more than one number on it, so it is the one
      that needs more than the amount box to be corrected. The hint on the Pump tab points
      at this button to fill in minutes that were missed at the time. */
+  fixAdds = addsSplit(r.added);
+  $('fix-adds-row').hidden = !takesAdds(r.type, r.subtype);
+  addChips('fix-adds', 'fixadd', fixAdds);
+
   var isPump = r.type === 'pump';
   fixKit = r.pump_dev || 'spectra';
   $('fix-kit-row').hidden = !isPump || r.subtype === 'hand';
@@ -3674,6 +3744,7 @@ function saveFix() {
   var mins = numOrNull(old.dur_min), ml_l = numOrNull(old.ml_l), ml_r = numOrNull(old.ml_r);
   var kit = old.pump_dev || '';
   if (!$('fix-kit-row').hidden) kit = fixKit;
+  var added = $('fix-adds-row').hidden ? (old.added || '') : addsJoin(fixAdds);
   if (!$('fix-lr-row').hidden) {
     ml_l = numOrNull($('fix-l').value);
     ml_r = numOrNull($('fix-r').value);
@@ -3697,7 +3768,7 @@ function saveFix() {
     type: oldType, subtype: oldSub,
     value: (value === '' || value === undefined) ? null : value,
     unit: unit, note: note, raw: oldRaw, msg_id: uid(),
-    dur_min: mins, ml_l: ml_l, ml_r: ml_r, pump_dev: kit,
+    dur_min: mins, ml_l: ml_l, ml_r: ml_r, pump_dev: kit, added: added,
     own: true, device: cfg.device || 'this-device'
   };
   entries.push(e);
@@ -3841,6 +3912,7 @@ function openSheet(kind) {
      because the whole point is that it is one tap at 3am - but it is still a chip you can
      tap off or change, so a guess is never forced into the record. */
   sheetSide = c.sides ? nextSide() : '';
+  sheetAdds = {};           /* never carried over from the last feed - it has to be asked */
   var el = $('sheet');
   el.className = 'sheet' + (c.tone ? ' ' + c.tone : '');
   el.hidden = false;
@@ -3855,6 +3927,8 @@ function openSheet(kind) {
   $('sheet-side').innerHTML = c.sides
     ? '<button class="chip" data-side="left">left</button><button class="chip" data-side="right">right</button>'
     : '';
+  $('sheet-adds').hidden = !c.adds;
+  if (c.adds) addChips('sheet-adds', 'add', sheetAdds); else $('sheet-adds').innerHTML = '';
   var hint = $('sheet-hint');
   if (c.sides && lastSide()) {
     hint.hidden = false;
@@ -3876,6 +3950,9 @@ function paintSheet() {
   document.querySelectorAll('#sheet-side .chip').forEach(function (b) {
     b.setAttribute('aria-pressed', b.dataset.side === sheetSide ? 'true' : 'false');
   });
+  document.querySelectorAll('#sheet-adds .chip').forEach(function (b) {
+    b.setAttribute('aria-pressed', sheetAdds[b.dataset.add] ? 'true' : 'false');
+  });
 }
 function closeSheet() { sheetKind = null; $('sheet').hidden = true; }
 
@@ -3891,6 +3968,12 @@ $('sheet').addEventListener('click', function (e) {
   }
   var sd = e.target.closest('[data-side]');
   if (sd) { sheetSide = sheetSide === sd.dataset.side ? '' : sd.dataset.side; paintSheet(); }
+  var ad = e.target.closest('[data-add]');
+  if (ad) {
+    var k = ad.dataset.add;
+    if (sheetAdds[k]) delete sheetAdds[k]; else sheetAdds[k] = true;   /* both can be on */
+    paintSheet();
+  }
 });
 $('toast-act').addEventListener('click', function () {
   var id = this.dataset.undo;
@@ -3910,6 +3993,12 @@ $('fix').addEventListener('click', function (e) {
   if (sd) { fixSide = fixSide === sd.dataset.fixside ? '' : sd.dataset.fixside; paintFixSide(); }
   var kd = e.target.closest('[data-fixkit]');
   if (kd) { fixKit = kd.dataset.fixkit; kitChips('fix-kit', 'fixkit', fixKit); }
+  var ad = e.target.closest('[data-fixadd]');
+  if (ad) {
+    if (fixAdds[ad.dataset.fixadd]) delete fixAdds[ad.dataset.fixadd];
+    else fixAdds[ad.dataset.fixadd] = true;
+    addChips('fix-adds', 'fixadd', fixAdds);
+  }
 });
 
 $('sheet-cancel').addEventListener('click', closeSheet);
@@ -3917,8 +4006,11 @@ $('sheet-save').addEventListener('click', function () {
   var c = SHEETS[sheetKind];
   if (!c) return;
   var v = Number(sheetVal.toFixed(c.dec));
+  var added = c.adds ? addsJoin(sheetAdds) : '';
   var e = add(c.t, c.s, v, c.unit, sheetSide,
-      c.title.toLowerCase() + ' ' + v + ' ' + c.unit + (sheetSide ? ' ' + sheetSide : ''));
+      c.title.toLowerCase() + ' ' + v + ' ' + c.unit + (sheetSide ? ' ' + sheetSide : '') +
+      (added ? ' with ' + addsWords(added).toLowerCase() : ''),
+      undefined, { added: added });
   closeSheet();
   afterWrite(e);
 });
@@ -3959,7 +4051,13 @@ $('book-rows').addEventListener('click', function (e) {
   if (f) openFix(f.dataset.fix);
 });
 
-$('bk-kind').addEventListener('change', function () { bkSide = ''; paintBookKind(); });
+$('bk-kind').addEventListener('change', function () { bkSide = ''; bkAdds = {}; paintBookKind(); });
+$('bk-adds').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-bkadd]');
+  if (!b) return;
+  if (bkAdds[b.dataset.bkadd]) delete bkAdds[b.dataset.bkadd]; else bkAdds[b.dataset.bkadd] = true;
+  paintBookKind();
+});
 ['bk-l', 'bk-r'].forEach(function (id) {
   $(id).addEventListener('input', function () { autoTotal('bk-l', 'bk-r', 'bk-amt'); });
 });
@@ -4014,17 +4112,20 @@ $('bk-add').addEventListener('click', function () {
     }
   }
 
+  var bkAdded = $('bk-adds-row').hidden ? '' : addsJoin(bkAdds);
   var note = k.sides ? bkSide : (textOnly ? '' : words);
   var raw  = textOnly ? words
            : (k.label.toLowerCase() + (value !== null ? ' ' + value + ' ' + k.unit : '') +
-              (k.sides && bkSide ? ' ' + bkSide : ''));
+              (k.sides && bkSide ? ' ' + bkSide : '') +
+              (bkAdded ? ' with ' + addsWords(bkAdded).toLowerCase() : ''));
 
   var e = add(k.t, k.s, value, k.unit, textOnly ? words : note, raw, ms,
               { ml_l: ml_l, ml_r: ml_r,
-                pump_dev: (k.t === 'pump' && k.s !== 'hand') ? bkKit : '' });
+                pump_dev: (k.t === 'pump' && k.s !== 'hand') ? bkKit : '',
+                added: bkAdded });
   ['bk-amt', 'bk-note', 'bk-l', 'bk-r'].forEach(function (id) { $(id).value = ''; });
   autoTotal('bk-l', 'bk-r', 'bk-amt');
-  bkSide = '';
+  bkSide = ''; bkAdds = {};
   paintBookKind();
   bookDay = daySG(ms);
   dayTried[bookDay] = true;          /* we are writing it, so there is no need to go and look */

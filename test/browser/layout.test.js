@@ -123,7 +123,7 @@ const VIEWPORTS = [
 
     await page.screenshot({ path: `${SHOTS}/${name}-home.png` });
 
-    // --- walk into Feed and log a bottle ---
+    // --- walk into the Feed screen ---
     await page.click('[data-go="feed"]');
     await page.waitForTimeout(250);
     await page.screenshot({ path: `${SHOTS}/${name}-feed.png` });

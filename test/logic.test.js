@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -111,17 +111,18 @@ t('undo marks it deleted', A.entries().find(r=>r.msg_id===e3.msg_id).type, 'dele
 const real = JSON.parse('{"ts":"2026-01-02T03:14:00+08:00","sender":"EXAMPLE","type":"sleep",' +
   '"subtype":"start","value":null,"unit":"","note":"","raw":"asleep now","msg_id":"web-example-0001"}');
 // The three fields the pump tab added, appended after msg_id and written onto every row.
-const ADDED = ['dur_min','ml_l','ml_r','pump_dev'];
+const ADDED = ['dur_min','ml_l','ml_r','pump_dev','added'];
 const out = A.jsonlFor('2026-10-01').trim().split('\n').map(JSON.parse);
 t('export has all three incl deleted', out.length, 3);
 t('the original nine come first, in the original order',
   JSON.stringify(Object.keys(out[0]).slice(0, 9)), JSON.stringify(Object.keys(real)));
 t('and the added ones come after, in order',
   JSON.stringify(Object.keys(out[0]).slice(9)), JSON.stringify(ADDED));
-t('nothing else crept in', Object.keys(out[0]).length, 13);
+t('nothing else crept in', Object.keys(out[0]).length, 14);
 t('the number ones are null on a row that has no use for them',
   ['dur_min','ml_l','ml_r'].every(k => out[0][k] === null), true);
-t('and the text one is an empty string, not null', out[0].pump_dev, '');
+t('and the text ones are empty strings, not null',
+  [out[0].pump_dev, out[0].added].join('|'), '|');
 t('ts carries +08:00', /\+08:00$/.test(out[0].ts), true);
 t('ts is SG wall clock', out[0].ts, '2026-10-01T19:30:00+08:00');
 t('absent value is null', out[1].value, null);
@@ -330,6 +331,54 @@ A.add('pump', '', 50, 'ml', '', 'p', Date.parse('2026-10-20T10:00:00+08:00'), {}
 const r13 = A.parsePumpNotes('20 Oct: 60mL pump\n21 Oct: 70mL pump', NOW);
 t('a day that already has sessions is marked as such', r13.days[0].had, 1);
 t('and one that does not, is not', r13.days[1].had, 0);
+
+console.log('\n--- what goes into a bottle ---');
+t('nothing added is an empty string', A.addsJoin({}), '');
+t('one of them', A.addsJoin({simeticone:true}), 'simeticone');
+t('the other', A.addsJoin({biogaia:true}), 'biogaia');
+// the pair must have one spelling, whichever order they were tapped in
+t('both, tapped either way, spell the same',
+  A.addsJoin({simeticone:true,biogaia:true}), A.addsJoin({biogaia:true,simeticone:true}));
+t('and that spelling is alphabetical', A.addsJoin({biogaia:true,simeticone:true}), 'biogaia+simeticone');
+t('it reads back as a set', JSON.stringify(A.addsSplit('biogaia+simeticone')),
+  JSON.stringify({biogaia:true,simeticone:true}));
+t('an empty one reads back empty', JSON.stringify(A.addsSplit('')), '{}');
+t('and it is shown in words', A.addsWords('biogaia+simeticone'), 'BioGaia + Simeticone');
+
+t('a formula feed can take them', A.takesAdds('feed','formula'), true);
+t('so can expressed milk', A.takesAdds('feed','expressed'), true);
+t('a breastfeed cannot', A.takesAdds('feed','breast'), false);
+t('nor can a nappy', A.takesAdds('nappy','wet'), false);
+t('the retired bottle still can, so old rows stay correctable',
+  A.takesAdds('feed','bottle'), true);
+
+A.setEntries([]);
+const fa = A.add('feed','formula',90,'ml','','formula 90', Date.parse('2026-11-01T10:00:00+08:00'),
+                 {added:'biogaia+simeticone'});
+t('it is stored as its own field, not in the note', fa.added, 'biogaia+simeticone');
+t('and the note is left alone', fa.note, '');
+t('it survives the export',
+  JSON.parse(A.jsonlFor('2026-11-01').trim().split('\n')[0]).added, 'biogaia+simeticone');
+t('describe names what went in',
+  A.describe({type:'feed',subtype:'formula',value:90,unit:'ml',note:'',added:'simeticone'}),
+  'Formula 90 ml · with Simeticone');
+t('and both when both did',
+  A.describe({type:'feed',subtype:'expressed',value:60,unit:'ml',note:'',added:'biogaia+simeticone'}),
+  'Expressed milk 60 ml · with BioGaia + Simeticone');
+t('a feed with nothing added reads as before',
+  A.describe({type:'feed',subtype:'formula',value:90,unit:'ml',note:''}), 'Formula 90 ml');
+
+console.log('\n--- the bottle button is gone, the rows are not ---');
+t('no Bottle picker', !!A.SHEETS.bottle, false);
+t('and no Bottle button in the feed catalogue',
+  JSON.stringify(A.CATS.feed.groups).indexOf('bottle'), -1);
+t('but feed/bottle still has a label, for the rows already logged under it',
+  A.label({type:'feed',subtype:'bottle'}), 'Bottle');
+t('and still describes', A.describe({type:'feed',subtype:'bottle',value:60,unit:'ml',note:''}),
+  'Bottle 60 ml');
+t('breast, formula and EBM are what is left',
+  A.CATS.feed.groups.slice(0,2).map(g=>g.items.map(i=>i.sheet).join(',')).join(' | '),
+  'breast | formula,expressed');
 
 console.log('\n--- the whole story: everything added up ---');
 A.setEntries([]);

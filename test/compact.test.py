@@ -70,11 +70,14 @@ check("the original nine still come first, in order",
       list(out[0].keys())[:9],
       ["ts", "sender", "type", "subtype", "value", "unit", "note", "raw", "msg_id"])
 check("and the added ones come after, in order",
-      list(out[0].keys())[9:], ["dur_min", "ml_l", "ml_r", "pump_dev"])
+      list(out[0].keys())[9:], ["dur_min", "ml_l", "ml_r", "pump_dev", "added"])
 check("a row written before they existed gets the number ones as null",
       [out[0]["dur_min"], out[0]["ml_l"], out[0]["ml_r"]], [None, None, None])
-check("and the text one as an empty string, like every other text field",
-      out[0]["pump_dev"], "")
+check("and the text ones as empty strings, like every other text field",
+      [out[0]["pump_dev"], out[0]["added"]], ["", ""])
+check("what went into a bottle feed survives compaction",
+      compact.merge([row(subtype="formula", added="biogaia+simeticone")])[0]["added"],
+      "biogaia+simeticone")
 pumped = compact.merge([row(type="pump", subtype="power", value=65, unit="ml", raw="pump 65",
                             ml_l=30, ml_r=35, pump_dev="imani")])[0]
 check("a pump session keeps its split and its machine",

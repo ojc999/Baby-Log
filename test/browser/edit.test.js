@@ -106,6 +106,39 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
       if(/Undone/.test(r.textContent)) return !!r.querySelector('[data-fix]');
     return false; }), false);
 
+  console.log('--- a dose forgotten at the time can be added afterwards ---');
+  await page.click('#tab-sum'); await page.waitForTimeout(500);
+  await page.evaluate(()=>{
+    add('feed','formula',110,'ml','','formula 110',
+        Date.parse('2026-11-01T07:00:00+08:00'));
+    render();});
+  await page.waitForTimeout(400);
+  await page.evaluate(()=>{
+    for(const r of document.querySelectorAll('#sum-timeline .row'))
+      if(/Formula 110/.test(r.textContent)) { r.querySelector('[data-fix]').click(); return; }});
+  await page.waitForTimeout(300);
+  t('the correction box offers what can go into a bottle',
+     await page.isVisible('#fix-adds-row'), true);
+  await page.click('#fix-adds [data-fixadd="simeticone"]');
+  await page.click('#fix-adds [data-fixadd="biogaia"]');
+  await page.click('#fix-save'); await page.waitForTimeout(900);
+  const dosed = await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2'))
+    .filter(r=>r.type==='feed'&&r.subtype==='formula'&&r.value===110));
+  t('the correction carries both, in one spelling', dosed.map(r=>r.added).join('|'), 'biogaia+simeticone');
+  // two earlier corrections in this file, plus this one
+  t('and the original is kept, struck out', await page.evaluate(()=>
+     JSON.parse(localStorage.getItem('babylog.entries.v2'))
+       .filter(r=>r.type==='deleted').length), 3);
+
+  console.log('--- but not on a breastfeed, which has nothing to stir it into ---');
+  await page.evaluate(()=>{
+    for(const r of document.querySelectorAll('#sum-timeline .row'))
+      if(/Tummy time/.test(r.textContent)) { r.querySelector('[data-fix]').click(); return; }});
+  await page.waitForTimeout(300);
+  t('no additions row on a kind that cannot take one',
+     await page.isVisible('#fix-adds-row'), false);
+  await page.click('#fix-cancel'); await page.waitForTimeout(200);
+
   console.log('--- a full pump session can be added for a day gone by ---');
   await page.click('#tab-book'); await page.waitForTimeout(800);
   const kinds = await page.evaluate(()=>[...document.querySelectorAll('#bk-kind option')].map(o=>o.value));

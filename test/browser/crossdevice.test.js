@@ -60,7 +60,7 @@ const pull = async P => { await P.page.evaluate(()=>{lastPullMs=0;}); await P.pa
 
   console.log('--- she logs a feed ---');
   await DES.page.click('[data-go="feed"]');
-  await DES.page.click('[data-sheet="bottle"]'); await DES.page.waitForTimeout(200);
+  await DES.page.click('[data-sheet="formula"]'); await DES.page.waitForTimeout(200);
   await DES.page.click('#sheet-save'); await DES.page.waitForTimeout(1200);
   const herId = await DES.page.evaluate(()=>entries[entries.length-1].msg_id);
   t('her file has it', rows(herFile).length, 1);

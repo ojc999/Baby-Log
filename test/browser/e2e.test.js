@@ -80,12 +80,15 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   await page.waitForTimeout(600);
   t('setup made a GitHub call', calls.length > 0, true);
 
-  console.log('\n--- log a bottle feed and push it ---');
+  console.log('\n--- log a formula feed, with something in it, and push it ---');
   await page.click('#tab-log');
   await page.click('[data-go="feed"]');
-  await page.click('[data-sheet="bottle"]');
+  await page.click('[data-sheet="formula"]');
   await page.waitForTimeout(200);
   await page.click('#sheet-presets .chip:nth-child(2)');   // a preset amount
+  // Simeticone and BioGaia go into the feed, not beside it as entries of their own
+  t('the feed picker offers what can go in it', await page.isVisible('#sheet-adds'), true);
+  await page.click('#sheet-adds [data-add="simeticone"]');
   await page.click('#sheet-save');
   await page.waitForTimeout(800);
 
@@ -103,11 +106,13 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   t('one row pushed', rows.length, 1);
   t('field order matches the contract', JSON.stringify(Object.keys(rows[0])),
      JSON.stringify(['ts','sender','type','subtype','value','unit','note','raw','msg_id',
-                     'dur_min','ml_l','ml_r','pump_dev']));
-  t('and the ones added for the pump tab are empty on a feed',
+                     'dur_min','ml_l','ml_r','pump_dev','added']));
+  t('and the pump-only ones are empty on a feed',
      JSON.stringify([rows[0].dur_min,rows[0].ml_l,rows[0].ml_r,rows[0].pump_dev]),
      JSON.stringify([null,null,null,'']));
-  t('row is a bottle feed', rows[0].type+'/'+rows[0].subtype, 'feed/bottle');
+  t('row is a formula feed', rows[0].type+'/'+rows[0].subtype, 'feed/formula');
+  t('carrying what went into it', rows[0].added, 'simeticone');
+  t('which is a field of its own, not words in the note', rows[0].note, '');
   t('ts carries +08:00', /\+08:00$/.test(rows[0].ts), true);
   t('file ends with a newline', /\n$/.test(decoded), true);
   t('sender is who we set', rows[0].sender, 'Simon');
@@ -237,12 +242,12 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   console.log('\n--- correcting an entry keeps the original ---');
   await page.evaluate(()=>{ const b=document.querySelector('#cat-back'); b && b.click(); });
   await page.click('[data-go="feed"]');
-  await page.click('[data-sheet="bottle"]');
+  await page.click('[data-sheet="formula"]');
   await page.waitForTimeout(200);
   await page.click('#sheet-presets .chip:nth-child(1)');
   await page.click('#sheet-save');
   await page.waitForTimeout(700);
-  const target = await page.evaluate(()=>{ const r=entries.filter(x=>x.type==='feed'&&x.subtype==='bottle').pop(); return {id:r.msg_id, v:r.value}; });
+  const target = await page.evaluate(()=>{ const r=entries.filter(x=>x.type==='feed'&&x.subtype==='formula').pop(); return {id:r.msg_id, v:r.value}; });
   await page.click('#tab-sum'); await page.waitForTimeout(300);
   await page.evaluate(id=>{ const b=document.querySelector(`#sum-timeline [data-fix="${id}"]`); b && b.click(); }, target.id);
   await page.waitForTimeout(300);
@@ -254,7 +259,7 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   await page.waitForTimeout(900);
   const fixed = await page.evaluate(id=>({
     original: entries.find(r=>r.msg_id===id),
-    corrected: entries.filter(r=>r.type==='feed'&&r.subtype==='bottle'&&r.value===125)[0] || null,
+    corrected: entries.filter(r=>r.type==='feed'&&r.subtype==='formula'&&r.value===125)[0] || null,
   }), target.id);
   t('the original is kept and marked deleted', fixed.original && fixed.original.type, 'deleted');
   t('the correction exists with the new amount', !!fixed.corrected, true);

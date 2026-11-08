@@ -53,7 +53,7 @@ const t=(n,got,want)=>{const ok=String(got)===String(want);if(!ok)fail++;
   await page.click('#when-yest'); await page.waitForTimeout(150);
   t('the chip reads as pressed', await page.getAttribute('#when-yest','aria-pressed'), 'true');
   t('and the row says what will happen', (await page.textContent('#when-lbl')).trim(), 'yesterday 08:00');
-  await page.click('[data-sheet="bottle"]'); await page.waitForTimeout(200);
+  await page.click('[data-sheet="formula"]'); await page.waitForTimeout(200);
   await page.click('#sheet-save'); await page.waitForTimeout(600);
   const row = await page.evaluate(()=>{const r=entries[entries.length-1];return r.ts;});
   console.log('   saved as', row);

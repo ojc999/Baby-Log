@@ -43,10 +43,12 @@ from pathlib import Path
 # keeps working, and they are written onto every row - null where they do not apply - so
 # that data/raw/ has one shape throughout rather than two. `pump_dev` names the machine
 # ("spectra", "imani", or empty for a hand expression) and is a string, not a number, so
-# its absent value is "" like every other text field.
+# its absent value is "" like every other text field. `added` names what went into a
+# bottle feed - "simeticone", "biogaia", or both joined with "+" in alphabetical order so
+# the pair has one spelling - and is also a string.
 FIELDS = ["ts", "sender", "type", "subtype", "value", "unit", "note", "raw", "msg_id"]
 NUMERIC_FIELDS = ["value", "dur_min", "ml_l", "ml_r"]
-FIELDS = FIELDS + ["dur_min", "ml_l", "ml_r", "pump_dev"]
+FIELDS = FIELDS + ["dur_min", "ml_l", "ml_r", "pump_dev", "added"]
 
 # Set by main() once --repo is known. Defaults to the repo this script sits in, which
 # is right when it lives at apps/baby-log-web/ inside the data repo, and overridable
