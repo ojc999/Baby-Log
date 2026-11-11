@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, dosesIn};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -367,6 +367,39 @@ t('and both when both did',
   'Expressed milk 60 ml · with BioGaia + Simeticone');
 t('a feed with nothing added reads as before',
   A.describe({type:'feed',subtype:'formula',value:90,unit:'ml',note:''}), 'Formula 90 ml');
+
+console.log('\n--- counting the doses ---');
+const DAY = '2026-11-03T';
+const dr = [
+  {type:'feed',subtype:'formula',  added:'simeticone'},
+  {type:'feed',subtype:'expressed',added:'biogaia+simeticone'},
+  {type:'feed',subtype:'formula',  added:'simeticone'},
+  {type:'feed',subtype:'breast',   added:''},
+  {type:'feed',subtype:'formula'},                       // older row, no field at all
+  {type:'nappy',subtype:'wet',     added:''}
+];
+const dc = A.dosesIn(dr);
+t('each feed carrying it counts once', dc.simeticone, 3);
+t('a feed carrying both counts for each', dc.biogaia, 1);
+t('a feed with nothing added counts for neither', dc.simeticone + dc.biogaia, 4);
+t('and a row written before the field existed does not break it', !!A.dosesIn([{type:'feed'}]), true);
+t('an empty set counts zero, not undefined', JSON.stringify(A.dosesIn([])),
+  JSON.stringify({simeticone:0, biogaia:0}));
+// one feed with one dose is one dose, however many times it is counted
+t('counting is per feed, not per millilitre',
+  A.dosesIn([{type:'feed',added:'simeticone',value:200}]).simeticone, 1);
+
+A.setEntries([]);
+A.add('feed','formula',90,'ml','','f', Date.parse(DAY+'08:00:00+08:00'), {added:'simeticone'});
+A.add('feed','formula',90,'ml','','f', Date.parse(DAY+'12:00:00+08:00'), {added:'biogaia+simeticone'});
+A.add('feed','breast', 20,'min','left','f', Date.parse(DAY+'16:00:00+08:00'));
+const sd = A.statsOf();
+t('the whole record counts them too', sd.doses.simeticone, 2);
+t('and the other one separately', sd.doses.biogaia, 1);
+t('an undone feed takes its dose with it', (()=>{
+  const last = A.entries().filter(r=>r.added==='biogaia+simeticone')[0];
+  A.undo(last.msg_id);
+  return A.statsOf().doses.simeticone; })(), 1);
 
 console.log('\n--- the bottle button is gone, the rows are not ---');
 t('no Bottle picker', !!A.SHEETS.bottle, false);

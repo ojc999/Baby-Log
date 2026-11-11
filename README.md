@@ -49,6 +49,12 @@ is the right trade for something done once a day or once a week. **Last bath** s
 home screen even so — the input moved, the readout did not, because how long since the last
 bath is exactly the sort of thing you forget.
 
+**The Summary tab counts the day's doses.** A card each for Simeticone and BioGaia,
+appearing only on a day one was given, and a **Sim** column on the seven-day table so you
+can see today against the days behind it — that column appears only in a week that had
+any. Neither says anything about a daily maximum: that is a fact about a particular
+product, not about this record, and a limit invented by an app is worse than none.
+
 **Simeticone and BioGaia go on the feed they went into**, as chips on the Formula and EBM
 pickers — not as entries of their own, which would make a wind-drop look like a feed in
 every count. Both can go into one bottle. Forgot at the time? **Fix** on that feed adds

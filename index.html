@@ -1236,6 +1236,20 @@ function addsSplit(v) {
   String(v || '').split('+').forEach(function (k) { if (k) set[k] = true; });
   return set;
 }
+/* How many doses of each thing went in across a set of rows. One counter, used by the
+   day's figures, the week table and the whole-story screen, so the three can never
+   disagree about what a dose is: one feed that carried it, counted once. */
+function dosesIn(rows) {
+  var out = {};
+  ADDS.forEach(function (a) { out[a[0]] = 0; });
+  rows.forEach(function (r) {
+    if (!r.added) return;
+    var set = addsSplit(r.added);
+    ADDS.forEach(function (a) { if (set[a[0]]) out[a[0]]++; });
+  });
+  return out;
+}
+
 function addsWords(v) {
   return String(v || '').split('+').filter(Boolean)
     .map(function (k) { return ADD_LABEL[k] || k; }).join(' + ');
@@ -2166,6 +2180,7 @@ function renderSummary() {
                 .reduce(function (a, r) { return a + (r.value || 0); }, 0);
   var pumped = rows.filter(function (r) { return r.type === 'pump'; })
                    .reduce(function (a, r) { return a + (r.value || 0); }, 0);
+  var doses = dosesIn(rows);
 
   $('sum-today').innerHTML =
     lcard('Feeds', feeds.length, ml ? ml + ' ml' + (bf ? ' + ' + bf + ' min' : '') : (bf ? bf + ' min' : 'no volumes'), false) +
@@ -2173,7 +2188,15 @@ function renderSummary() {
     lcard('Wet', wet, 'nappies', false) +
     lcard('Dirty', dirt, 'nappies', dirt === 0) +
     (cry ? lcard('Unsettled', cry, 'minutes', false) : '') +
-    (pumped ? lcard('Mum expressed', pumped, 'ml', false) : '');
+    (pumped ? lcard('Mum expressed', pumped, 'ml', false) : '') +
+    /* A card each, and only on a day it was given - the same way the unsettled and
+       expressing cards come and go. Nothing here says what the daily maximum is: that is
+       a fact about a particular product, not about this record, and a limit invented by
+       an app is worse than none. */
+    ADDS.map(function (a) {
+      return doses[a[0]]
+        ? lcard(a[1], doses[a[0]], plural(doses[a[0]], 'dose'), false) : '';
+    }).join('');
 
   $('sum-gaps').innerHTML = si.unpaired.length
     ? '<div class="gap"><b>' + si.unpaired.length + ' unpaired sleep entr' +
@@ -2186,12 +2209,25 @@ function renderSummary() {
   // seven days back, oldest at the bottom
   var days = [];
   for (var i = 0; i < 7; i++) days.push(daySG(Date.now() - i * 86400000));
-  var head = '<tr><th>Day</th><th>Feeds</th><th>ml</th><th>Wet</th><th>Dirty</th><th>Slept</th></tr>';
+  /* A simeticone column, but only in a week that had any - the question it answers is
+     whether he is needing more of it than yesterday, and a column of dashes for a family
+     that has stopped using it is clutter that never goes away. BioGaia is not given a
+     column: it is a once-a-day probiotic rather than something you titrate, and today's
+     card already carries it. */
+  var weekDoses = {};
+  days.forEach(function (d) {
+    weekDoses[d] = dosesIn(live().filter(function (r) { return daySG(r.ms) === d; })).simeticone;
+  });
+  var anySim = days.some(function (d) { return weekDoses[d] > 0; });
+
+  var head = '<tr><th>Day</th><th>Feeds</th><th>ml</th><th>Wet</th><th>Dirty</th><th>Slept</th>' +
+             (anySim ? '<th>Sim</th>' : '') + '</tr>';
   var body = days.map(function (d) {
     var rr = live().filter(function (r) { return daySG(r.ms) === d; });
     if (!rr.length) {
       return '<tr' + (d === today ? ' class="today"' : '') + '><td>' + dayShort(d) +
-             '</td><td colspan="5" style="text-align:right;color:var(--ink-faint)">nothing logged</td></tr>';
+             '</td><td colspan="' + (anySim ? 6 : 5) +
+             '" style="text-align:right;color:var(--ink-faint)">nothing logged</td></tr>';
     }
     var f = rr.filter(function (r) { return r.type === 'feed'; });
     var v = f.reduce(function (a, r) { return a + (r.unit === 'ml' && r.value ? r.value : 0); }, 0);
@@ -2204,10 +2240,12 @@ function renderSummary() {
       '<td>' + (v || '—') + '</td>' +
       '<td>' + nn.filter(function (r) { return r.subtype === 'wet' || r.subtype === 'both'; }).length + '</td>' +
       '<td>' + nn.filter(function (r) { return r.subtype === 'dirty' || r.subtype === 'both'; }).length + '</td>' +
-      '<td>' + (s2.pairs.length ? dur(sl) : '—') + (s2.unpaired.length ? '*' : '') + '</td></tr>';
+      '<td>' + (s2.pairs.length ? dur(sl) : '—') + (s2.unpaired.length ? '*' : '') + '</td>' +
+      (anySim ? '<td>' + (weekDoses[d] || '—') + '</td>' : '') + '</tr>';
   }).join('');
   $('sum-week').innerHTML = head + body;
   $('sum-weeknote').innerHTML =
+    (anySim ? '<b>Sim</b> is doses of simeticone, counted one to a feed. ' : '') +
     'Counts only what is in this app — this device plus whatever the other one had ' +
     'pushed when it was last read. A <b>*</b> marks a day with an unpaired sleep entry, ' +
     'so its total is an undercount. For anything beyond a week, ask a Claude Code session ' +
@@ -2258,9 +2296,10 @@ function statsOf() {
     ml: 0, feeds: 0, breastMin: 0, biggest: null,
     pumpMl: 0, pumps: 0,
     tummyMin: 0, tummies: 0, baths: 0, vomits: 0, cryMin: 0,
-    weights: [], who: {}, nights: {},
+    weights: [], who: {}, nights: {}, doses: {},
     first: null, last: null
   };
+  ADDS.forEach(function (a) { out.doses[a[0]] = 0; });
   rows.forEach(function (r) {
     var d = daySG(r.ms);
     out.days[d] = true;
@@ -2280,6 +2319,10 @@ function statsOf() {
       if (r.subtype === 'dirty' || r.subtype === 'both') out.dirty++;
     } else if (r.type === 'feed') {
       out.feeds++;
+      if (r.added) {
+        var set = addsSplit(r.added);
+        ADDS.forEach(function (a) { if (set[a[0]]) out.doses[a[0]]++; });
+      }
       if (r.unit === 'ml' && r.value) {
         out.ml += r.value;
         if (!out.biggest || r.value > out.biggest.value) out.biggest = r;
@@ -2382,6 +2425,12 @@ function renderStats() {
     bits.push('Busiest night: <b>' + plural(s.busiestNight.n, 'entry', 'entries') + '</b> between midnight and ' +
       '6am on <b>' + esc(dayLabel(s.busiestNight.day)) + '</b>.');
   }
+  ADDS.forEach(function (a) {
+    if (s.doses[a[0]]) {
+      bits.push('<b>' + plural(s.doses[a[0]], 'dose') + '</b> of ' + a[1] + ', in ' +
+        (s.feeds ? Math.round(s.doses[a[0]] / s.feeds * 100) + '% of feeds' : 'the feeds') + '.');
+    }
+  });
   if (s.baths) bits.push('<b>' + s.baths + '</b> bath' + (s.baths === 1 ? '' : 's') + ' so far.');
   if (s.vomits) bits.push('Brought back up <b>' + s.vomits + '</b> time' + (s.vomits === 1 ? '' : 's') + '.');
   if (s.unpaired) {

@@ -771,6 +771,24 @@ so that tapping them in either order spells the same thing — the same order-in
 A breastfeed cannot take one. There is nothing to stir it into, and the picker used most
 often should not grow a row that never applies to it.
 
+**Counting them is one function, used three times.** `dosesIn()` serves the day's figures,
+the seven-day table and the whole-story screen, so the three cannot disagree about what a
+dose is: one feed that carried it, counted once, whatever volume it was. A feed carrying
+both counts once for each. An undone feed takes its dose with it, because every count here
+runs off `live()`.
+
+Both appear on the Summary tab as cards, and only on a day one was given — the same way
+the unsettled and expressing cards come and go. The seven-day table gains a **Sim** column,
+and only in a week that had any: the question it answers is whether he is needing more than
+yesterday, and a column of dashes for a family that has stopped using it is clutter that
+never leaves. BioGaia gets no column; it is a once-a-day probiotic rather than something
+you titrate, and the card already carries it.
+
+**Nothing here states a daily maximum.** That is a fact about a particular product — which
+simeticone, what strength — not a fact about this record. An app inventing a threshold and
+colouring a number red against it would be worse than showing the number plainly, which is
+what a physician asked for.
+
 **The Bottle button is gone.** Every bottle he drinks is either formula or expressed milk,
 so Bottle only ever asked a question the next two buttons already answer, and a row saying
 `bottle` tells you less than one saying which. Breast now takes the full width it earns —
