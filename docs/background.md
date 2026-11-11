@@ -771,11 +771,37 @@ so that tapping them in either order spells the same thing — the same order-in
 A breastfeed cannot take one. There is nothing to stir it into, and the picker used most
 often should not grow a row that never applies to it.
 
+**BioGaia came off that picker.** It is not given with a feed — it is given at bath time —
+so it is now an entry of its own, `med/biogaia`, with a button under **More** and a prompt
+after a bath. The option is gone from the pickers; the label is not, because feeds were
+logged carrying it and a retired option is not a retired row. Those feeds still count,
+under a card headed `BioGaia in feeds` so it cannot be confused with the daily one.
+
+**The reminder is the one place the app asks rather than reports.** Logging a bath raises
+a toast — "Bath logged. BioGaia?" — with a button that logs the dose in one tap. It is not
+raised twice: if a dose is already recorded for the day the ordinary toast shows instead,
+so the prompt stays worth reading. The trade is that logging a bath offers the prompt
+rather than Undo; the row still has Fix and × wherever it is listed.
+
+The Summary card for it is a yes-or-no rather than a count, and is shown whether or not it
+has been given — amber "not yet" until it has, then the time it was. A card that only
+appeared after the fact could not answer the question the reminder exists for.
+
 **Counting them is one function, used three times.** `dosesIn()` serves the day's figures,
 the seven-day table and the whole-story screen, so the three cannot disagree about what a
 dose is: one feed that carried it, counted once, whatever volume it was. A feed carrying
 both counts once for each. An undone feed takes its dose with it, because every count here
 runs off `live()`.
+
+**A retired option has to survive a correction, not just a count.** `addsJoin()` first
+filtered its output through `ADDS`, the list the chips are drawn from. That was harmless
+while the only caller was the picker, which cannot set a key it does not offer. Fix is a
+second caller, and it builds its set from the row being corrected: so a feed logged back
+when BioGaia was offered would lose it the moment anyone fixed the volume — no mark, no
+record of the change, exactly what the rest of this design goes out of its way to avoid.
+It now joins whatever the set holds. The chips still only ever offer the current list, and
+a chip for something no longer offered simply never appears, so a dose already on a row is
+carried through a correction untouched rather than re-ticked by hand.
 
 Both appear on the Summary tab as cards, and only on a day one was given — the same way
 the unsettled and expressing cards come and go. The seven-day table gains a **Sim** column,

@@ -1183,6 +1183,12 @@ var CATS = {
         { t: 'hygiene', s: 'cord',  label: 'Cord care',    tone: 'leafb' },
         { t: 'hygiene', s: 'cream', label: 'Cream',        tone: 'leafb' }
       ] },
+      /* Right under the bath buttons, because that is when it is given. The reminder
+         after a bath logs the same thing; this is the way in on a day there was no
+         bath, or when the reminder has already gone. */
+      { head: 'Every day', cols: 1, items: [
+        { t: 'med', s: 'biogaia', label: 'BioGaia', tone: 'leafb' }
+      ] },
       { head: 'Growth', cols: 3, items: [
         { sheet: 'weight' }, { sheet: 'length' }, { sheet: 'head' }
       ] },
@@ -1223,13 +1229,20 @@ var SHEETS = {
    question worth being able to answer later, and a category written as prose cannot be
    counted. Joined alphabetically so the pair has exactly one spelling - the same reason
    `compact.py` resolves a struck row without reference to order. */
-var ADDS = [['simeticone', 'Simeticone'], ['biogaia', 'BioGaia']];
+/* Offered on the feed pickers. BioGaia was here and is not any more - it is not given
+   with a feed - but its label stays below, because feeds were logged carrying it and a
+   retired option is not a retired row. Same rule as the Bottle button. */
+var ADDS = [['simeticone', 'Simeticone']];
 var ADD_LABEL = { simeticone: 'Simeticone', biogaia: 'BioGaia' };
 
+/* Joins whatever the set holds, not whatever the pickers currently offer. The chips can
+   only ever set an offered key, so filtering was a no-op there - but `saveFix` builds its
+   set from the row being corrected, and a row may carry a since-retired option. Filtering
+   stripped it: correcting an old feed quietly dropped its BioGaia. */
 function addsJoin(set) {
-  return ADDS.map(function (a) { return a[0]; })
-             .filter(function (k) { return !!set[k]; })
-             .sort().join('+');
+  var out = [];
+  for (var k in set) { if (set[k]) out.push(k); }
+  return out.sort().join('+');
 }
 function addsSplit(v) {
   var set = {};
@@ -1244,10 +1257,26 @@ function dosesIn(rows) {
   ADDS.forEach(function (a) { out[a[0]] = 0; });
   rows.forEach(function (r) {
     if (!r.added) return;
+    /* Counted by what the rows actually carry, not by what the pickers currently offer.
+       An option can be retired; the feeds logged under it stay counted. */
     var set = addsSplit(r.added);
-    ADDS.forEach(function (a) { if (set[a[0]]) out[a[0]]++; });
+    for (var k in set) { if (set[k]) out[k] = (out[k] || 0) + 1; }
   });
   return out;
+}
+
+/* BioGaia is given on its own, at bath time, not stirred into a bottle - so it is an
+   entry of its own rather than a field on a feed. `med` already means "something given",
+   so it needs no new type, only a subtype. */
+function isBiogaia(r) {
+  return r.type === 'med' && r.subtype === 'biogaia';
+}
+function isBath(r) {
+  return (r.type === 'hygiene' && r.subtype === 'bath') || r.type === 'bath';
+}
+function biogaiaToday() {
+  var d = daySG(Date.now());
+  return live().some(function (r) { return isBiogaia(r) && daySG(r.ms) === d; });
 }
 
 function addsWords(v) {
@@ -1264,6 +1293,7 @@ var LABELS = {
   'feed/expressed': 'Expressed milk', 'feed/': 'Feed',
   'measure/weight': 'Weight', 'measure/length': 'Length', 'measure/head': 'Head',
   'measure/temp': 'Temperature',
+  'med/biogaia': 'BioGaia',
   'pump/': 'Mum expressed', 'pump/hand': 'Hand expressed', 'pump/power': 'Power pumped',
   'cry/': 'Unsettled', 'tummy/': 'Tummy time', 'vomit/': 'Vomit',
   'med/': 'Medicine', 'vax/': 'Vaccination', 'milestone/': 'Milestone', 'note/': 'Note',
@@ -2181,6 +2211,7 @@ function renderSummary() {
   var pumped = rows.filter(function (r) { return r.type === 'pump'; })
                    .reduce(function (a, r) { return a + (r.value || 0); }, 0);
   var doses = dosesIn(rows);
+  var bio = rows.filter(isBiogaia).pop() || null;
 
   $('sum-today').innerHTML =
     lcard('Feeds', feeds.length, ml ? ml + ' ml' + (bf ? ' + ' + bf + ' min' : '') : (bf ? bf + ' min' : 'no volumes'), false) +
@@ -2193,10 +2224,20 @@ function renderSummary() {
        expressing cards come and go. Nothing here says what the daily maximum is: that is
        a fact about a particular product, not about this record, and a limit invented by
        an app is worse than none. */
-    ADDS.map(function (a) {
-      return doses[a[0]]
-        ? lcard(a[1], doses[a[0]], plural(doses[a[0]], 'dose'), false) : '';
-    }).join('');
+    Object.keys(doses).sort().map(function (k) {
+      if (!doses[k]) return '';
+      /* A retired option still has to be counted where feeds carry it, but it must not
+         collide with a card of the same name - BioGaia is now given on its own, and two
+         cards both called BioGaia on one screen is worse than either. */
+      var offered = ADDS.some(function (a) { return a[0] === k; });
+      return lcard((ADD_LABEL[k] || k) + (offered ? '' : ' in feeds'),
+                   doses[k], plural(doses[k], 'dose'), false);
+    }).join('') +
+    /* BioGaia is a yes-or-no for the day rather than a count, so it is shown whether or
+       not it has been given: amber until it has. That is the question the reminder is
+       answering, and a card that only appears afterwards cannot answer it. */
+    lcard('BioGaia', bio ? 'given' : 'not yet',
+          bio ? hhmm(bio.ms) : 'prompted when you log a bath', !bio);
 
   $('sum-gaps').innerHTML = si.unpaired.length
     ? '<div class="gap"><b>' + si.unpaired.length + ' unpaired sleep entr' +
@@ -2296,7 +2337,7 @@ function statsOf() {
     ml: 0, feeds: 0, breastMin: 0, biggest: null,
     pumpMl: 0, pumps: 0,
     tummyMin: 0, tummies: 0, baths: 0, vomits: 0, cryMin: 0,
-    weights: [], who: {}, nights: {}, doses: {},
+    weights: [], who: {}, nights: {}, doses: {}, biogaia: 0,
     first: null, last: null
   };
   ADDS.forEach(function (a) { out.doses[a[0]] = 0; });
@@ -2319,10 +2360,6 @@ function statsOf() {
       if (r.subtype === 'dirty' || r.subtype === 'both') out.dirty++;
     } else if (r.type === 'feed') {
       out.feeds++;
-      if (r.added) {
-        var set = addsSplit(r.added);
-        ADDS.forEach(function (a) { if (set[a[0]]) out.doses[a[0]]++; });
-      }
       if (r.unit === 'ml' && r.value) {
         out.ml += r.value;
         if (!out.biggest || r.value > out.biggest.value) out.biggest = r;
@@ -2338,10 +2375,17 @@ function statsOf() {
       out.vomits++;
     } else if ((r.type === 'hygiene' && r.subtype === 'bath') || r.type === 'bath') {
       out.baths++;
+    } else if (isBiogaia(r)) {
+      out.biogaia++;
     } else if (r.type === 'measure' && r.subtype === 'weight' && r.value) {
       out.weights.push(r);
     }
   });
+
+  /* The same counter the day's figures and the week table use, rather than a second one
+     here that could drift from it - which it had: this one still iterated the offered
+     options and stopped counting a retired one the moment it left the picker. */
+  out.doses = dosesIn(rows);
 
   var si = sleepIntervals(rows);
   out.sleeps = si.pairs.length;
@@ -2425,12 +2469,15 @@ function renderStats() {
     bits.push('Busiest night: <b>' + plural(s.busiestNight.n, 'entry', 'entries') + '</b> between midnight and ' +
       '6am on <b>' + esc(dayLabel(s.busiestNight.day)) + '</b>.');
   }
-  ADDS.forEach(function (a) {
-    if (s.doses[a[0]]) {
-      bits.push('<b>' + plural(s.doses[a[0]], 'dose') + '</b> of ' + a[1] + ', in ' +
-        (s.feeds ? Math.round(s.doses[a[0]] / s.feeds * 100) + '% of feeds' : 'the feeds') + '.');
+  Object.keys(s.doses).sort().forEach(function (k) {
+    if (s.doses[k]) {
+      bits.push('<b>' + plural(s.doses[k], 'dose') + '</b> of ' + (ADD_LABEL[k] || k) +
+        ' in a feed, ' + (s.feeds ? Math.round(s.doses[k] / s.feeds * 100) + '% of them' : '') + '.');
     }
   });
+  if (s.biogaia) {
+    bits.push('<b>' + plural(s.biogaia, 'dose') + '</b> of BioGaia, given on its own.');
+  }
   if (s.baths) bits.push('<b>' + s.baths + '</b> bath' + (s.baths === 1 ? '' : 's') + ' so far.');
   if (s.vomits) bits.push('Brought back up <b>' + s.vomits + '</b> time' + (s.vomits === 1 ? '' : 's') + '.');
   if (s.unpaired) {
@@ -3518,21 +3565,31 @@ function renderDiag() {
    `undoId` adds an Undo button, which is the answer to the commonest way a wrong entry
    gets in: a mis-tap while holding the baby. */
 var toastT = null;
-function toast(msg, undoId) {
+/* `action` is a third shape: a button that does something other than undo, used for the
+   BioGaia reminder. It lingers longer than an undo, because it is asking for a decision
+   rather than offering to take one back. */
+var toastFn = null;
+
+function toast(msg, undoId, action) {
   var el = $('toast'), act = $('toast-act');
   $('toast-txt').innerHTML = msg;
-  if (undoId) {
+  toastFn = null;
+  delete act.dataset.undo;
+  if (action) {
+    act.hidden = false;
+    act.textContent = action.label;
+    toastFn = action.fn;
+  } else if (undoId) {
     act.hidden = false;
     act.textContent = 'Undo';
     act.dataset.undo = undoId;
   } else {
     act.hidden = true;
-    delete act.dataset.undo;
   }
   el.hidden = false;
   el.classList.remove('out');
   if (toastT) clearTimeout(toastT);
-  toastT = setTimeout(hideToast, undoId ? 5200 : 3400);
+  toastT = setTimeout(hideToast, action ? 9000 : (undoId ? 5200 : 3400));
 }
 function hideToast() {
   var el = $('toast');
@@ -3551,7 +3608,18 @@ function afterWrite(e) {
   offsetMin = 0; absTime = ''; dayBack = 0; $('when-time').value = '';
   paintWhen(); render(); paintSync(); renderDiag(); buzz();
   if (e && e.msg_id && e.type !== 'deleted') {
-    toast('<b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms), e.msg_id);
+    /* The one place the app asks for something rather than reporting it. A bath is when
+       BioGaia gets given, and the moment just after logging the bath is the moment he is
+       holding the phone. Not asked twice: if it has already been given today the ordinary
+       toast shows instead, so the prompt stays worth reading. */
+    if (isBath(e) && !biogaiaToday()) {
+      toast('<b>' + esc(describe(e)) + '</b> logged. BioGaia?', null,
+            { label: 'Give it', fn: function () {
+                afterWrite(add('med', 'biogaia', null, '', '', 'biogaia'));
+              } });
+    } else {
+      toast('<b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms), e.msg_id);
+    }
   }
   flush();
 }
@@ -4025,9 +4093,10 @@ $('sheet').addEventListener('click', function (e) {
   }
 });
 $('toast-act').addEventListener('click', function () {
-  var id = this.dataset.undo;
-  if (id) undo(id);
+  var id = this.dataset.undo, fn = toastFn;
   hideToast();
+  if (fn) { toastFn = null; fn(); return; }
+  if (id) undo(id);
 });
 
 ['fix-l', 'fix-r'].forEach(function (id) {

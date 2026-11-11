@@ -69,9 +69,19 @@ async function open_(b, rows) {
   console.log('   cards:', JSON.stringify(c));
   t('simeticone is counted for the day', c['Simeticone'][0], '3');
   t('as doses, not millilitres', c['Simeticone'][1], '3 doses');
-  t('the feed carrying both counts for the other one too', c['BioGaia'][0], '1');
-  t('and reads singular when it is one', c['BioGaia'][1], '1 dose');
   t('the feeds card is unchanged by any of it', c['Feeds'][0], '4');
+  // BioGaia is no longer given with a feed: it is a yes-or-no for the day
+  t('BioGaia reads as not given', c['BioGaia'][0], 'not yet');
+  t('and says where the nudge comes from', c['BioGaia'][1], 'prompted when you log a bath');
+  t('no two cards share a name', await page.evaluate(()=>{
+     const n=[...document.querySelectorAll('#sum-today .lcard')].map(c=>c.querySelector('dt').textContent);
+     return n.length - new Set(n).size;}), 0);
+  t('a retired option counted on old feeds says where it was',
+     c['BioGaia in feeds'][1], '1 dose');
+  t('shown amber while it is still owed', await page.evaluate(()=>{
+     for(const c of document.querySelectorAll('#sum-today .lcard'))
+       if(c.querySelector('dt').textContent==='BioGaia') return c.classList.contains('stale');
+     return 'no card';}), true);
 
   console.log('--- and the days behind it ---');
   const head = await weekHead(page);
@@ -94,7 +104,8 @@ async function open_(b, rows) {
   ]);
   const c2 = await cards(page);
   t('no card for something that was not given', c2['Simeticone'][0], '(no such card)');
-  t('nor for the other', c2['BioGaia'][0], '(no such card)');
+  // BioGaia is the exception: a yes-or-no for the day, so it shows either way
+  t('but BioGaia still shows, unanswered', c2['BioGaia'][0], 'not yet');
   t('and no column either',
      (await weekHead(page)).join(','), 'Day,Feeds,ml,Wet,Dirty,Slept');
   t('the empty-day span narrows to match', await page.evaluate(()=>{
@@ -117,12 +128,51 @@ async function open_(b, rows) {
   await page.waitForTimeout(300);
   t('one once a feed is struck out', (await cards(page))['Simeticone'][0], '1');
 
+  console.log('--- the reminder, when a bath is logged ---');
+  await page.click('#tab-log'); await page.waitForTimeout(300);
+  await page.click('[data-go="more"]'); await page.waitForTimeout(400);
+  t('BioGaia has a button of its own, for a day with no bath',
+     await page.isVisible('[data-ev="med:biogaia"]'), true);
+  await page.evaluate(()=>{const b=[...document.querySelectorAll('#cat-body [data-ev]')]
+    .find(e=>e.dataset.ev==='hygiene:bath'); b.click();});
+  await page.waitForTimeout(500);
+  const tx = (await page.textContent('#toast-txt')||'').replace(/\s+/g,' ');
+  t('logging a bath asks for it', /BioGaia\?/.test(tx), true);
+  t('and says the bath itself was logged', /Bath logged/.test(tx), true);
+  t('the button offers to give it', (await page.textContent('#toast-act')).trim(), 'Give it');
+  await page.click('#toast-act'); await page.waitForTimeout(600);
+  const given = await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2'))
+    .filter(r=>r.type==='med'&&r.subtype==='biogaia'));
+  t('tapping it logs a dose', given.length, 1);
+  t('as its own entry, not a feed', given[0].type+'/'+given[0].subtype, 'med/biogaia');
+  t('and it is not written onto any feed', await page.evaluate(()=>
+     JSON.parse(localStorage.getItem('babylog.entries.v2'))
+       .some(r=>/biogaia/.test(r.added||''))), false);
+
+  console.log('--- and it does not ask twice ---');
+  await page.evaluate(()=>{const b=[...document.querySelectorAll('#cat-body [data-ev]')]
+    .find(e=>e.dataset.ev==='hygiene:bath'); b.click();});
+  await page.waitForTimeout(500);
+  const tx2 = (await page.textContent('#toast-txt')||'').replace(/\s+/g,' ');
+  t('a second bath gets the ordinary toast', /BioGaia\?/.test(tx2), false);
+  t('which offers undo as usual', (await page.textContent('#toast-act')).trim(), 'Undo');
+
+  await page.click('#tab-sum'); await page.waitForTimeout(500);
+  const c3 = await cards(page);
+  t('the card now reads given', c3['BioGaia'][0], 'given');
+  t('with the time it was given', /^\d\d:\d\d$/.test(c3['BioGaia'][1]), true);
+  t('and no longer amber, the thing being done', await page.evaluate(()=>{
+     for(const c of document.querySelectorAll('#sum-today .lcard'))
+       if(c.querySelector('dt').textContent==='BioGaia') return c.classList.contains('stale');
+     return 'no card';}), false);
+
   console.log('--- the whole story counts them over the record ---');
   await page.click('#go-stats'); await page.waitForTimeout(1200);
   const odd = (await page.textContent('#stats-odd')).replace(/\s+/g,' ');
   console.log('   fact:', (odd.match(/[^.]*Simeticone[^.]*\./)||[''])[0].trim());
-  t('a lifetime dose count is there', /1 dose of Simeticone/.test(odd), true);
-  t('with how much of the feeding it covered', /of feeds/.test(odd), true);
+  t('a lifetime dose count is there', /1 dose of Simeticone in a feed/.test(odd), true);
+  t('and the standalone BioGaia doses are counted apart from it',
+     /1 dose of BioGaia, given on its own/.test(odd), true);
 
   await b.close(); srv.close();
   console.log(fail?'\n======== '+fail+' FAILURES ========':'\n======== ALL PASS ========');

@@ -49,16 +49,23 @@ is the right trade for something done once a day or once a week. **Last bath** s
 home screen even so — the input moved, the readout did not, because how long since the last
 bath is exactly the sort of thing you forget.
 
-**The Summary tab counts the day's doses.** A card each for Simeticone and BioGaia,
-appearing only on a day one was given, and a **Sim** column on the seven-day table so you
-can see today against the days behind it — that column appears only in a week that had
-any. Neither says anything about a daily maximum: that is a fact about a particular
-product, not about this record, and a limit invented by an app is worse than none.
+**The Summary tab counts the day's doses.** A Simeticone card, on a day it was given, and
+a **Sim** column on the seven-day table so you can see today against the days behind it —
+that column appears only in a week that had any. Nothing says anything about a daily
+maximum: that is a fact about a particular product, not about this record, and a limit
+invented by an app is worse than none.
 
-**Simeticone and BioGaia go on the feed they went into**, as chips on the Formula and EBM
-pickers — not as entries of their own, which would make a wind-drop look like a feed in
-every count. Both can go into one bottle. Forgot at the time? **Fix** on that feed adds
-them later. A breastfeed has nothing to stir them into, so it does not offer them.
+**BioGaia is not given with a feed.** It has a button of its own under **More**, and
+logging a bath raises a prompt — *"Bath logged. BioGaia?"* — with a button that records
+the dose in one tap. You are not asked twice in a day. The Summary carries a BioGaia card
+that reads amber **not yet** until it has been given, then the time it was, so you can
+check at a glance without waiting for the next bath.
+
+**Simeticone goes on the feed it went into**, as a chip on the Formula and EBM pickers —
+not as an entry of its own, which would make a wind-drop look like a feed in every count.
+Forgot at the time? **Fix** on that feed adds it later. A breastfeed has nothing to stir it
+into, so it does not offer it. Feeds logged with BioGaia before it moved are untouched and
+still counted, under **BioGaia in feeds**.
 
 There is **no Bottle button**: every bottle is either formula or expressed milk, so it only
 asked a question the other two answer. Feeds already logged as Bottle are untouched and can

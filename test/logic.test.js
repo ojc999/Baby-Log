@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, dosesIn};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, dosesIn, isBath, isBiogaia, biogaiaToday};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -334,16 +334,24 @@ t('and one that does not, is not', r13.days[1].had, 0);
 
 console.log('\n--- what goes into a bottle ---');
 t('nothing added is an empty string', A.addsJoin({}), '');
-t('one of them', A.addsJoin({simeticone:true}), 'simeticone');
-t('the other', A.addsJoin({biogaia:true}), 'biogaia');
-// the pair must have one spelling, whichever order they were tapped in
-t('both, tapped either way, spell the same',
-  A.addsJoin({simeticone:true,biogaia:true}), A.addsJoin({biogaia:true,simeticone:true}));
-t('and that spelling is alphabetical', A.addsJoin({biogaia:true,simeticone:true}), 'biogaia+simeticone');
-t('it reads back as a set', JSON.stringify(A.addsSplit('biogaia+simeticone')),
+t('simeticone is what the pickers offer', A.addsJoin({simeticone:true}), 'simeticone');
+t('and it is the only one', A.ADDS.map(a=>a[0]).join(','), 'simeticone');
+// BioGaia is not given with a feed any more, so the pickers no longer offer it - but a
+// feed logged carrying it keeps the row, reads it back, still counts, and survives being
+// corrected. Joining must not filter through the offered list, or Fix would strip it.
+t('a retired option is kept when a row already carries it',
+  A.addsJoin({biogaia:true}), 'biogaia');
+t('and keeps one spelling beside a current one',
+  A.addsJoin({simeticone:true, biogaia:true}), 'biogaia+simeticone');
+t('whichever order they came in',
+  A.addsJoin({biogaia:true, simeticone:true}), 'biogaia+simeticone');
+t('but an old row still reads back as a set', JSON.stringify(A.addsSplit('biogaia+simeticone')),
   JSON.stringify({biogaia:true,simeticone:true}));
 t('an empty one reads back empty', JSON.stringify(A.addsSplit('')), '{}');
-t('and it is shown in words', A.addsWords('biogaia+simeticone'), 'BioGaia + Simeticone');
+t('and an old row is still shown in words', A.addsWords('biogaia+simeticone'), 'BioGaia + Simeticone');
+t('an old row still describes',
+  A.describe({type:'feed',subtype:'formula',value:90,unit:'ml',note:'',added:'biogaia'}),
+  'Formula 90 ml · with BioGaia');
 
 t('a formula feed can take them', A.takesAdds('feed','formula'), true);
 t('so can expressed milk', A.takesAdds('feed','expressed'), true);
@@ -384,7 +392,9 @@ t('a feed carrying both counts for each', dc.biogaia, 1);
 t('a feed with nothing added counts for neither', dc.simeticone + dc.biogaia, 4);
 t('and a row written before the field existed does not break it', !!A.dosesIn([{type:'feed'}]), true);
 t('an empty set counts zero, not undefined', JSON.stringify(A.dosesIn([])),
-  JSON.stringify({simeticone:0, biogaia:0}));
+  JSON.stringify({simeticone:0}));
+t('a retired option is still counted where a row carries it',
+  A.dosesIn([{type:'feed',added:'biogaia'}]).biogaia, 1);
 // one feed with one dose is one dose, however many times it is counted
 t('counting is per feed, not per millilitre',
   A.dosesIn([{type:'feed',added:'simeticone',value:200}]).simeticone, 1);
@@ -395,11 +405,36 @@ A.add('feed','formula',90,'ml','','f', Date.parse(DAY+'12:00:00+08:00'), {added:
 A.add('feed','breast', 20,'min','left','f', Date.parse(DAY+'16:00:00+08:00'));
 const sd = A.statsOf();
 t('the whole record counts them too', sd.doses.simeticone, 2);
-t('and the other one separately', sd.doses.biogaia, 1);
+t('and a retired one where it appears', sd.doses.biogaia, 1);
 t('an undone feed takes its dose with it', (()=>{
   const last = A.entries().filter(r=>r.added==='biogaia+simeticone')[0];
   A.undo(last.msg_id);
   return A.statsOf().doses.simeticone; })(), 1);
+
+console.log('\n--- BioGaia, given on its own at bath time ---');
+t('it is its own kind of entry, not a field on a feed',
+  A.label({type:'med',subtype:'biogaia'}), 'BioGaia');
+t('and it is offered under More',
+  JSON.stringify(A.CATS.more.groups).indexOf('biogaia') > -1, true);
+t('a bath is a bath', A.isBath({type:'hygiene',subtype:'bath'}), true);
+t("and the bot's older type counts as one too", A.isBath({type:'bath'}), true);
+t('a top-and-tail is not', A.isBath({type:'hygiene',subtype:'wipe'}), false);
+
+A.setEntries([]);
+t('nothing given yet today', A.biogaiaToday(), false);
+const bg = A.add('med','biogaia',null,'','','biogaia');
+t('and given once it has been', A.biogaiaToday(), true);
+A.undo(bg.msg_id);
+t('an undone dose does not count as given', A.biogaiaToday(), false);
+A.setEntries([]);
+A.add('med','biogaia',null,'','','biogaia', Date.parse('2026-11-10T20:00:00+08:00'));
+t("yesterday's dose does not count for today", A.biogaiaToday(), false);
+
+A.setEntries([]);
+A.add('med','biogaia',null,'','','b', Date.parse('2026-11-01T20:00:00+08:00'));
+A.add('med','biogaia',null,'','','b', Date.parse('2026-11-02T20:00:00+08:00'));
+t('the whole record counts the standalone doses', A.statsOf().biogaia, 2);
+t('and does not count them as feeds', A.statsOf().feeds, 0);
 
 console.log('\n--- the bottle button is gone, the rows are not ---');
 t('no Bottle picker', !!A.SHEETS.bottle, false);

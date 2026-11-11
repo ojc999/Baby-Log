@@ -119,16 +119,41 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
   await page.waitForTimeout(300);
   t('the correction box offers what can go into a bottle',
      await page.isVisible('#fix-adds-row'), true);
+  t('and offers only what is still given with a feed', await page.evaluate(()=>
+     [...document.querySelectorAll('#fix-adds [data-fixadd]')]
+       .map(b=>b.dataset.fixadd).join(',')), 'simeticone');
   await page.click('#fix-adds [data-fixadd="simeticone"]');
-  await page.click('#fix-adds [data-fixadd="biogaia"]');
   await page.click('#fix-save'); await page.waitForTimeout(900);
   const dosed = await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2'))
     .filter(r=>r.type==='feed'&&r.subtype==='formula'&&r.value===110));
-  t('the correction carries both, in one spelling', dosed.map(r=>r.added).join('|'), 'biogaia+simeticone');
+  t('the correction carries the dose', dosed.map(r=>r.added).join('|'), 'simeticone');
   // two earlier corrections in this file, plus this one
   t('and the original is kept, struck out', await page.evaluate(()=>
      JSON.parse(localStorage.getItem('babylog.entries.v2'))
        .filter(r=>r.type==='deleted').length), 3);
+
+  console.log('--- correcting an old feed does not strip an addition we no longer offer ---');
+  // BioGaia left the pickers, so there is no chip to re-tick it with. If the correction
+  // rebuilt `added` from the chips alone, fixing the volume on a feed logged back when it
+  // was offered would quietly drop the dose - a silent repair of real data.
+  await page.evaluate(()=>{
+    add('feed','formula',null,'ml','','formula',
+        Date.parse('2026-11-01T09:00:00+08:00'), {added:'biogaia+simeticone'});
+    render();});
+  await page.waitForTimeout(400);
+  await page.evaluate(()=>{
+    for(const r of document.querySelectorAll('#sum-timeline .row'))
+      if(/Formula/.test(r.textContent) && /09:00/.test(r.textContent))
+        { r.querySelector('[data-fix]').click(); return; }});
+  await page.waitForTimeout(300);
+  t('the chip for the option still offered comes up already ticked',
+     await page.getAttribute('#fix-adds [data-fixadd="simeticone"]','aria-pressed'), 'true');
+  await page.fill('#fix-amt','95');
+  await page.click('#fix-save'); await page.waitForTimeout(900);
+  const kept = await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2'))
+    .filter(r=>r.type==='feed'&&r.value===95));
+  t('the retired dose survives the correction', kept.map(r=>r.added).join('|'),
+    'biogaia+simeticone');
 
   console.log('--- but not on a breastfeed, which has nothing to stir it into ---');
   await page.evaluate(()=>{

@@ -64,6 +64,11 @@ what it is, and lists decisions that look arbitrary and are not.
   repo, where history keeps everything anyway. Do not reuse it for anything narrower: if
   a single entry is wrong, that is what Fix and undo are for.
 - **Never rename or repurpose a field** in the data contract. Add one if you must.
+- **Never let two cards on one screen share a name.** A retired feed addition still has
+  to be counted where feeds carry it, and `biogaia` is now also a daily entry of its own —
+  so the feed-dose card is labelled `BioGaia in feeds` and the daily one `BioGaia`. Two
+  cards reading `BioGaia` with different numbers is worse than either alone. The browser
+  test asserts no two card titles repeat.
 - **Never retire a subtype out of `LABELS`.** The Bottle button is gone, because every
   bottle he drinks is either formula or expressed milk and the button only asked a
   question the other two answer. `feed/bottle` is still labelled, still described and
@@ -149,12 +154,22 @@ more he takes directly the less there is left to express. The field stays in the
 and is written `null`, because removing it would leave the archive with two row shapes and
 would throw away the sessions already logged with it. Do not reuse it for anything else.
 
-`added` is what went into a milk feed: `simeticone`, `biogaia`, or both joined with `+`
-in alphabetical order, so the pair has exactly one spelling whichever order they were
-tapped. A field rather than words in `note`, because "how many feeds had simeticone in
-them" is a question worth being able to answer, and a category kept as prose cannot be
-counted. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` can carry
-one — there is nothing to stir into a breastfeed.
+`added` is what went into a milk feed. The pickers now offer **simeticone only**;
+`biogaia` was offered and is not any more, because it is given on its own at bath time
+rather than in a bottle. Values stay joined with `+` in alphabetical order, so a pair has
+exactly one spelling. A field rather than words in `note`, because "how many feeds had
+simeticone in them" is a question worth being able to answer, and a category kept as prose
+cannot be counted. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` can
+carry one — there is nothing to stir into a breastfeed.
+
+**Count by what the rows carry, not by what the pickers offer.** `dosesIn()` counts every
+key it finds in `added`, so feeds logged with a since-retired option keep counting. It is
+the single counter for the day's cards, the week table and the whole-story screen; the
+last of those once had its own copy, which stopped counting `biogaia` the moment it left
+the picker. Do not write a second one. The same goes for writing back: `addsJoin()` joins
+whatever the set holds and never filters through `ADDS`, because Fix builds its set from
+the row being corrected. Filtering there meant fixing the volume on an old feed silently
+dropped its BioGaia — a repair nobody asked for, of real data, with no mark left.
 
 `pump_dev` is which machine: `spectra`, `imani`, or empty for a hand expression. It is a
 field rather than more `subtype` values because power pumping is a technique and the
