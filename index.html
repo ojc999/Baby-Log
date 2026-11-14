@@ -1146,14 +1146,13 @@ var CATS = {
       ] },
       { head: 'Mum', cols: 2, items: [{ sheet: 'pump' }] }
     ],
-    /* Names what the pickers currently offer. It said "Simeticone and BioGaia" for a
-       while after BioGaia moved to a button of its own, which is the kind of thing only
-       a screenshot catches. */
+    /* Names what the pickers currently offer, and nothing else. It read "Simeticone and
+       BioGaia" for a whole change after BioGaia came off the picker, which is the kind of
+       thing only a screenshot catches. */
     hint: 'Simeticone and vitamin D are logged on the feed they went into, not as ' +
-          'entries of their own — tap them on the Formula or EBM picker. BioGaia has a ' +
-          'button of its own under More. Expressing is stored as its own kind of entry, ' +
-          'never as a feed: expressing 80 ml and him drinking 80 ml are different ' +
-          'events and must not be added together.',
+          'entries of their own — tap them on the Formula or EBM picker. Expressing is ' +
+          'stored as its own kind of entry, never as a feed: expressing 80 ml and him ' +
+          'drinking 80 ml are different events and must not be added together.',
     /* No bare "60ml" in the examples any more. The shared parser still reads one, and
        still files it as `feed/bottle` - which is now a subtype with no button - so the
        suggestions point at the words that say which kind of milk it was. The parser
@@ -1190,12 +1189,6 @@ var CATS = {
         { t: 'hygiene', s: 'hair',  label: 'Hair wash',    tone: 'leafb' },
         { t: 'hygiene', s: 'cord',  label: 'Cord care',    tone: 'leafb' },
         { t: 'hygiene', s: 'cream', label: 'Cream',        tone: 'leafb' }
-      ] },
-      /* Right under the bath buttons, because that is when it is given. The reminder
-         after a bath logs the same thing; this is the way in on a day there was no
-         bath, or when the reminder has already gone. */
-      { head: 'Every day', cols: 1, items: [
-        { t: 'med', s: 'biogaia', label: 'BioGaia', tone: 'leafb' }
       ] },
       { head: 'Growth', cols: 3, items: [
         { sheet: 'weight' }, { sheet: 'length' }, { sheet: 'head' }
@@ -1237,9 +1230,10 @@ var SHEETS = {
    question worth being able to answer later, and a category written as prose cannot be
    counted. Joined alphabetically so the pair has exactly one spelling - the same reason
    `compact.py` resolves a struck row without reference to order. */
-/* Offered on the feed pickers. BioGaia was here and is not any more - it is not given
-   with a feed - but its label stays below, because feeds were logged carrying it and a
-   retired option is not a retired row. Same rule as the Bottle button. */
+/* Offered on the feed pickers. BioGaia was here and is not any more - first because it
+   was given at bath time rather than in a bottle, and now because it is not given at all
+   - but its label stays below, because feeds were logged carrying it and a retired option
+   is not a retired row. Same rule as the Bottle button. */
 var ADDS = [['simeticone', 'Simeticone'], ['vitd', 'Vitamin D']];
 var ADD_LABEL = { simeticone: 'Simeticone', vitd: 'Vitamin D', biogaia: 'BioGaia' };
 
@@ -1256,8 +1250,7 @@ var ADD_WORD = { simeticone: 'simeticone', vitd: 'vitamin D' };
    The distinction is only about what an empty day means. Simeticone not given today is
    not a finding - he was not windy. Vitamin D not given today is a missed dose, so its
    card is shown amber from midnight rather than appearing only once it has gone in.
-   Same reasoning as the BioGaia card, which is the same kind of thing given at a
-   different moment. */
+   The BioGaia card worked the same way while BioGaia was still being given. */
 var ADD_DAILY = { vitd: true };
 
 /* Joins whatever the set holds, not whatever the pickers currently offer. The chips can
@@ -1290,18 +1283,20 @@ function dosesIn(rows) {
   return out;
 }
 
-/* BioGaia is given on its own, at bath time, not stirred into a bottle - so it is an
-   entry of its own rather than a field on a feed. `med` already means "something given",
-   so it needs no new type, only a subtype. */
+/* BioGaia is no longer given at all. The button, the bath reminder and the daily card
+   are gone; this stays because the doses already logged are real rows that still have to
+   be counted on the whole-story screen. Taking a thing out of the app is not taking it
+   out of the record - the same rule that kept `feed/bottle` readable. */
 function isBiogaia(r) {
   return r.type === 'med' && r.subtype === 'biogaia';
 }
+/* A bath, either way it was ever written: the app logs `hygiene/bath`, the retired
+   Telegram bot logged a bare `bath` type, and both are in the archive. One predicate, so
+   the home screen's "last bath" and the lifetime count cannot disagree about what counts.
+   It was written for the BioGaia reminder, which is gone; the two callers below had the
+   same test spelled out by hand, so it stays and they use it. */
 function isBath(r) {
   return (r.type === 'hygiene' && r.subtype === 'bath') || r.type === 'bath';
-}
-function biogaiaToday() {
-  var d = daySG(Date.now());
-  return live().some(function (r) { return isBiogaia(r) && daySG(r.ms) === d; });
 }
 
 function addsWords(v) {
@@ -2089,8 +2084,10 @@ function renderLast() {
   var feed  = lastOf(function (r) { return r.type === 'feed'; });
   var poo   = lastOf(function (r) { return r.type === 'nappy' && (r.subtype === 'dirty' || r.subtype === 'both'); });
   var wet   = lastOf(function (r) { return r.type === 'nappy' && (r.subtype === 'wet' || r.subtype === 'both'); });
-  var bath  = lastOf(function (r) { return r.type === 'hygiene' && r.subtype === 'bath'; }) ||
-              lastOf(function (r) { return r.type === 'bath'; });
+  /* One pass over both spellings, rather than all the new ones and then all the old:
+     looking for `hygiene/bath` first and only falling back meant a bot-era `bath` row
+     logged later than the last `hygiene/bath` would lose to the older entry. */
+  var bath  = lastOf(isBath);
   var pump  = lastOf(function (r) { return r.type === 'pump'; });
 
   function card(lbl, r, extra, staleAfterH) {
@@ -2236,7 +2233,6 @@ function renderSummary() {
   var pumped = rows.filter(function (r) { return r.type === 'pump'; })
                    .reduce(function (a, r) { return a + (r.value || 0); }, 0);
   var doses = dosesIn(rows);
-  var bio = rows.filter(isBiogaia).pop() || null;
 
   $('sum-today').innerHTML =
     lcard('Feeds', feeds.length, ml ? ml + ' ml' + (bf ? ' + ' + bf + ' min' : '') : (bf ? bf + ' min' : 'no volumes'), false) +
@@ -2250,9 +2246,9 @@ function renderSummary() {
        a fact about a particular product, not about this record, and a limit invented by
        an app is worse than none. */
     Object.keys(doses).sort().map(function (k) {
-      /* A retired option still has to be counted where feeds carry it, but it must not
-         collide with a card of the same name - BioGaia is now given on its own, and two
-         cards both called BioGaia on one screen is worse than either. */
+      /* A retired option is still counted where feeds carry it, and said to be in a
+         feed, because a bare "BioGaia" card would read as a dose given today rather than
+         one stirred into a bottle months ago. */
       var offered = ADDS.some(function (a) { return a[0] === k; });
       var daily = offered && ADD_DAILY[k];
       if (!doses[k] && !daily) return '';
@@ -2260,12 +2256,7 @@ function renderSummary() {
                                   'give it with a milk feed', true);
       return lcard((ADD_LABEL[k] || k) + (offered ? '' : ' in feeds'),
                    doses[k], plural(doses[k], 'dose'), false);
-    }).join('') +
-    /* BioGaia is a yes-or-no for the day rather than a count, so it is shown whether or
-       not it has been given: amber until it has. That is the question the reminder is
-       answering, and a card that only appears afterwards cannot answer it. */
-    lcard('BioGaia', bio ? 'given' : 'not yet',
-          bio ? hhmm(bio.ms) : 'prompted when you log a bath', !bio);
+    }).join('');
 
   $('sum-gaps').innerHTML = si.unpaired.length
     ? '<div class="gap"><b>' + si.unpaired.length + ' unpaired sleep entr' +
@@ -2282,8 +2273,7 @@ function renderSummary() {
      question a column answers is whether a day differs from the one before it, and a
      column of dashes for something the family has stopped using is clutter that never
      goes away. Driven off ADDS rather than named one by one, so adding an option does
-     not leave the table a version behind. BioGaia gets no column: it is given on its
-     own, once a day, and today's card already carries it. */
+     not leave the table a version behind. */
   var weekDoses = {};
   days.forEach(function (d) {
     weekDoses[d] = dosesIn(live().filter(function (r) { return daySG(r.ms) === d; }));
@@ -2411,7 +2401,7 @@ function statsOf() {
       out.cryMin += (r.value || 0);
     } else if (r.type === 'vomit') {
       out.vomits++;
-    } else if ((r.type === 'hygiene' && r.subtype === 'bath') || r.type === 'bath') {
+    } else if (isBath(r)) {
       out.baths++;
     } else if (isBiogaia(r)) {
       out.biogaia++;
@@ -3603,21 +3593,15 @@ function renderDiag() {
    `undoId` adds an Undo button, which is the answer to the commonest way a wrong entry
    gets in: a mis-tap while holding the baby. */
 var toastT = null;
-/* `action` is a third shape: a button that does something other than undo, used for the
-   BioGaia reminder. It lingers longer than an undo, because it is asking for a decision
-   rather than offering to take one back. */
-var toastFn = null;
+/* The toast briefly took a third shape - a button that did something other than undo -
+   for the BioGaia reminder. BioGaia is not given any more, so nothing asks, and the
+   shape is gone with it rather than left behind for someone to find and wonder about. */
 
-function toast(msg, undoId, action) {
+function toast(msg, undoId) {
   var el = $('toast'), act = $('toast-act');
   $('toast-txt').innerHTML = msg;
-  toastFn = null;
   delete act.dataset.undo;
-  if (action) {
-    act.hidden = false;
-    act.textContent = action.label;
-    toastFn = action.fn;
-  } else if (undoId) {
+  if (undoId) {
     act.hidden = false;
     act.textContent = 'Undo';
     act.dataset.undo = undoId;
@@ -3627,7 +3611,7 @@ function toast(msg, undoId, action) {
   el.hidden = false;
   el.classList.remove('out');
   if (toastT) clearTimeout(toastT);
-  toastT = setTimeout(hideToast, action ? 9000 : (undoId ? 5200 : 3400));
+  toastT = setTimeout(hideToast, undoId ? 5200 : 3400);
 }
 function hideToast() {
   var el = $('toast');
@@ -3646,18 +3630,7 @@ function afterWrite(e) {
   offsetMin = 0; absTime = ''; dayBack = 0; $('when-time').value = '';
   paintWhen(); render(); paintSync(); renderDiag(); buzz();
   if (e && e.msg_id && e.type !== 'deleted') {
-    /* The one place the app asks for something rather than reporting it. A bath is when
-       BioGaia gets given, and the moment just after logging the bath is the moment he is
-       holding the phone. Not asked twice: if it has already been given today the ordinary
-       toast shows instead, so the prompt stays worth reading. */
-    if (isBath(e) && !biogaiaToday()) {
-      toast('<b>' + esc(describe(e)) + '</b> logged. BioGaia?', null,
-            { label: 'Give it', fn: function () {
-                afterWrite(add('med', 'biogaia', null, '', '', 'biogaia'));
-              } });
-    } else {
-      toast('<b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms), e.msg_id);
-    }
+    toast('<b>' + esc(describe(e)) + '</b> at ' + hhmm(e.ms), e.msg_id);
   }
   flush();
 }
@@ -4131,9 +4104,8 @@ $('sheet').addEventListener('click', function (e) {
   }
 });
 $('toast-act').addEventListener('click', function () {
-  var id = this.dataset.undo, fn = toastFn;
+  var id = this.dataset.undo;
   hideToast();
-  if (fn) { toastFn = null; fn(); return; }
   if (id) undo(id);
 });
 

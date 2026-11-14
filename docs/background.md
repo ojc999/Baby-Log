@@ -163,7 +163,7 @@ Unchanged from the bot, and checked by the test suite against the committed
 | `dur_min` | **Added for the Pump tab, then retired.** Minutes spent expressing. No longer collected — the minutes that matter beside the volume are his at the breast, not hers at the pump. Kept in the contract and written `null`, so the archive has one shape and the sessions already logged with it keep it. |
 | `ml_l`, `ml_r` | **Added for the Pump tab.** The per-side split of a pump session, left and right. `null` unless it was actually measured. `value` stays the total and is the authoritative figure; these are detail. |
 | `pump_dev` | **Added for the Pump tab.** Which machine: `spectra`, `imani`, or empty for a hand expression. A string, so its absent value is `""`. |
-| `added` | What went into a milk feed: `simeticone`, `biogaia`, or both joined with `+` alphabetically. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` carry one. A string, so its absent value is `""`. |
+| `added` | What went into a milk feed: `simeticone`, `vitd`, or the retired `biogaia`, joined with `+` alphabetically where there is more than one. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` carry one. A string, so its absent value is `""`. |
 
 **Why the fields were appended, not inserted.** They all went in **after `msg_id`**, so
 anything reading these files by position keeps working, and they are written onto **every**
@@ -755,9 +755,9 @@ as a number in grams and grams a day underneath, where a truncated axis cannot f
 
 ## 7k. What goes into a bottle, and the Bottle that went
 
-**Simeticone and BioGaia are logged on the feed, not beside it.** They are not events of
+**Simeticone and vitamin D are logged on the feed, not beside it.** They are not events of
 their own: they go into a bottle he is drinking anyway, and an entry of their own would
-make a wind-drop look like a feed in every count that follows. So they are chips on the
+make a wind-drop or a vitamin look like a feed in every count that follows. So they are chips on the
 Formula and EBM pickers, and on the same row in the Book form and the correction box — a
 dose forgotten at the time can be added later without re-keying the feed.
 
@@ -771,30 +771,42 @@ so that tapping them in either order spells the same thing — the same order-in
 A breastfeed cannot take one. There is nothing to stir it into, and the picker used most
 often should not grow a row that never applies to it.
 
-**BioGaia came off that picker.** It is not given with a feed — it is given at bath time —
-so it is now an entry of its own, `med/biogaia`, with a button under **More** and a prompt
-after a bath. The option is gone from the pickers; the label is not, because feeds were
-logged carrying it and a retired option is not a retired row. Those feeds still count,
-under a card headed `BioGaia in feeds` so it cannot be confused with the daily one.
+**BioGaia came off that picker, and then came out of the app.** It left the pickers first
+because it was given at bath time rather than in a bottle, and became an entry of its own,
+`med/biogaia`, with a button under **More** and a prompt after a bath. It is now not given
+at all, so the button, the prompt and the daily card are gone too.
 
-**The reminder is the one place the app asks rather than reports.** Logging a bath raises
-a toast — "Bath logged. BioGaia?" — with a button that logs the dose in one tap. It is not
-raised twice: if a dose is already recorded for the day the ordinary toast shows instead,
-so the prompt stays worth reading. The trade is that logging a bath offers the prompt
-rather than Undo; the row still has Fix and × wherever it is listed.
+What is gone is the asking. What stays is everything needed to read back what was already
+logged: `med/biogaia` in `LABELS`, `biogaia` in `ADD_LABEL`, `isBiogaia()`, the lifetime
+count on the whole-story screen, and the `BioGaia in feeds` card for the feeds that carried
+it before it moved. That card keeps its longer name now that there is nothing to collide
+with, because a bare `BioGaia` would read as a dose given today rather than one stirred
+into a bottle months ago. Taking a thing out of the app is not taking it out of the record
+— the same rule that kept `feed/bottle` readable.
 
-The Summary card for it is a yes-or-no rather than a count, and is shown whether or not it
-has been given — amber "not yet" until it has, then the time it was. A card that only
-appeared after the fact could not answer the question the reminder exists for.
+**Two pieces of machinery went with the reminder, and one did not.** The toast had grown a
+third shape — a button that does something other than undo, lingering nine seconds rather
+than five because it was asking for a decision rather than offering to take one back.
+Nothing asks any more, so that shape is gone rather than left behind for someone to find
+and wonder about.
+
+`isBath()` stayed. It was written for the reminder and was orphaned by its removal, but the
+home screen's "Last bath" and the lifetime bath count each had the same test written out by
+hand, and the hand-written one on the home screen was subtly wrong: it looked for the newest
+`hygiene/bath` and only fell back to the retired Telegram bot's bare `bath` rows if there
+were none at all, so a bot-era bath logged later lost to an earlier app-era one. Both
+callers now use the one predicate. Not a live bug — the bot has been off for months, so
+every `bath` row is older than every `hygiene/bath` row — but two copies of a rule drift,
+and this pair already had.
 
 **Vitamin D went onto the picker BioGaia came off.** It is given in a bottle, so it is an
 addition and not an entry: same field, same chips, same counter. What is different is what
 an empty day means. Simeticone is given when he is windy, so a day with none is an ordinary
 day and its card does not appear. Vitamin D is given once a day whatever happens, so a day
 with none is a missed dose — its card is there from midnight, amber, reading "not yet", and
-goes to a count once a feed carries it. That is the same reasoning as the BioGaia card,
-which is the same kind of thing given at a different moment; `ADD_DAILY` is the one-line
-list of which additions behave that way, so the next one is a key rather than a branch.
+goes to a count once a feed carries it. The BioGaia card worked the same way while BioGaia
+was still being given; `ADD_DAILY` is the one-line list of which additions behave that way,
+so the next one is a key rather than a branch.
 
 Every key in `ADD_DAILY` has to be something the pickers still offer. A daily card for a
 retired option would ask for a dose with no chip to log it on, and the logic test asserts
@@ -821,8 +833,7 @@ had: the question a column answers is whether a day differs from the one before 
 column of dashes for something the family has stopped using is clutter that never leaves.
 The columns are built off `ADDS` rather than named one at a time, so the table cannot end
 up a version behind the pickers — the first version of this hard-coded `.simeticone` and
-would have shown nothing for vitamin D. BioGaia gets no column; it is given on its own,
-once a day, and the card already carries it.
+would have shown nothing for vitamin D.
 
 **Adding the eighth column broke the table, silently.** `.wrap` has `overflow-x: auto`, so
 an overflowing table does not push the page sideways — it just scrolls inside its box, and

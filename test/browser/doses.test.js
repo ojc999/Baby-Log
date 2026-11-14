@@ -1,4 +1,4 @@
-// Doses of simeticone, vitamin D and BioGaia, counted per day. The question behind this
+// Doses of simeticone and vitamin D, counted per day. The question behind this
 // screen is "how many has he had today", so the number has to be on the Summary tab where
 // the day's figures are, not buried on a tab you open once a week.
 //
@@ -76,18 +76,12 @@ async function open_(b, rows, width) {
   t('simeticone is counted for the day', c['Simeticone'][0], '3');
   t('as doses, not millilitres', c['Simeticone'][1], '3 doses');
   t('the feeds card is unchanged by any of it', c['Feeds'][0], '4');
-  // BioGaia is no longer given with a feed: it is a yes-or-no for the day
-  t('BioGaia reads as not given', c['BioGaia'][0], 'not yet');
-  t('and says where the nudge comes from', c['BioGaia'][1], 'prompted when you log a bath');
+  t('and no card for BioGaia, which is not given any more', c['BioGaia'][0], '(no such card)');
   t('no two cards share a name', await page.evaluate(()=>{
      const n=[...document.querySelectorAll('#sum-today .lcard')].map(c=>c.querySelector('dt').textContent);
      return n.length - new Set(n).size;}), 0);
   t('a retired option counted on old feeds says where it was',
      c['BioGaia in feeds'][1], '1 dose');
-  t('shown amber while it is still owed', await page.evaluate(()=>{
-     for(const c of document.querySelectorAll('#sum-today .lcard'))
-       if(c.querySelector('dt').textContent==='BioGaia') return c.classList.contains('stale');
-     return 'no card';}), true);
 
   console.log('--- and the days behind it ---');
   const head = await weekHead(page);
@@ -113,8 +107,6 @@ async function open_(b, rows, width) {
   ]);
   const c2 = await cards(page);
   t('no card for something that was not given', c2['Simeticone'][0], '(no such card)');
-  // BioGaia is the exception: a yes-or-no for the day, so it shows either way
-  t('but BioGaia still shows, unanswered', c2['BioGaia'][0], 'not yet');
   t('and no column either',
      (await weekHead(page)).join(','), 'Day,Feeds,ml,Wet,Dirty,Slept');
   t('the empty-day span narrows to match', await page.evaluate(()=>{
@@ -233,48 +225,70 @@ async function open_(b, rows, width) {
   t('the hint names every addition the pickers offer',
      offered.filter(l=>!new RegExp(l,'i').test(hint)).join(',')
        .replace(/^$/,'none missing'), 'none missing');
-  t('and does not offer BioGaia on a feed',
-     /BioGaia/.test(hint) ? /button of its own/.test(hint) : true, true);
+  t('and names nothing it does not offer', /BioGaia/.test(hint), false);
 
-  console.log('--- the reminder, when a bath is logged ---');
+  console.log('--- BioGaia is gone from the app, and a bath is just a bath ---');
   await page.click('#tab-log'); await page.waitForTimeout(300);
   await page.click('[data-go="more"]'); await page.waitForTimeout(400);
-  t('BioGaia has a button of its own, for a day with no bath',
-     await page.isVisible('[data-ev="med:biogaia"]'), true);
+  t('no button for it under More',
+     await page.isVisible('[data-ev="med:biogaia"]'), false);
   await page.evaluate(()=>{const b=[...document.querySelectorAll('#cat-body [data-ev]')]
     .find(e=>e.dataset.ev==='hygiene:bath'); b.click();});
   await page.waitForTimeout(500);
   const tx = (await page.textContent('#toast-txt')||'').replace(/\s+/g,' ');
-  t('logging a bath asks for it', /BioGaia\?/.test(tx), true);
-  t('and says the bath itself was logged', /Bath logged/.test(tx), true);
-  t('the button offers to give it', (await page.textContent('#toast-act')).trim(), 'Give it');
-  await page.click('#toast-act'); await page.waitForTimeout(600);
-  const given = await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2'))
-    .filter(r=>r.type==='med'&&r.subtype==='biogaia'));
-  t('tapping it logs a dose', given.length, 1);
-  t('as its own entry, not a feed', given[0].type+'/'+given[0].subtype, 'med/biogaia');
-  t('and it is not written onto any feed', await page.evaluate(()=>
+  t('logging a bath no longer asks for it', /BioGaia/.test(tx), false);
+  t('it just says the bath was logged', /Bath at \d\d:\d\d/.test(tx), true);
+  // The toast's third shape went with the reminder. Undo is the only button it has again,
+  // and that is the one that must not have broken on the way out.
+  t('and the button is Undo again', (await page.textContent('#toast-act')).trim(), 'Undo');
+  await page.click('#toast-act'); await page.waitForTimeout(500);
+  t('which still undoes the entry', await page.evaluate(()=>
      JSON.parse(localStorage.getItem('babylog.entries.v2'))
-       .some(r=>/biogaia/.test(r.added||''))), false);
-
-  console.log('--- and it does not ask twice ---');
-  await page.evaluate(()=>{const b=[...document.querySelectorAll('#cat-body [data-ev]')]
-    .find(e=>e.dataset.ev==='hygiene:bath'); b.click();});
-  await page.waitForTimeout(500);
-  const tx2 = (await page.textContent('#toast-txt')||'').replace(/\s+/g,' ');
-  t('a second bath gets the ordinary toast', /BioGaia\?/.test(tx2), false);
-  t('which offers undo as usual', (await page.textContent('#toast-act')).trim(), 'Undo');
+       .filter(r=>r.type==='deleted').length), 2);
+  t('and nothing logged a dose of it', await page.evaluate(()=>
+     JSON.parse(localStorage.getItem('babylog.entries.v2'))
+       .some(r=>r.subtype==='biogaia'||/biogaia/.test(r.added||''))), false);
 
   await page.click('#tab-sum'); await page.waitForTimeout(500);
   const c3 = await cards(page);
-  t('the card now reads given', c3['BioGaia'][0], 'given');
-  t('with the time it was given', /^\d\d:\d\d$/.test(c3['BioGaia'][1]), true);
-  t('and no longer amber, the thing being done', await page.evaluate(()=>{
-     for(const c of document.querySelectorAll('#sum-today .lcard'))
-       if(c.querySelector('dt').textContent==='BioGaia') return c.classList.contains('stale');
-     return 'no card';}), false);
+  t('and no card asking for it', c3['BioGaia'][0], '(no such card)');
+
+  console.log('--- the home screen reads both spellings of a bath ---');
+  // `isBath` was written for the reminder and was orphaned by its removal. It is kept
+  // because "Last bath" and the lifetime count each had the same test written out by
+  // hand, and the hand-written one on the home screen was subtly wrong: it took the
+  // newest `hygiene/bath`, and only looked at the retired bot's bare `bath` rows if there
+  // were none at all. A bot-era bath logged later lost to an earlier app-era one.
+  await page.evaluate(()=>{
+    const mk=(ts,type,subtype)=>({ms:Date.parse(ts),ts,sender:'Des',type,subtype,value:null,
+      unit:'',note:'',raw:type,msg_id:'b-'+ts,dur_min:null,ml_l:null,ml_r:null,pump_dev:'',
+      added:'',own:true,device:'des'});
+    entries.push(mk('2026-11-11T06:00:00+08:00','hygiene','bath'));
+    entries.push(mk('2026-11-11T08:30:00+08:00','bath',''));      // the retired bot's shape
+    entries.sort((a,b)=>a.ms-b.ms); saveEntries(); render();});
+  await page.click('#tab-log'); await page.waitForTimeout(500);
+  const lastBath = await page.evaluate(()=>{
+    for(const c of document.querySelectorAll('#lastgrid .lcard'))
+      if(c.querySelector('dt').textContent==='Last bath')
+        return c.querySelector('small').textContent;
+    return 'no card';});
+  t('the later bath wins, whichever shape it was written in', lastBath, '08:30');
 
   console.log('--- the whole story counts them over the record ---');
+  await page.click('#tab-sum'); await page.waitForTimeout(400);   // #go-stats lives here
+  // A dose from the days it was still being given. Nothing in the app can write one now,
+  // so it is seeded directly - which is the point: rows in the archive still have to be
+  // read, named and counted after the thing that made them has gone.
+  // Pushed onto the live array rather than written to storage and reloaded: the seed runs
+  // again on every navigation, so a reload would put the page back to its opening rows and
+  // quietly undo the strike-out this file just proved.
+  await page.evaluate(()=>{
+    const ts='2026-11-02T19:30:00+08:00';
+    entries.push({ms:Date.parse(ts),ts,sender:'Des',type:'med',subtype:'biogaia',value:null,
+      unit:'',note:'',raw:'biogaia',msg_id:'old-biogaia',dur_min:null,ml_l:null,ml_r:null,
+      pump_dev:'',added:'',own:true,device:'des'});
+    entries.sort((a,b)=>a.ms-b.ms); saveEntries(); render();});
+  await page.waitForTimeout(400);
   await page.click('#go-stats'); await page.waitForTimeout(1200);
   const odd = (await page.textContent('#stats-odd')).replace(/\s+/g,' ');
   console.log('   fact:', (odd.match(/[^.]*Simeticone[^.]*\./)||[''])[0].trim());

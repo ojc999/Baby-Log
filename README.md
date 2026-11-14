@@ -63,18 +63,19 @@ that.
 Nothing says anything about a daily maximum: that is a fact about a particular product, not
 about this record, and a limit invented by an app is worse than none.
 
-**BioGaia is not given with a feed.** It has a button of its own under **More**, and
-logging a bath raises a prompt — *"Bath logged. BioGaia?"* — with a button that records
-the dose in one tap. You are not asked twice in a day. The Summary carries a BioGaia card
-that reads amber **not yet** until it has been given, then the time it was, so you can
-check at a glance without waiting for the next bath.
+**BioGaia is not given any more**, so the app does not ask for it: no button, no prompt
+after a bath, no card. The doses already logged are untouched. They keep their name, still
+show in the timeline, are still correctable, and are still counted on **the whole story**
+— taking something out of the app does not take it out of the record.
 
 **Simeticone and vitamin D go on the feed they went into**, as chips on the Formula and
 EBM pickers — not as entries of their own, which would make a wind-drop or a vitamin look
 like a feed in every count. Both can be on the same feed. Forgot at the time? **Fix** on
 that feed adds it later, and a correction never drops something you can no longer tick.
 A breastfeed has nothing to stir them into, so it does not offer them. Feeds logged with
-BioGaia before it moved are untouched and still counted, under **BioGaia in feeds**.
+BioGaia back when it was offered are untouched and still counted, under **BioGaia in
+feeds** — named that way so a dose stirred into a bottle months ago cannot be mistaken for
+one given today.
 
 There is **no Bottle button**: every bottle is either formula or expressed milk, so it only
 asked a question the other two answer. Feeds already logged as Bottle are untouched and can

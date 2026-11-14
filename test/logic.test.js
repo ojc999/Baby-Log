@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, ADD_DAILY, ADD_SHORT, ADD_WORD, ADD_LABEL, dosesIn, isBath, isBiogaia, biogaiaToday};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, ADD_DAILY, ADD_SHORT, ADD_WORD, ADD_LABEL, dosesIn, isBath, isBiogaia, lastOf};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -430,30 +430,38 @@ t('an undone feed takes its dose with it', (()=>{
   A.undo(last.msg_id);
   return A.statsOf().doses.simeticone; })(), 1);
 
-console.log('\n--- BioGaia, given on its own at bath time ---');
-t('it is its own kind of entry, not a field on a feed',
+console.log('\n--- BioGaia is not given any more, and the rows still are ---');
+// It is off the pickers, off the More page and off the Summary. What stays is everything
+// needed to read back what was already logged: the label, the description, the count.
+// Taking a thing out of the app is not taking it out of the record.
+t('no button for it anywhere',
+  JSON.stringify(A.CATS).indexOf('biogaia') > -1, false);
+t('but the rows already logged still have a name',
   A.label({type:'med',subtype:'biogaia'}), 'BioGaia');
-t('and it is offered under More',
-  JSON.stringify(A.CATS.more.groups).indexOf('biogaia') > -1, true);
+t('and still describe',
+  A.describe({type:'med',subtype:'biogaia'}), 'BioGaia');
+
+A.setEntries([]);
+A.add('med','biogaia',null,'','','b', Date.parse('2026-11-01T20:00:00+08:00'));
+A.add('med','biogaia',null,'','','b', Date.parse('2026-11-02T20:00:00+08:00'));
+t('the whole record still counts the standalone doses', A.statsOf().biogaia, 2);
+t('and does not count them as feeds', A.statsOf().feeds, 0);
+
+console.log('\n--- one predicate for a bath, written two ways over the years ---');
+// Orphaned when the reminder went. Kept because the home screen and the lifetime count
+// each had the same test spelled out by hand, and two copies drift.
 t('a bath is a bath', A.isBath({type:'hygiene',subtype:'bath'}), true);
 t("and the bot's older type counts as one too", A.isBath({type:'bath'}), true);
 t('a top-and-tail is not', A.isBath({type:'hygiene',subtype:'wipe'}), false);
 
 A.setEntries([]);
-t('nothing given yet today', A.biogaiaToday(), false);
-const bg = A.add('med','biogaia',null,'','','biogaia');
-t('and given once it has been', A.biogaiaToday(), true);
-A.undo(bg.msg_id);
-t('an undone dose does not count as given', A.biogaiaToday(), false);
-A.setEntries([]);
-A.add('med','biogaia',null,'','','biogaia', Date.parse('2026-11-10T20:00:00+08:00'));
-t("yesterday's dose does not count for today", A.biogaiaToday(), false);
-
-A.setEntries([]);
-A.add('med','biogaia',null,'','','b', Date.parse('2026-11-01T20:00:00+08:00'));
-A.add('med','biogaia',null,'','','b', Date.parse('2026-11-02T20:00:00+08:00'));
-t('the whole record counts the standalone doses', A.statsOf().biogaia, 2);
-t('and does not count them as feeds', A.statsOf().feeds, 0);
+A.add('hygiene','bath',null,'','','bath', Date.parse('2026-11-01T19:00:00+08:00'));
+A.add('bath','',null,'','','bath', Date.parse('2026-11-02T19:00:00+08:00'));
+t('both spellings count towards the lifetime total', A.statsOf().baths, 2);
+// The home screen used to look for every `hygiene/bath` first and only fall back to the
+// older type if there were none at all, so a later bot-era row lost to an earlier one.
+t('and the last bath is the latest of either', A.hhmm(A.lastOf(A.isBath).ms) + ' on ' +
+  A.daySG(A.lastOf(A.isBath).ms), '19:00 on 2026-11-02');
 
 console.log('\n--- the bottle button is gone, the rows are not ---');
 t('no Bottle picker', !!A.SHEETS.bottle, false);

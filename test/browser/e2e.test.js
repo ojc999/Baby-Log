@@ -86,7 +86,7 @@ const t = (n, got, want) => { const ok = String(got)===String(want); if(!ok) fai
   await page.click('[data-sheet="formula"]');
   await page.waitForTimeout(200);
   await page.click('#sheet-presets .chip:nth-child(2)');   // a preset amount
-  // Simeticone and BioGaia go into the feed, not beside it as entries of their own
+  // Simeticone and vitamin D go into the feed, not beside it as entries of their own
   t('the feed picker offers what can go in it', await page.isVisible('#sheet-adds'), true);
   await page.click('#sheet-adds [data-add="simeticone"]');
   await page.click('#sheet-save');

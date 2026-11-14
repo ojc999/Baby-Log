@@ -75,11 +75,16 @@ what it is, and lists decisions that look arbitrary and are not.
   page read `Simeticone and BioGaia are logged on the feed they went into` for a whole
   change after BioGaia moved to a button of its own. No test saw it; a screenshot did.
   `doses.test.js` now checks that hint against `ADDS` itself.
-- **Never let two cards on one screen share a name.** A retired feed addition still has
-  to be counted where feeds carry it, and `biogaia` is now also a daily entry of its own —
-  so the feed-dose card is labelled `BioGaia in feeds` and the daily one `BioGaia`. Two
-  cards reading `BioGaia` with different numbers is worse than either alone. The browser
-  test asserts no two card titles repeat.
+- **Never let two cards on one screen share a name.** The rule was written when `biogaia`
+  was both a retired feed addition and a daily entry of its own: the feed-dose card is
+  labelled `BioGaia in feeds` for that reason, and keeps the label now that the daily card
+  has gone, because a bare `BioGaia` card would read as a dose given today rather than one
+  stirred into a bottle months ago. The browser test asserts no two card titles repeat.
+- **BioGaia is not given any more, and its rows are still real.** The button, the bath
+  reminder and the daily card are gone. What stays: `med/biogaia` in `LABELS`, `biogaia`
+  in `ADD_LABEL`, `isBiogaia()`, the lifetime count on the whole-story screen, and the
+  `BioGaia in feeds` card for the feeds that carried it. Taking something out of the app
+  is not taking it out of the record — the same rule that kept `feed/bottle` readable.
 - **Never retire a subtype out of `LABELS`.** The Bottle button is gone, because every
   bottle he drinks is either formula or expressed milk and the button only asked a
   question the other two answer. `feed/bottle` is still labelled, still described and
@@ -166,8 +171,8 @@ and is written `null`, because removing it would leave the archive with two row 
 would throw away the sessions already logged with it. Do not reuse it for anything else.
 
 `added` is what went into a milk feed. The pickers offer **`simeticone` and `vitd`**;
-`biogaia` was offered and is not any more, because it is given on its own at bath time
-rather than in a bottle. Values stay joined with `+` in alphabetical order, so a pair has
+`biogaia` was offered and is not any more — first because it was given at bath time rather
+than in a bottle, and now because it is not given at all. Values stay joined with `+` in alphabetical order, so a pair has
 exactly one spelling. A field rather than words in `note`, because "how many feeds had
 simeticone in them" is a question worth being able to answer, and a category kept as prose
 cannot be counted. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` can
@@ -176,10 +181,9 @@ carry one — there is nothing to stir into a breastfeed.
 **An addition's card says something different when the day is empty.** `ADD_DAILY` marks
 the ones given once a day come what may — `vitd` — and only those get a card from midnight,
 amber, reading `not yet`. Simeticone is given when he is windy, so a day without it is not
-a finding and no card appears. The distinction is only about what an absence means, and it
-is the same reasoning as the BioGaia card. Every key in `ADD_DAILY` must still be in
-`ADDS`, or the card would ask for a dose with no chip to log it on; the logic test asserts
-that.
+a finding and no card appears. The distinction is only about what an absence means. Every
+key in `ADD_DAILY` must still be in `ADDS`, or the card would ask for a dose with no chip
+to log it on; the logic test asserts that.
 
 **Keep `ADD_LABEL`, `ADD_SHORT` and `ADD_WORD` in step with `ADDS`.** Three maps because
 they answer three questions: the card and sentence label, the seven-day column head (a full
