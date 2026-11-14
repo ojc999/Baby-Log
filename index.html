@@ -1235,6 +1235,11 @@ var SHEETS = {
    - but its label stays below, because feeds were logged carrying it and a retired option
    is not a retired row. Same rule as the Bottle button. */
 var ADDS = [['simeticone', 'Simeticone'], ['vitd', 'Vitamin D']];
+/* `biogaia` is in the labels and nowhere else. Nothing offers it, nothing counts it and
+   nothing on any screen says the word - the archive was checked and holds no row carrying
+   it, so there is nothing to count. It stays here, and in LABELS, as a fallback: if a row
+   does turn up from the other phone, it reads "BioGaia" rather than "biogaia". An inert
+   dictionary entry costs nothing; an unlabelled row is a thing you have to go and look up. */
 var ADD_LABEL = { simeticone: 'Simeticone', vitd: 'Vitamin D', biogaia: 'BioGaia' };
 
 /* Short forms, for the seven-day table's column heads only. A full label there would
@@ -1283,13 +1288,6 @@ function dosesIn(rows) {
   return out;
 }
 
-/* BioGaia is no longer given at all. The button, the bath reminder and the daily card
-   are gone; this stays because the doses already logged are real rows that still have to
-   be counted on the whole-story screen. Taking a thing out of the app is not taking it
-   out of the record - the same rule that kept `feed/bottle` readable. */
-function isBiogaia(r) {
-  return r.type === 'med' && r.subtype === 'biogaia';
-}
 /* A bath, either way it was ever written: the app logs `hygiene/bath`, the retired
    Telegram bot logged a bare `bath` type, and both are in the archive. One predicate, so
    the home screen's "last bath" and the lifetime count cannot disagree about what counts.
@@ -2365,7 +2363,7 @@ function statsOf() {
     ml: 0, feeds: 0, breastMin: 0, biggest: null,
     pumpMl: 0, pumps: 0,
     tummyMin: 0, tummies: 0, baths: 0, vomits: 0, cryMin: 0,
-    weights: [], who: {}, nights: {}, doses: {}, biogaia: 0,
+    weights: [], who: {}, nights: {}, doses: {},
     first: null, last: null
   };
   ADDS.forEach(function (a) { out.doses[a[0]] = 0; });
@@ -2403,8 +2401,6 @@ function statsOf() {
       out.vomits++;
     } else if (isBath(r)) {
       out.baths++;
-    } else if (isBiogaia(r)) {
-      out.biogaia++;
     } else if (r.type === 'measure' && r.subtype === 'weight' && r.value) {
       out.weights.push(r);
     }
@@ -2503,9 +2499,6 @@ function renderStats() {
         ' in a feed, ' + (s.feeds ? Math.round(s.doses[k] / s.feeds * 100) + '% of them' : '') + '.');
     }
   });
-  if (s.biogaia) {
-    bits.push('<b>' + plural(s.biogaia, 'dose') + '</b> of BioGaia, given on its own.');
-  }
   if (s.baths) bits.push('<b>' + s.baths + '</b> bath' + (s.baths === 1 ? '' : 's') + ' so far.');
   if (s.vomits) bits.push('Brought back up <b>' + s.vomits + '</b> time' + (s.vomits === 1 ? '' : 's') + '.');
   if (s.unpaired) {

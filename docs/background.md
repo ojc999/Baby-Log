@@ -776,13 +776,22 @@ because it was given at bath time rather than in a bottle, and became an entry o
 `med/biogaia`, with a button under **More** and a prompt after a bath. It is now not given
 at all, so the button, the prompt and the daily card are gone too.
 
-What is gone is the asking. What stays is everything needed to read back what was already
-logged: `med/biogaia` in `LABELS`, `biogaia` in `ADD_LABEL`, `isBiogaia()`, the lifetime
-count on the whole-story screen, and the `BioGaia in feeds` card for the feeds that carried
-it before it moved. That card keeps its longer name now that there is nothing to collide
-with, because a bare `BioGaia` would read as a dose given today rather than one stirred
-into a bottle months ago. Taking a thing out of the app is not taking it out of the record
-— the same rule that kept `feed/bottle` readable.
+The read-back machinery went too, which is a departure from how `feed/bottle` was handled
+and worth saying why. That rule exists because retiring a button must not make real rows
+unreadable. Here there are no real rows: the data repo was searched for `biogaia`, in
+`subtype` and in `added`, and holds none — it was never given with a feed, and the button
+and the bath prompt existed for a matter of hours. So `isBiogaia()`, the lifetime counter
+and the whole-story line were counting something that does not exist, and no screen says
+the word any more.
+
+Two dictionary entries stay: `med/biogaia` in `LABELS` and `biogaia` in `ADD_LABEL`. They
+show nothing on their own. They matter only if a row turns up — the other phone could in
+principle hold one that was never pushed — and then it reads `BioGaia` rather than
+`biogaia`. They also supply the title of the `BioGaia in feeds` card, which keeps its
+longer name because a bare `BioGaia` would read as a dose given today rather than one
+stirred into a bottle months ago. Reverting either entry fails four logic assertions and
+one browser assertion, so the cost of keeping them is twenty characters and the cost of
+losing them is a row nobody can read.
 
 **Two pieces of machinery went with the reminder, and one did not.** The toast had grown a
 third shape — a button that does something other than undo, lingering nine seconds rather

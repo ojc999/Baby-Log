@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, ADD_DAILY, ADD_SHORT, ADD_WORD, ADD_LABEL, dosesIn, isBath, isBiogaia, lastOf};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, ADD_DAILY, ADD_SHORT, ADD_WORD, ADD_LABEL, dosesIn, isBath, lastOf};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -430,22 +430,23 @@ t('an undone feed takes its dose with it', (()=>{
   A.undo(last.msg_id);
   return A.statsOf().doses.simeticone; })(), 1);
 
-console.log('\n--- BioGaia is not given any more, and the rows still are ---');
-// It is off the pickers, off the More page and off the Summary. What stays is everything
-// needed to read back what was already logged: the label, the description, the count.
-// Taking a thing out of the app is not taking it out of the record.
+console.log('\n--- BioGaia is gone, down to a label nothing shows ---');
+// Off the pickers, off More, off the Summary, out of the whole story. The archive was
+// checked and holds no row carrying it, so there is nothing for a counter to count. The
+// two dictionary entries stay as a fallback for a row that turns up from the other phone.
 t('no button for it anywhere',
   JSON.stringify(A.CATS).indexOf('biogaia') > -1, false);
-t('but the rows already logged still have a name',
+t('and nothing counts it', 'biogaia' in A.statsOf(), false);
+t('but a row that turns up still has a name, not a key',
   A.label({type:'med',subtype:'biogaia'}), 'BioGaia');
-t('and still describe',
-  A.describe({type:'med',subtype:'biogaia'}), 'BioGaia');
+t('and still describes', A.describe({type:'med',subtype:'biogaia'}), 'BioGaia');
+t('and an old feed carrying it still reads in words',
+  A.addsWords('biogaia+simeticone'), 'BioGaia + Simeticone');
 
 A.setEntries([]);
 A.add('med','biogaia',null,'','','b', Date.parse('2026-11-01T20:00:00+08:00'));
-A.add('med','biogaia',null,'','','b', Date.parse('2026-11-02T20:00:00+08:00'));
-t('the whole record still counts the standalone doses', A.statsOf().biogaia, 2);
-t('and does not count them as feeds', A.statsOf().feeds, 0);
+t('such a row is not counted as a feed', A.statsOf().feeds, 0);
+t('nor as anything else with a number', A.statsOf().rows, 1);
 
 console.log('\n--- one predicate for a bath, written two ways over the years ---');
 // Orphaned when the reminder went. Kept because the home screen and the lifetime count

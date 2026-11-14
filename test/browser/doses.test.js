@@ -252,6 +252,8 @@ async function open_(b, rows, width) {
   await page.click('#tab-sum'); await page.waitForTimeout(500);
   const c3 = await cards(page);
   t('and no card asking for it', c3['BioGaia'][0], '(no such card)');
+  t('and the word is nowhere on the Summary',
+     /biogaia/i.test(await page.textContent('#pane-sum')||''), false);
 
   console.log('--- the home screen reads both spellings of a bath ---');
   // `isBath` was written for the reminder and was orphaned by its removal. It is kept
@@ -276,9 +278,9 @@ async function open_(b, rows, width) {
 
   console.log('--- the whole story counts them over the record ---');
   await page.click('#tab-sum'); await page.waitForTimeout(400);   // #go-stats lives here
-  // A dose from the days it was still being given. Nothing in the app can write one now,
-  // so it is seeded directly - which is the point: rows in the archive still have to be
-  // read, named and counted after the thing that made them has gone.
+  // A row from the days BioGaia was still being given, seeded directly because nothing in
+  // the app can write one now. The archive holds none, so nothing counts them any more -
+  // but one must not break the screen or be quietly folded into another total either.
   // Pushed onto the live array rather than written to storage and reloaded: the seed runs
   // again on every navigation, so a reload would put the page back to its opening rows and
   // quietly undo the strike-out this file just proved.
@@ -293,8 +295,13 @@ async function open_(b, rows, width) {
   const odd = (await page.textContent('#stats-odd')).replace(/\s+/g,' ');
   console.log('   fact:', (odd.match(/[^.]*Simeticone[^.]*\./)||[''])[0].trim());
   t('a lifetime dose count is there', /1 dose of Simeticone in a feed/.test(odd), true);
-  t('and the standalone BioGaia doses are counted apart from it',
-     /1 dose of BioGaia, given on its own/.test(odd), true);
+  t('and the whole story says nothing about BioGaia', /biogaia/i.test(odd), false);
+  t('nor does the rest of that screen',
+     /biogaia/i.test(await page.textContent('#pane-stats')||''), false);
+  // The seeded row is still in the record and still readable - it is just not totalled.
+  t('the row itself is still there and still named', await page.evaluate(()=>{
+     const r = entries.find(x=>x.msg_id==='old-biogaia');
+     return r ? label(r) : 'row gone';}), 'BioGaia');
 
   await b.close(); srv.close();
   console.log(fail?'\n======== '+fail+' FAILURES ========':'\n======== ALL PASS ========');

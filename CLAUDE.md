@@ -80,11 +80,16 @@ what it is, and lists decisions that look arbitrary and are not.
   labelled `BioGaia in feeds` for that reason, and keeps the label now that the daily card
   has gone, because a bare `BioGaia` card would read as a dose given today rather than one
   stirred into a bottle months ago. The browser test asserts no two card titles repeat.
-- **BioGaia is not given any more, and its rows are still real.** The button, the bath
-  reminder and the daily card are gone. What stays: `med/biogaia` in `LABELS`, `biogaia`
-  in `ADD_LABEL`, `isBiogaia()`, the lifetime count on the whole-story screen, and the
-  `BioGaia in feeds` card for the feeds that carried it. Taking something out of the app
-  is not taking it out of the record — the same rule that kept `feed/bottle` readable.
+- **BioGaia is gone, down to two dictionary entries.** It is not given any more, so the
+  button, the bath reminder, the daily card, `isBiogaia()`, the lifetime counter and the
+  whole-story line are all gone, and no screen says the word. This goes further than the
+  `feed/bottle` rule because the reason behind that rule does not apply: the archive was
+  searched and holds **no row** carrying `biogaia`, in `subtype` or in `added`, so there
+  was nothing to make unreadable. What stays is `med/biogaia` in `LABELS` and `biogaia`
+  in `ADD_LABEL` — inert entries that show nothing unless a row turns up from the other
+  phone, and then make it read `BioGaia` rather than `biogaia`. They also set the title
+  of the `BioGaia in feeds` card. Do not remove them: the logic and browser tests both
+  fail if you do, which is the point.
 - **Never retire a subtype out of `LABELS`.** The Bottle button is gone, because every
   bottle he drinks is either formula or expressed milk and the button only asked a
   question the other two answer. `feed/bottle` is still labelled, still described and

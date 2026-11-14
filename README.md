@@ -63,17 +63,18 @@ that.
 Nothing says anything about a daily maximum: that is a fact about a particular product, not
 about this record, and a limit invented by an app is worse than none.
 
-**BioGaia is not given any more**, so the app does not ask for it: no button, no prompt
-after a bath, no card. The doses already logged are untouched. They keep their name, still
-show in the timeline, are still correctable, and are still counted on **the whole story**
-— taking something out of the app does not take it out of the record.
+**BioGaia is not given any more**, so the app is done with it: no button, no prompt after
+a bath, no card, nothing on the whole story. The record was checked and holds no BioGaia
+entry at all, so there is nothing of yours being hidden. If a dose ever turns up from the
+other phone it still reads **BioGaia** in the timeline and is still correctable — the name
+is kept for exactly that.
 
 **Simeticone and vitamin D go on the feed they went into**, as chips on the Formula and
 EBM pickers — not as entries of their own, which would make a wind-drop or a vitamin look
 like a feed in every count. Both can be on the same feed. Forgot at the time? **Fix** on
 that feed adds it later, and a correction never drops something you can no longer tick.
-A breastfeed has nothing to stir them into, so it does not offer them. Feeds logged with
-BioGaia back when it was offered are untouched and still counted, under **BioGaia in
+A breastfeed has nothing to stir them into, so it does not offer them. Should a feed ever
+turn up carrying BioGaia from when it was offered, it is still counted, under **BioGaia in
 feeds** — named that way so a dose stirred into a bottle months ago cannot be mistaken for
 one given today.
 
