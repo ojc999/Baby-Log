@@ -295,12 +295,16 @@ button,.tab,.chip,.tile{-webkit-touch-callout:none;-webkit-user-select:none;user
 /* ───── week table ───── */
 .wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table.week{border-collapse:collapse;width:100%;font-size:13px}
-table.week th,table.week td{text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.week th,table.week td{text-align:right;padding:8px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
 table.week th{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint)}
 table.week td{font-family:var(--mono);font-variant-numeric:tabular-nums}
-table.week th:first-child,table.week td:first-child{text-align:left}
+table.week th:first-child,table.week td:first-child{text-align:left;white-space:normal}
 table.week tr.today td{color:var(--ink);font-weight:600}
-table.week tr.today td:first-child::after{content:" \00B7 today";color:var(--ink-faint);font-weight:500;font-size:11px}
+/* "today" goes under the date rather than beside it. Beside it, the first column had to
+   be wide enough for "11 Nov · today" on every row, and that one word was costing 45px of
+   a 288px table - more than two of the dose columns. Under it, the column is as wide as
+   the date and the marker is still there to read at 3am. */
+table.week tr.today td:first-child::after{content:"today";display:block;color:var(--ink-faint);font-weight:500;font-size:11px;line-height:1.2}
 
 /* ───── setup ───── */
 .field{margin-bottom:12px}
@@ -1142,10 +1146,14 @@ var CATS = {
       ] },
       { head: 'Mum', cols: 2, items: [{ sheet: 'pump' }] }
     ],
-    hint: 'Simeticone and BioGaia are logged on the feed they went into, not as entries ' +
-          'of their own — tap them on the Formula or EBM picker. Expressing is stored as ' +
-          'its own kind of entry, never as a feed: expressing 80 ml and him drinking ' +
-          '80 ml are different events and must not be added together.',
+    /* Names what the pickers currently offer. It said "Simeticone and BioGaia" for a
+       while after BioGaia moved to a button of its own, which is the kind of thing only
+       a screenshot catches. */
+    hint: 'Simeticone and vitamin D are logged on the feed they went into, not as ' +
+          'entries of their own — tap them on the Formula or EBM picker. BioGaia has a ' +
+          'button of its own under More. Expressing is stored as its own kind of entry, ' +
+          'never as a feed: expressing 80 ml and him drinking 80 ml are different ' +
+          'events and must not be added together.',
     /* No bare "60ml" in the examples any more. The shared parser still reads one, and
        still files it as `feed/bottle` - which is now a subtype with no button - so the
        suggestions point at the words that say which kind of milk it was. The parser
@@ -1232,8 +1240,25 @@ var SHEETS = {
 /* Offered on the feed pickers. BioGaia was here and is not any more - it is not given
    with a feed - but its label stays below, because feeds were logged carrying it and a
    retired option is not a retired row. Same rule as the Bottle button. */
-var ADDS = [['simeticone', 'Simeticone']];
-var ADD_LABEL = { simeticone: 'Simeticone', biogaia: 'BioGaia' };
+var ADDS = [['simeticone', 'Simeticone'], ['vitd', 'Vitamin D']];
+var ADD_LABEL = { simeticone: 'Simeticone', vitd: 'Vitamin D', biogaia: 'BioGaia' };
+
+/* Short forms, for the seven-day table's column heads only. A full label there would
+   force the table wider than a phone. */
+var ADD_SHORT = { simeticone: 'Sim', vitd: 'VitD' };
+
+/* And how each reads inside a sentence, for the note under that table. Spelled out rather
+   than lower-cased from the label, because `'Vitamin D'.toLowerCase()` gives "vitamin d",
+   and the D in vitamin D is a name, not a capital that belongs at the start of a word. */
+var ADD_WORD = { simeticone: 'simeticone', vitd: 'vitamin D' };
+
+/* Which of them is given once a day come what may, rather than when it is needed.
+   The distinction is only about what an empty day means. Simeticone not given today is
+   not a finding - he was not windy. Vitamin D not given today is a missed dose, so its
+   card is shown amber from midnight rather than appearing only once it has gone in.
+   Same reasoning as the BioGaia card, which is the same kind of thing given at a
+   different moment. */
+var ADD_DAILY = { vitd: true };
 
 /* Joins whatever the set holds, not whatever the pickers currently offer. The chips can
    only ever set an offered key, so filtering was a no-op there - but `saveFix` builds its
@@ -1348,7 +1373,7 @@ var offsetMin = 0;
 var absTime = '';            // 'HH:MM' from the time picker, wins over offsetMin
 var dayBack = 0;             // 0 = the time picked is today's, 1 = yesterday's
 var sheetKind = null, sheetVal = 0, sheetSide = '';
-var sheetAdds = {};         /* { simeticone: true, biogaia: true } for the feed being logged */
+var sheetAdds = {};         /* { simeticone: true, vitd: true } for the feed being logged */
 
 function lsGet(k, dflt) {
   try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : dflt; }
@@ -2225,11 +2250,14 @@ function renderSummary() {
        a fact about a particular product, not about this record, and a limit invented by
        an app is worse than none. */
     Object.keys(doses).sort().map(function (k) {
-      if (!doses[k]) return '';
       /* A retired option still has to be counted where feeds carry it, but it must not
          collide with a card of the same name - BioGaia is now given on its own, and two
          cards both called BioGaia on one screen is worse than either. */
       var offered = ADDS.some(function (a) { return a[0] === k; });
+      var daily = offered && ADD_DAILY[k];
+      if (!doses[k] && !daily) return '';
+      if (!doses[k]) return lcard(ADD_LABEL[k] || k, 'not yet',
+                                  'give it with a milk feed', true);
       return lcard((ADD_LABEL[k] || k) + (offered ? '' : ' in feeds'),
                    doses[k], plural(doses[k], 'dose'), false);
     }).join('') +
@@ -2250,24 +2278,28 @@ function renderSummary() {
   // seven days back, oldest at the bottom
   var days = [];
   for (var i = 0; i < 7; i++) days.push(daySG(Date.now() - i * 86400000));
-  /* A simeticone column, but only in a week that had any - the question it answers is
-     whether he is needing more of it than yesterday, and a column of dashes for a family
-     that has stopped using it is clutter that never goes away. BioGaia is not given a
-     column: it is a once-a-day probiotic rather than something you titrate, and today's
-     card already carries it. */
+  /* One column per addition, and only for an addition this week actually had - the
+     question a column answers is whether a day differs from the one before it, and a
+     column of dashes for something the family has stopped using is clutter that never
+     goes away. Driven off ADDS rather than named one by one, so adding an option does
+     not leave the table a version behind. BioGaia gets no column: it is given on its
+     own, once a day, and today's card already carries it. */
   var weekDoses = {};
   days.forEach(function (d) {
-    weekDoses[d] = dosesIn(live().filter(function (r) { return daySG(r.ms) === d; })).simeticone;
+    weekDoses[d] = dosesIn(live().filter(function (r) { return daySG(r.ms) === d; }));
   });
-  var anySim = days.some(function (d) { return weekDoses[d] > 0; });
+  var addCols = ADDS.map(function (a) { return a[0]; }).filter(function (k) {
+    return days.some(function (d) { return weekDoses[d][k] > 0; });
+  });
 
   var head = '<tr><th>Day</th><th>Feeds</th><th>ml</th><th>Wet</th><th>Dirty</th><th>Slept</th>' +
-             (anySim ? '<th>Sim</th>' : '') + '</tr>';
+             addCols.map(function (k) { return '<th>' + (ADD_SHORT[k] || k) + '</th>'; }).join('') +
+             '</tr>';
   var body = days.map(function (d) {
     var rr = live().filter(function (r) { return daySG(r.ms) === d; });
     if (!rr.length) {
       return '<tr' + (d === today ? ' class="today"' : '') + '><td>' + dayShort(d) +
-             '</td><td colspan="' + (anySim ? 6 : 5) +
+             '</td><td colspan="' + (5 + addCols.length) +
              '" style="text-align:right;color:var(--ink-faint)">nothing logged</td></tr>';
     }
     var f = rr.filter(function (r) { return r.type === 'feed'; });
@@ -2282,11 +2314,17 @@ function renderSummary() {
       '<td>' + nn.filter(function (r) { return r.subtype === 'wet' || r.subtype === 'both'; }).length + '</td>' +
       '<td>' + nn.filter(function (r) { return r.subtype === 'dirty' || r.subtype === 'both'; }).length + '</td>' +
       '<td>' + (s2.pairs.length ? dur(sl) : '—') + (s2.unpaired.length ? '*' : '') + '</td>' +
-      (anySim ? '<td>' + (weekDoses[d] || '—') + '</td>' : '') + '</tr>';
+      addCols.map(function (k) {
+        return '<td>' + (weekDoses[d][k] || '—') + '</td>';
+      }).join('') + '</tr>';
   }).join('');
   $('sum-week').innerHTML = head + body;
   $('sum-weeknote').innerHTML =
-    (anySim ? '<b>Sim</b> is doses of simeticone, counted one to a feed. ' : '') +
+    (addCols.length
+       ? addCols.map(function (k) {
+           return '<b>' + (ADD_SHORT[k] || k) + '</b> is ' + (ADD_WORD[k] || k);
+         }).join(', ') + ', counted one to a feed. '
+       : '') +
     'Counts only what is in this app — this device plus whatever the other one had ' +
     'pushed when it was last read. A <b>*</b> marks a day with an unpaired sleep entry, ' +
     'so its total is an undercount. For anything beyond a week, ask a Claude Code session ' +

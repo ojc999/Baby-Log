@@ -5,7 +5,7 @@ const m = html.match(/<script>([\s\S]*)<\/script>/);
 if (!m) { console.error('No <script> block found in index.html'); process.exit(1); }
 const src = m[1];
 // expose internals for testing
-eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, dosesIn, isBath, isBiogaia, biogaiaToday};');
+eval(src + '\n;global.__api = {parseMessage, add, undo, entries:()=>entries, setEntries:v=>{entries=v}, dirty:()=>dirty, jsonlFor, mergeForeign, sleepIntervals, daySG, isoSG, hhmm, dur, describe, label, stamp, cfg, setAbs:v=>{absTime=v}, setOff:v=>{offsetMin=v}, CATS, SHEETS, CAT_OF, LABELS, numOrNull, pumpOf, pumpStats, parsePumpNotes, splitTop_, readSession_, dayFromDM_, statsOf, addsJoin, addsSplit, addsWords, takesAdds, ADDS, ADD_DAILY, ADD_SHORT, ADD_WORD, ADD_LABEL, dosesIn, isBath, isBiogaia, biogaiaToday};');
 const A = global.__api;
 let fail = 0;
 const t = (n, got, want) => { const ok = String(got) === String(want); if (!ok) fail++;
@@ -335,7 +335,24 @@ t('and one that does not, is not', r13.days[1].had, 0);
 console.log('\n--- what goes into a bottle ---');
 t('nothing added is an empty string', A.addsJoin({}), '');
 t('simeticone is what the pickers offer', A.addsJoin({simeticone:true}), 'simeticone');
-t('and it is the only one', A.ADDS.map(a=>a[0]).join(','), 'simeticone');
+t('and so is vitamin D', A.addsJoin({vitd:true}), 'vitd');
+t('those two, in picker order', A.ADDS.map(a=>a[0]).join(','), 'simeticone,vitd');
+// Stored joined alphabetically, so a pair has exactly one spelling whichever order the
+// chips were tapped in.
+t('a pair joins alphabetically', A.addsJoin({vitd:true, simeticone:true}), 'simeticone+vitd');
+// Only vitamin D is a daily. The difference is what an empty day means: no simeticone is
+// not a finding, no vitamin D is a missed dose, so only the latter gets a card from
+// midnight. Every daily must be something the pickers still offer, or its card would ask
+// for a dose with no chip to log it on.
+t('vitamin D is the daily one', Object.keys(A.ADD_DAILY).join(','), 'vitd');
+t('and every daily is still offered', Object.keys(A.ADD_DAILY).every(
+  k => A.ADDS.some(a => a[0] === k)), true);
+t('every offered addition has a short form for the table',
+  A.ADDS.every(a => !!A.ADD_SHORT[a[0]]), true);
+t('a word for the sentence under it', A.ADDS.every(a => !!A.ADD_WORD[a[0]]), true);
+t('and a label', A.ADDS.every(a => !!A.ADD_LABEL[a[0]]), true);
+// Lower-casing the label would have given "vitamin d". The D is a name.
+t('the sentence form keeps the D a capital', A.ADD_WORD.vitd, 'vitamin D');
 // BioGaia is not given with a feed any more, so the pickers no longer offer it - but a
 // feed logged carrying it keeps the row, reads it back, still counts, and survives being
 // corrected. Joining must not filter through the offered list, or Fix would strip it.
@@ -392,7 +409,9 @@ t('a feed carrying both counts for each', dc.biogaia, 1);
 t('a feed with nothing added counts for neither', dc.simeticone + dc.biogaia, 4);
 t('and a row written before the field existed does not break it', !!A.dosesIn([{type:'feed'}]), true);
 t('an empty set counts zero, not undefined', JSON.stringify(A.dosesIn([])),
-  JSON.stringify({simeticone:0}));
+  JSON.stringify({simeticone:0, vitd:0}));
+t('and vitamin D is counted the same way', A.dosesIn(
+  [{type:'feed',added:'simeticone+vitd'},{type:'feed',added:'vitd'}]).vitd, 2);
 t('a retired option is still counted where a row carries it',
   A.dosesIn([{type:'feed',added:'biogaia'}]).biogaia, 1);
 // one feed with one dose is one dose, however many times it is counted

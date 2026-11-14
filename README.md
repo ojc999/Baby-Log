@@ -36,7 +36,7 @@ just a static file, and an entry is in the repo within a second of the tap.
 | | |
 | --- | --- |
 | **Sleep** | Asleep now · Awake now |
-| **Feed** | Breast (minutes, and which side) · Formula · EBM, each with **Simeticone** and **BioGaia** · **Vomit** — then Mum's expressing, kept separate |
+| **Feed** | Breast (minutes, and which side) · Formula · EBM, each with **Simeticone** and **Vitamin D** · **Vomit** — then Mum's expressing, kept separate |
 | **Diapers** | Wet · Dirty · Both |
 | **Tummy time** | How long was it (minutes) · Just log it, when you did not time it |
 | **More** | Bath · Top and tail · Nails cut · Hair wash · Cord care · Cream · Weight · Length · Head · Temperature · Unsettled · Medicine · Vaccination · Milestone · Note |
@@ -49,11 +49,19 @@ is the right trade for something done once a day or once a week. **Last bath** s
 home screen even so — the input moved, the readout did not, because how long since the last
 bath is exactly the sort of thing you forget.
 
-**The Summary tab counts the day's doses.** A Simeticone card, on a day it was given, and
-a **Sim** column on the seven-day table so you can see today against the days behind it —
-that column appears only in a week that had any. Nothing says anything about a daily
-maximum: that is a fact about a particular product, not about this record, and a limit
-invented by an app is worse than none.
+**The Summary tab counts the day's doses.** A Simeticone card, on a day it was given, a
+Vitamin D card every day, and a column on the seven-day table for each of them — **Sim**
+and **VitD** — so you can see today against the days behind it. A column appears only in a
+week that had any.
+
+The two cards behave differently on purpose. Simeticone is given when he is windy, so a
+day without it is not a finding and its card simply does not appear. Vitamin D is given
+once a day come what may, so a day without it is a **missed dose** — its card is there from
+midnight, amber, reading **not yet** until a feed carries it. An absent card cannot tell you
+that.
+
+Nothing says anything about a daily maximum: that is a fact about a particular product, not
+about this record, and a limit invented by an app is worse than none.
 
 **BioGaia is not given with a feed.** It has a button of its own under **More**, and
 logging a bath raises a prompt — *"Bath logged. BioGaia?"* — with a button that records
@@ -61,11 +69,12 @@ the dose in one tap. You are not asked twice in a day. The Summary carries a Bio
 that reads amber **not yet** until it has been given, then the time it was, so you can
 check at a glance without waiting for the next bath.
 
-**Simeticone goes on the feed it went into**, as a chip on the Formula and EBM pickers —
-not as an entry of its own, which would make a wind-drop look like a feed in every count.
-Forgot at the time? **Fix** on that feed adds it later. A breastfeed has nothing to stir it
-into, so it does not offer it. Feeds logged with BioGaia before it moved are untouched and
-still counted, under **BioGaia in feeds**.
+**Simeticone and vitamin D go on the feed they went into**, as chips on the Formula and
+EBM pickers — not as entries of their own, which would make a wind-drop or a vitamin look
+like a feed in every count. Both can be on the same feed. Forgot at the time? **Fix** on
+that feed adds it later, and a correction never drops something you can no longer tick.
+A breastfeed has nothing to stir them into, so it does not offer them. Feeds logged with
+BioGaia before it moved are untouched and still counted, under **BioGaia in feeds**.
 
 There is **no Bottle button**: every bottle is either formula or expressed milk, so it only
 asked a question the other two answer. Feeds already logged as Bottle are untouched and can

@@ -121,7 +121,7 @@ const rowsIn=p=>{const f=repoFiles[p];return f?Buffer.from(f.content,'base64').t
      await page.isVisible('#fix-adds-row'), true);
   t('and offers only what is still given with a feed', await page.evaluate(()=>
      [...document.querySelectorAll('#fix-adds [data-fixadd]')]
-       .map(b=>b.dataset.fixadd).join(',')), 'simeticone');
+       .map(b=>b.dataset.fixadd).join(',')), 'simeticone,vitd');
   await page.click('#fix-adds [data-fixadd="simeticone"]');
   await page.click('#fix-save'); await page.waitForTimeout(900);
   const dosed = await page.evaluate(()=>JSON.parse(localStorage.getItem('babylog.entries.v2'))

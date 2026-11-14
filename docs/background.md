@@ -787,6 +787,19 @@ The Summary card for it is a yes-or-no rather than a count, and is shown whether
 has been given — amber "not yet" until it has, then the time it was. A card that only
 appeared after the fact could not answer the question the reminder exists for.
 
+**Vitamin D went onto the picker BioGaia came off.** It is given in a bottle, so it is an
+addition and not an entry: same field, same chips, same counter. What is different is what
+an empty day means. Simeticone is given when he is windy, so a day with none is an ordinary
+day and its card does not appear. Vitamin D is given once a day whatever happens, so a day
+with none is a missed dose — its card is there from midnight, amber, reading "not yet", and
+goes to a count once a feed carries it. That is the same reasoning as the BioGaia card,
+which is the same kind of thing given at a different moment; `ADD_DAILY` is the one-line
+list of which additions behave that way, so the next one is a key rather than a branch.
+
+Every key in `ADD_DAILY` has to be something the pickers still offer. A daily card for a
+retired option would ask for a dose with no chip to log it on, and the logic test asserts
+the two lists agree.
+
 **Counting them is one function, used three times.** `dosesIn()` serves the day's figures,
 the seven-day table and the whole-story screen, so the three cannot disagree about what a
 dose is: one feed that carried it, counted once, whatever volume it was. A feed carrying
@@ -803,12 +816,29 @@ It now joins whatever the set holds. The chips still only ever offer the current
 a chip for something no longer offered simply never appears, so a dose already on a row is
 carried through a correction untouched rather than re-ticked by hand.
 
-Both appear on the Summary tab as cards, and only on a day one was given — the same way
-the unsettled and expressing cards come and go. The seven-day table gains a **Sim** column,
-and only in a week that had any: the question it answers is whether he is needing more than
-yesterday, and a column of dashes for a family that has stopped using it is clutter that
-never leaves. BioGaia gets no column; it is a once-a-day probiotic rather than something
-you titrate, and the card already carries it.
+**The seven-day table takes a column per addition**, and only for one the week actually
+had: the question a column answers is whether a day differs from the one before it, and a
+column of dashes for something the family has stopped using is clutter that never leaves.
+The columns are built off `ADDS` rather than named one at a time, so the table cannot end
+up a version behind the pickers — the first version of this hard-coded `.simeticone` and
+would have shown nothing for vitamin D. BioGaia gets no column; it is given on its own,
+once a day, and the card already carries it.
+
+**Adding the eighth column broke the table, silently.** `.wrap` has `overflow-x: auto`, so
+an overflowing table does not push the page sideways — it just scrolls inside its box, and
+a column off the right edge looks like no column at all. Seven columns already overflowed a
+375px phone by 2px, which nothing had caught because nothing measured it; eight overflowed a
+390px phone by 25px.
+
+Almost all of it was one word. The first column was `white-space: nowrap`, so every row had
+to be wide enough for "11 Nov · today" — 105px of a 288px table, more than the two dose
+columns put together. Letting that column wrap puts "today" under the date instead of beside
+it, which costs one row a second line and gives back 45px. Dropping the cell padding from
+6px to 5px gives back another 16px. Both are load-bearing: `doses.test.js` seeds a day that
+is widest in every column at once — a four-figure millilitre total, two-figure feed and
+nappy counts, a sleep total in double-figure hours — and asserts nothing scrolls at 375px
+or 390px. Reverting either makes it fail. A 320px phone (the first iPhone SE) still scrolls,
+which is what `.wrap` is for and is a reasonable place to stop.
 
 **Nothing here states a daily maximum.** That is a fact about a particular product — which
 simeticone, what strength — not a fact about this record. An app inventing a threshold and

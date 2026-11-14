@@ -64,6 +64,17 @@ what it is, and lists decisions that look arbitrary and are not.
   repo, where history keeps everything anyway. Do not reuse it for anything narrower: if
   a single entry is wrong, that is what Fix and undo are for.
 - **Never rename or repurpose a field** in the data contract. Add one if you must.
+- **Never widen the seven-day table without measuring it.** It is eight columns at its
+  widest and `.wrap` scrolls sideways, so an overflow is silent — the page looks fine and
+  a column is simply off the edge. Two things buy the room it now has: the first column
+  wraps, so the `today` marker sits under the date rather than beside it, and the cell
+  padding is `5px`. Both are load-bearing; `doses.test.js` seeds a day that is widest in
+  every column at once and asserts nothing scrolls at 375px or 390px. A 320px phone still
+  scrolls, which is what `.wrap` is for.
+- **Never leave a page's prose naming an option the pickers no longer offer.** The Feed
+  page read `Simeticone and BioGaia are logged on the feed they went into` for a whole
+  change after BioGaia moved to a button of its own. No test saw it; a screenshot did.
+  `doses.test.js` now checks that hint against `ADDS` itself.
 - **Never let two cards on one screen share a name.** A retired feed addition still has
   to be counted where feeds carry it, and `biogaia` is now also a daily entry of its own —
   so the feed-dose card is labelled `BioGaia in feeds` and the daily one `BioGaia`. Two
@@ -154,13 +165,29 @@ more he takes directly the less there is left to express. The field stays in the
 and is written `null`, because removing it would leave the archive with two row shapes and
 would throw away the sessions already logged with it. Do not reuse it for anything else.
 
-`added` is what went into a milk feed. The pickers now offer **simeticone only**;
+`added` is what went into a milk feed. The pickers offer **`simeticone` and `vitd`**;
 `biogaia` was offered and is not any more, because it is given on its own at bath time
 rather than in a bottle. Values stay joined with `+` in alphabetical order, so a pair has
 exactly one spelling. A field rather than words in `note`, because "how many feeds had
 simeticone in them" is a question worth being able to answer, and a category kept as prose
 cannot be counted. Only `feed/formula`, `feed/expressed` and the retired `feed/bottle` can
 carry one — there is nothing to stir into a breastfeed.
+
+**An addition's card says something different when the day is empty.** `ADD_DAILY` marks
+the ones given once a day come what may — `vitd` — and only those get a card from midnight,
+amber, reading `not yet`. Simeticone is given when he is windy, so a day without it is not
+a finding and no card appears. The distinction is only about what an absence means, and it
+is the same reasoning as the BioGaia card. Every key in `ADD_DAILY` must still be in
+`ADDS`, or the card would ask for a dose with no chip to log it on; the logic test asserts
+that.
+
+**Keep `ADD_LABEL`, `ADD_SHORT` and `ADD_WORD` in step with `ADDS`.** Three maps because
+they answer three questions: the card and sentence label, the seven-day column head (a full
+label there pushes the table off a phone), and how it reads mid-sentence in the note under
+that table. `ADD_WORD` is spelled out rather than lower-cased from the label, because
+`'Vitamin D'.toLowerCase()` gives `vitamin d` and that D is a name. `ADD_LABEL` also covers
+retired keys, which the other two do not need to. The tests fail if an offered key is
+missing from any of them.
 
 **Count by what the rows carry, not by what the pickers offer.** `dosesIn()` counts every
 key it finds in `added`, so feeds logged with a since-retired option keep counting. It is
